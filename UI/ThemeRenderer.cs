@@ -29,9 +29,8 @@ public static class ThemeRenderer
 
     public static void DrawListViewSubItem(object sender, DrawListViewSubItemEventArgs e)
     {
-        // Color base dependiendo si es fila par o impar
+        // Cebra sutil (Filas pares/impares)
         Color defaultBg = (e.Item.Index % 2 == 0) ? MainBg : ColorTranslator.FromHtml("#FFF0F5");
-
         Color backColor = e.Item.Selected ? Accent : defaultBg;
         Color foreColor = e.Item.Selected ? Color.White : MainText;
 
@@ -40,8 +39,36 @@ public static class ThemeRenderer
 
         using SolidBrush textBrush = new SolidBrush(foreColor);
         StringFormat format = new StringFormat { LineAlignment = StringAlignment.Center };
-        RectangleF rect = new RectangleF(e.Bounds.X + 4, e.Bounds.Y, e.Bounds.Width, e.Bounds.Height);
-        e.Graphics.DrawString(e.SubItem.Text, e.Item.ListView.Font, textBrush, rect, format);
+
+        // Si es la PRIMERA COLUMNA (Nombre), le dibujamos un icono
+        if (e.ColumnIndex == 0)
+        {
+            // Determinar el icono según la categoría
+            string icono = "📄"; // Default
+            string tipo = e.Item.SubItems[1].Text;
+
+            if (tipo == "Carpeta") icono = "📁";
+            else if (e.Item.Group?.Name == "Imágenes") icono = "🖼️";
+            else if (e.Item.Group?.Name == "Audio") icono = "🎵";
+            else if (e.Item.Group?.Name == "Video") icono = "🎬";
+            else if (e.Item.Group?.Name == "Texto/Código") icono = "📝";
+            else if (tipo.Contains("PDF")) icono = "📕";
+            else if (tipo.Contains("XLS") || tipo.Contains("CSV")) icono = "📊";
+
+            // Dibujar el icono
+            using Font iconFont = new Font("Segoe UI Emoji", 11);
+            e.Graphics.DrawString(icono, iconFont, textBrush, e.Bounds.X + 4, e.Bounds.Y + 2);
+
+            // Dibujar el texto desplazado a la derecha para dejar espacio al icono
+            RectangleF textRect = new RectangleF(e.Bounds.X + 30, e.Bounds.Y, e.Bounds.Width - 30, e.Bounds.Height);
+            e.Graphics.DrawString(e.SubItem.Text, e.Item.ListView.Font, textBrush, textRect, format);
+        }
+        else
+        {
+            // Las demás columnas (Tamaño, Fecha, etc.) se dibujan normal
+            RectangleF textRect = new RectangleF(e.Bounds.X + 6, e.Bounds.Y, e.Bounds.Width, e.Bounds.Height);
+            e.Graphics.DrawString(e.SubItem.Text, e.Item.ListView.Font, textBrush, textRect, format);
+        }
     }
 
     public static void DrawTreeNode(object sender, DrawTreeNodeEventArgs e)

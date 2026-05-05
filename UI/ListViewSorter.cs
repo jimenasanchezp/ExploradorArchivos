@@ -42,14 +42,15 @@ public class ListViewSorter : IComparer
             double bytesY = ParsearTamano(textY);
             compareResult = bytesX.CompareTo(bytesY);
         }
-        else if (ColumnToSort == 3 && DateTime.TryParse(textX, out DateTime dateX) && DateTime.TryParse(textY, out DateTime dateY))
+        else if (ColumnToSort == 4) // <--- NUEVA: Columna "Fecha Modificación"
         {
-            // Por si en el futuro decides poner Fechas en la última columna
+            DateTime.TryParse(textX, out DateTime dateX);
+            DateTime.TryParse(textY, out DateTime dateY);
             compareResult = DateTime.Compare(dateX, dateY);
         }
         else
         {
-            // Ordenamiento alfabético normal (Nombre, Tipo)
+            // Ordenamiento alfabético normal (Nombre, Tipo, Info)
             compareResult = string.Compare(textX, textY, StringComparison.OrdinalIgnoreCase);
         }
 

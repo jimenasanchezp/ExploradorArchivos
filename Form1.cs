@@ -13,11 +13,17 @@ namespace ExploradorArchivos;
 
 public partial class Form1 : Form
 {
-    private string _rutaActual = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+    private string _rutaActual = "Inicio";
     private Stack<string> _historial = new Stack<string>();
     private List<FileSystemItem> _itemsActuales = new List<FileSystemItem>();
-    private ListViewSorter _sorter;
-    private QuickLookForm _quickLookForm;
+    private ListViewSorter _sorter = default!;
+    private QuickLookForm? _quickLookForm;
+    private string _filtroActivo = "Todos";
+    private FlowLayoutPanel _pnlFiltros = default!;
+    private ImageList _imageListMiniaturas = default!;
+    private Button _btnToggleVista = default!;
+    private FlowLayoutPanel _flpBreadcrumbs = default!;
+
     public Form1()
     {
         InitializeComponent();
@@ -35,14 +41,61 @@ public partial class Form1 : Form
         _sorter = new ListViewSorter();
         listViewPrincipal.ListViewItemSorter = _sorter;
 
+        ConfigurarFiltrosRapidos(); // 
+        ConfigurarVistaMiniaturas(); //
+
+        // Opcional: Activar grupos visuales para la vista de Detalles
+        listViewPrincipal.ShowGroups = true;
+
         // OwnerDraw
         listViewPrincipal.OwnerDraw = true;
         listViewPrincipal.DrawColumnHeader += ThemeRenderer.DrawListViewColumnHeader;
         listViewPrincipal.DrawItem += ThemeRenderer.DrawListViewItem;
         listViewPrincipal.DrawSubItem += ThemeRenderer.DrawListViewSubItem;
 
+        //columna fecha
+        listViewPrincipal.Columns.Add("Fecha de Modificación", 150);
+
         treeViewLateral.DrawMode = TreeViewDrawMode.OwnerDrawAll;
         treeViewLateral.DrawNode += ThemeRenderer.DrawTreeNode;
+
+        // Configuración de Breadcrumbs (Migas de pan)
+        _flpBreadcrumbs = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            BackColor = ColorTranslator.FromHtml("#FFF5F8"),
+            WrapContents = false,
+            AutoScroll = false,
+            Cursor = Cursors.IBeam // Para que el usuario sepa que puede dar clic para escribir
+        };
+        _flpBreadcrumbs.Click += (s, e) => MostrarTextBoxDireccion();
+
+        // Lo añadimos encima del TextBox
+        pnlAddressBorder.Controls.Add(_flpBreadcrumbs);
+        _flpBreadcrumbs.BringToFront();
+
+        // Ocultamos el TextBox por defecto y lo mostramos solo al editar
+        txtDireccion.Visible = false;
+        txtDireccion.Leave += (s, e) => OcultarTextBoxDireccion();
+
+        // ==========================================
+        // MOVER PANEL LATERAL A LA IZQUIERDA
+        // ==========================================
+        splitContainerMain.Panel1.Controls.Clear();
+        splitContainerMain.Panel2.Controls.Clear();
+
+        // Panel Izquierdo: Buscador y Árbol de navegación
+        splitContainerMain.Panel1.Controls.Add(treeViewLateral);
+        splitContainerMain.Panel1.Controls.Add(pnlSearch);
+        pnlSearch.BringToFront(); // Asegurar que el buscador quede arriba
+
+        // Panel Derecho: Filtros rápidos y Lista de Archivos principal
+        splitContainerMain.Panel2.Controls.Add(listViewPrincipal);
+        splitContainerMain.Panel2.Controls.Add(_pnlFiltros);
+        _pnlFiltros.BringToFront(); // Asegurar que los filtros queden arriba
+
+        // Ajustar el tamaño del panel izquierdo
+        splitContainerMain.SplitterDistance = 250;
     }
 
     private void ConectarEventos()
@@ -74,69 +127,198 @@ public partial class Form1 : Form
 
         // Quick Look (Vista Previa)
         listViewPrincipal.KeyDown += ListViewPrincipal_KeyDown;
+
+        // TreeView
+        treeViewLateral.NodeMouseDoubleClick += TreeViewLateral_NodeMouseDoubleClick;
     }
 
-    // ==========================================
-    // CARGA ASÍNCRONA DE DIRECTORIO
-    // ==========================================
+    private void PoblarListViewDesdeMemoria()
+    {
+        listViewPrincipal.BeginUpdate();
+        listViewPrincipal.Items.Clear();
+        listViewPrincipal.Groups.Clear();
+
+        // 1. Filtrar usando el Chip activo (memoria RAM pura, muy rápido)
+        var itemsFiltrados = _itemsActuales.Where(x =>
+            _filtroActivo == "Todos" ||
+            (_filtroActivo == "Carpetas" && x.EsCarpeta) ||
+            (!x.EsCarpeta && x.CategoriaVisual == _filtroActivo)
+        ).ToList();
+
+        foreach (var item in itemsFiltrados)
+        {
+            var lvi = new ListViewItem(item.Nombre) { Tag = item.RutaCompleta };
+            lvi.SubItems.Add(item.Tipo);
+            lvi.SubItems.Add(item.TamanoTexto);
+            lvi.SubItems.Add(item.InfoAdicional);
+            lvi.SubItems.Add(item.FechaModificacion.ToString("dd/MM/yyyy HH:mm"));
+
+            // Agrupación visual (Lo que te propuse antes)
+            var grupo = listViewPrincipal.Groups[item.CategoriaVisual];
+            if (grupo == null)
+            {
+                grupo = new ListViewGroup(item.CategoriaVisual, item.CategoriaVisual);
+                listViewPrincipal.Groups.Add(grupo);
+            }
+            lvi.Group = grupo;
+
+            // Asignar icono base para la vista de cuadrícula
+            lvi.ImageKey = item.EsCarpeta ? "folder" : "file";
+
+            listViewPrincipal.Items.Add(lvi);
+        }
+        listViewPrincipal.EndUpdate();
+    }
+
+    private void TreeViewLateral_NodeMouseDoubleClick(object sender, TreeNodeMouseClickEventArgs e)
+    {
+        // Si el nodo tiene una ruta en su Tag, navegamos hacia allá
+        if (e.Node.Tag != null)
+        {
+            string? ruta = e.Node.Tag.ToString();
+            if (string.IsNullOrEmpty(ruta)) return;
+
+            if (Directory.Exists(ruta))
+                CargarDirectorio(ruta);
+            else
+                AbrirArchivoConAppPredeterminada(ruta); // Por si dan doble clic a un archivo
+        }
+    }
+
     private async void CargarDirectorio(string ruta, bool guardarHistorial = true)
     {
-        if (!Directory.Exists(ruta)) return;
-
         if (guardarHistorial && !string.IsNullOrEmpty(_rutaActual) && _rutaActual != ruta)
             _historial.Push(_rutaActual);
 
         _rutaActual = ruta;
-        txtDireccion.Text = _rutaActual;
-        lblStatus.Text = "Cargando directorio...";
-        listViewPrincipal.Items.Clear();
 
-        // 1. Obtener archivos asíncronamente
+        // 1. VISTA DE INICIO (Dashboard)
+        if (ruta == "Inicio")
+        {
+            txtDireccion.Text = "🏠 Inicio";
+            ActualizarBreadcrumbs();
+            OcultarTextBoxDireccion();
+            GenerarVistaInicio();
+            PoblarTreeViewNormal();
+            return;
+        }
+
+        // 2. VISTA DE ESTE EQUIPO (Discos duros)
+        if (ruta == "EsteEquipo")
+        {
+            txtDireccion.Text = "💻 Este Equipo";
+            ActualizarBreadcrumbs();
+            OcultarTextBoxDireccion();
+            GenerarVistaEsteEquipo();
+            PoblarTreeViewNormal();
+            return;
+        }
+
+        // 3. NAVEGACIÓN NORMAL (Carpetas reales)
+        if (!Directory.Exists(ruta)) return;
+
+        txtDireccion.Text = _rutaActual;
+        ActualizarBreadcrumbs();
+        OcultarTextBoxDireccion();
+        lblStatus.Text = "Cargando directorio...";
+
+        _imageListMiniaturas.Images.Clear();
         _itemsActuales = await FileService.ObtenerContenidoAsync(_rutaActual);
 
-        // 2. Poblar ListView
-        listViewPrincipal.BeginUpdate();
-        foreach (var item in _itemsActuales)
-        {
-            var lvi = new ListViewItem(item.Nombre) { Tag = item.RutaCompleta };
-            lvi.SubItems.Add(item.Tipo);
-            lvi.SubItems.Add(item.TamanoTexto);
-            lvi.SubItems.Add(item.InfoAdicional);
-            listViewPrincipal.Items.Add(lvi);
-        }
-        listViewPrincipal.EndUpdate();
-
+        PoblarListViewDesdeMemoria();
         ActualizarEstadisticas();
         PoblarTreeViewNormal();
 
-        // Asegúrate de poner esto en ConfigurarUI():
-        // listViewPrincipal.ShowGroups = true;
-
-        // Dentro de CargarDirectorio(), al momento de poblar el ListView:
+        _ = GenerarMiniaturasAsync();
+    }
+    private void GenerarVistaInicio()
+    {
         listViewPrincipal.BeginUpdate();
-        listViewPrincipal.Groups.Clear(); // Limpiamos grupos anteriores
+        listViewPrincipal.Items.Clear();
+        listViewPrincipal.Groups.Clear();
 
-        foreach (var item in _itemsActuales)
+        // Grupo 1: Carpetas Principales
+        ListViewGroup grpAccesos = new ListViewGroup("Carpetas Principales", "📌 Carpetas Principales");
+        listViewPrincipal.Groups.Add(grpAccesos);
+
+        var carpetas = new Dictionary<string, string>
+    {
+        { "Escritorio", Environment.GetFolderPath(Environment.SpecialFolder.Desktop) },
+        { "Descargas", Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads") },
+        { "Documentos", Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments) },
+        { "Imágenes", Environment.GetFolderPath(Environment.SpecialFolder.MyPictures) },
+        { "Música", Environment.GetFolderPath(Environment.SpecialFolder.MyMusic) },
+        { "Videos", Environment.GetFolderPath(Environment.SpecialFolder.MyVideos) }
+    };
+
+        foreach (var kvp in carpetas)
         {
-            var lvi = new ListViewItem(item.Nombre) { Tag = item.RutaCompleta };
-            lvi.SubItems.Add(item.Tipo);
-            lvi.SubItems.Add(item.TamanoTexto);
-            lvi.SubItems.Add(item.InfoAdicional);
-
-            // LÓGICA DE GRUPOS
-            string nombreGrupo = item.CategoriaVisual;
-            var grupo = listViewPrincipal.Groups[nombreGrupo];
-            if (grupo == null)
+            if (Directory.Exists(kvp.Value))
             {
-                grupo = new ListViewGroup(nombreGrupo, nombreGrupo);
-                grupo.Name = nombreGrupo;
-                listViewPrincipal.Groups.Add(grupo);
+                var lvi = new ListViewItem(kvp.Key) { Tag = kvp.Value, Group = grpAccesos };
+                lvi.SubItems.Add("Carpeta");
+                lvi.SubItems.Add("");
+                lvi.SubItems.Add("Directorio del usuario");
+                lvi.SubItems.Add(""); // Sin fecha para que quede limpio
+                listViewPrincipal.Items.Add(lvi);
             }
-            lvi.Group = grupo; // Asignamos el item a su grupo
-
-            listViewPrincipal.Items.Add(lvi);
         }
+
+        // Grupo 2: Archivos Recientes
+        ListViewGroup grpRecientes = new ListViewGroup("Archivos Recientes", "🕒 Archivos Recientes");
+        listViewPrincipal.Groups.Add(grpRecientes);
+
+        try
+        {
+            // Traemos los últimos 15 archivos modificados en Documentos
+            var dirDocs = new DirectoryInfo(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments));
+            var recientes = dirDocs.GetFiles("*.*", SearchOption.TopDirectoryOnly)
+                                   .OrderByDescending(f => f.LastWriteTime)
+                                   .Take(15);
+
+            foreach (var f in recientes)
+            {
+                var lvi = new ListViewItem(f.Name) { Tag = f.FullName, Group = grpRecientes };
+                lvi.SubItems.Add(f.Extension.ToUpper() + " File");
+                lvi.SubItems.Add((f.Length / 1024).ToString() + " KB");
+                lvi.SubItems.Add("Modificado recientemente");
+                lvi.SubItems.Add(f.LastWriteTime.ToString("dd/MM/yyyy HH:mm"));
+                listViewPrincipal.Items.Add(lvi);
+            }
+        }
+        catch { /* Ignorar errores de permisos */ }
+
         listViewPrincipal.EndUpdate();
+        lblStatus.Text = "🏠 Vista de Inicio cargada.";
+        _itemsActuales.Clear(); // Limpiamos para que los filtros superiores no hagan cosas raras aquí
+    }
+
+    private void GenerarVistaEsteEquipo()
+    {
+        listViewPrincipal.BeginUpdate();
+        listViewPrincipal.Items.Clear();
+        listViewPrincipal.Groups.Clear();
+
+        ListViewGroup grpDiscos = new ListViewGroup("Unidades de Disco", "💻 Unidades de Disco");
+        listViewPrincipal.Groups.Add(grpDiscos);
+
+        // Iteramos por todos los discos duros conectados (C:, D:, USBs)
+        foreach (var drive in DriveInfo.GetDrives())
+        {
+            if (drive.IsReady)
+            {
+                var lvi = new ListViewItem($"{drive.Name} ({drive.VolumeLabel})") { Tag = drive.Name, Group = grpDiscos };
+                lvi.SubItems.Add("Unidad Local");
+                lvi.SubItems.Add((drive.TotalSize / 1073741824).ToString() + " GB"); // Tamaño total
+                lvi.SubItems.Add($"Libre: {(drive.AvailableFreeSpace / 1073741824)} GB"); // Espacio libre
+                lvi.SubItems.Add("");
+                listViewPrincipal.Items.Add(lvi);
+            }
+        }
+
+        listViewPrincipal.EndUpdate();
+        lblStatus.Text = "💻 Vista de Este Equipo cargada.";
+        _itemsActuales.Clear();
     }
 
     // ==========================================
@@ -144,19 +326,57 @@ public partial class Form1 : Form
     // ==========================================
     private void PoblarTreeViewNormal()
     {
+        treeViewLateral.BeginUpdate();
         treeViewLateral.Nodes.Clear();
-        var grupos = _itemsActuales.GroupBy(x => x.CategoriaVisual);
 
-        foreach (var grupo in grupos.OrderBy(g => g.Key))
+        // 1. PINNED / ACCESOS RÁPIDOS (Siempre visibles)
+        TreeNode nodoFavoritos = new TreeNode("📌 Accesos Rápidos");
+        nodoFavoritos.Nodes.Add(new TreeNode("🏠 Inicio") { Tag = "Inicio" });
+        nodoFavoritos.Nodes.Add(new TreeNode("🖥️ Escritorio") { Tag = Environment.GetFolderPath(Environment.SpecialFolder.Desktop) });
+        nodoFavoritos.Nodes.Add(new TreeNode("📥 Descargas") { Tag = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads") });
+        nodoFavoritos.Nodes.Add(new TreeNode("📄 Documentos") { Tag = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments) });
+        nodoFavoritos.Nodes.Add(new TreeNode("🖼️ Imágenes") { Tag = Environment.GetFolderPath(Environment.SpecialFolder.MyPictures) });
+        nodoFavoritos.Nodes.Add(new TreeNode("🎵 Música") { Tag = Environment.GetFolderPath(Environment.SpecialFolder.MyMusic) });
+        nodoFavoritos.Nodes.Add(new TreeNode("🎬 Videos") { Tag = Environment.GetFolderPath(Environment.SpecialFolder.MyVideos) });
+        treeViewLateral.Nodes.Add(nodoFavoritos);
+        nodoFavoritos.Expand();
+
+        // 2. ESTE EQUIPO (Discos Duros)
+        TreeNode nodoEquipo = new TreeNode("💻 Este Equipo") { Tag = "EsteEquipo" };
+        foreach (var drive in DriveInfo.GetDrives())
         {
-            TreeNode nodoPadre = new TreeNode($"{grupo.Key} ({grupo.Count()})");
-            foreach (var item in grupo)
+            if (drive.IsReady)
             {
-                nodoPadre.Nodes.Add(new TreeNode(item.Nombre) { Tag = item.RutaCompleta });
+                nodoEquipo.Nodes.Add(new TreeNode($"💽 {drive.Name} ({drive.VolumeLabel})") { Tag = drive.Name });
             }
-            treeViewLateral.Nodes.Add(nodoPadre);
         }
-        treeViewLateral.ExpandAll();
+        treeViewLateral.Nodes.Add(nodoEquipo);
+        nodoEquipo.Expand();
+
+        // 3. CARPETA ACTUAL (Solo se dibuja si estamos dentro de una ruta real navegando)
+        if (_rutaActual != "Inicio" && _rutaActual != "EsteEquipo" && Directory.Exists(_rutaActual))
+        {
+            TreeNode nodoActual = new TreeNode($"📂 Abierto: {new DirectoryInfo(_rutaActual).Name}");
+            var grupos = _itemsActuales.GroupBy(x => x.CategoriaVisual);
+
+            foreach (var grupo in grupos.OrderBy(g => g.Key))
+            {
+                TreeNode nodoPadre = new TreeNode($"{grupo.Key} ({grupo.Count()})");
+                foreach (var item in grupo)
+                {
+                    // En el árbol izquierdo solo mostramos las subcarpetas, no los archivos
+                    if (item.EsCarpeta)
+                        nodoPadre.Nodes.Add(new TreeNode("📁 " + item.Nombre) { Tag = item.RutaCompleta });
+                }
+                // Solo agregamos la categoría si tiene carpetas adentro
+                if (nodoPadre.Nodes.Count > 0)
+                    nodoActual.Nodes.Add(nodoPadre);
+            }
+            treeViewLateral.Nodes.Add(nodoActual);
+            nodoActual.ExpandAll();
+        }
+
+        treeViewLateral.EndUpdate();
     }
 
     private void TxtBuscar_KeyDown(object sender, KeyEventArgs e)
@@ -189,7 +409,8 @@ public partial class Form1 : Form
     private void ListViewPrincipal_DoubleClick(object sender, EventArgs e)
     {
         if (listViewPrincipal.SelectedItems.Count == 0) return;
-        string ruta = listViewPrincipal.SelectedItems[0].Tag.ToString();
+        string? ruta = listViewPrincipal.SelectedItems[0].Tag?.ToString();
+        if (string.IsNullOrEmpty(ruta)) return;
 
         if (Directory.Exists(ruta)) CargarDirectorio(ruta);
         else AbrirArchivoConAppPredeterminada(ruta); // Para abrir el archivo
@@ -197,8 +418,44 @@ public partial class Form1 : Form
 
     private void AbrirArchivoConAppPredeterminada(string ruta)
     {
-        try { Process.Start(new ProcessStartInfo { FileName = ruta, UseShellExecute = true }); }
-        catch (Exception ex) { MessageBox.Show("No se pudo abrir: " + ex.Message); }
+        try 
+        {
+            string ext = Path.GetExtension(ruta).ToLower();
+            
+            // 1. Imágenes
+            string[] imgExt = { ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp" };
+            if (imgExt.Contains(ext))
+            {
+                var view = new ImageViewerForm(ruta);
+                view.Show();
+                return;
+            }
+
+            // 2. Multimedia (Audio/Video)
+            string[] mediaExt = { ".mp3", ".wav", ".mp4", ".mov", ".webm", ".m4a", ".ogg" };
+            if (mediaExt.Contains(ext))
+            {
+                var player = new MediaPlayerForm(ruta);
+                player.Show();
+                return;
+            }
+
+            // 3. Texto y Código
+            string[] txtExt = { ".txt", ".json", ".xml", ".csv", ".cs", ".html", ".css", ".js", ".md", ".py" };
+            if (txtExt.Contains(ext))
+            {
+                var view = new FileViewerForm(ruta);
+                view.Show();
+                return;
+            }
+
+            // 4. Otros (Abrir con Windows)
+            Process.Start(new ProcessStartInfo { FileName = ruta, UseShellExecute = true }); 
+        }
+        catch (Exception ex) 
+        { 
+            MessageBox.Show("No se pudo abrir: " + ex.Message); 
+        }
     }
 
     private void PnlTrash_DragEnter(object sender, DragEventArgs e)
@@ -225,7 +482,11 @@ public partial class Form1 : Form
         {
             foreach (ListViewItem item in items)
             {
-                FileService.EnviarAPapelera(item.Tag.ToString());
+                string? ruta = item.Tag?.ToString();
+                if (!string.IsNullOrEmpty(ruta))
+                {
+                    FileService.EnviarAPapelera(ruta);
+                }
             }
             CargarDirectorio(_rutaActual, false); // Refrescar
         }
@@ -307,7 +568,8 @@ public partial class Form1 : Form
             // 2. Verificamos que haya un archivo seleccionado
             if (listViewPrincipal.SelectedItems.Count == 0) return;
 
-            string ruta = listViewPrincipal.SelectedItems[0].Tag.ToString();
+            string? ruta = listViewPrincipal.SelectedItems[0].Tag?.ToString();
+            if (string.IsNullOrEmpty(ruta)) return;
 
             // No mostramos vista previa de carpetas
             if (Directory.Exists(ruta)) return;
@@ -326,6 +588,230 @@ public partial class Form1 : Form
             _quickLookForm.Show(this);
         }
     }
+
+    // 
+    //
+    private void ConfigurarFiltrosRapidos()
+    {
+        // 1. Crear el contenedor de los chips
+        _pnlFiltros = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Top,
+            Height = 40,
+            BackColor = ThemeRenderer.SecondaryBg,
+            Padding = new Padding(10, 5, 0, 0),
+            WrapContents = false
+        };
+
+        // 2. Insertarlo en el Panel 1 del SplitContainer (Justo arriba del ListView)
+        splitContainerMain.Panel1.Controls.Add(_pnlFiltros);
+        _pnlFiltros.BringToFront();
+
+        // 3. Crear los botones (Chips)
+        string[] filtros = { "Todos", "Carpetas", "Imágenes", "Texto/Código", "Audio", "Video" };
+
+        foreach (var f in filtros)
+        {
+            Button btnChip = new Button
+            {
+                Text = f,
+                FlatStyle = FlatStyle.Flat,
+                Height = 28,
+                AutoSize = true,
+                Cursor = Cursors.Hand,
+                BackColor = (f == "Todos") ? ThemeRenderer.Accent : ThemeRenderer.MainBg,
+                ForeColor = (f == "Todos") ? Color.White : ThemeRenderer.MainText,
+                Tag = f // Guardamos el nombre del filtro aquí
+            };
+            btnChip.FlatAppearance.BorderSize = 0;
+
+            // Evento click del chip
+            btnChip.Click += (s, e) =>
+            {
+                _filtroActivo = btnChip.Tag?.ToString() ?? "Todos";
+                ActualizarEstiloChips(btnChip);
+                PoblarListViewDesdeMemoria(); // Filtra sin leer el disco
+            };
+
+            _pnlFiltros.Controls.Add(btnChip);
+        }
+    }
+
+    //
+    //
+    private void ConfigurarVistaMiniaturas()
+    {
+        // 1. Configurar la lista de imágenes para las miniaturas
+        _imageListMiniaturas = new ImageList
+        {
+            ImageSize = new Size(96, 96), // Tamaño de las miniaturas
+            ColorDepth = ColorDepth.Depth32Bit
+        };
+        listViewPrincipal.LargeImageList = _imageListMiniaturas;
+
+        // 2. Crear un botón Toggle y ponerlo en la barra superior derecha
+        _btnToggleVista = new Button
+        {
+            Text = "🖼️ Vista",
+            FlatStyle = FlatStyle.Flat,
+            BackColor = ThemeRenderer.MainBg,
+            ForeColor = ThemeRenderer.MainText,
+            Size = new Size(90, 30),
+            Cursor = Cursors.Hand,
+            Anchor = AnchorStyles.Top | AnchorStyles.Right,
+            Location = new Point(pnlTop.Width - 360, 10) // Ajusta la posición según tus botones actuales
+        };
+        _btnToggleVista.FlatAppearance.BorderSize = 0;
+
+        _btnToggleVista.Click += (s, e) =>
+        {
+            if (listViewPrincipal.View == View.Details)
+            {
+                listViewPrincipal.View = View.LargeIcon;
+                listViewPrincipal.OwnerDraw = false; // Windows dibuja la grilla
+            }
+            else
+            {
+                listViewPrincipal.View = View.Details;
+                listViewPrincipal.OwnerDraw = true; // Nuestro ThemeRenderer dibuja la lista
+            }
+        };
+
+        pnlTop.Controls.Add(_btnToggleVista);
+    }
+
+    // Generador de miniaturas asíncrono
+    // Generador de miniaturas asíncrono
+    private async Task GenerarMiniaturasAsync()
+    {
+        // 1. Crear iconos por defecto
+        if (!_imageListMiniaturas.Images.ContainsKey("folder"))
+            _imageListMiniaturas.Images.Add("folder", GenerarIconoBase("📁"));
+
+        if (!_imageListMiniaturas.Images.ContainsKey("file"))
+            _imageListMiniaturas.Images.Add("file", GenerarIconoBase("📄"));
+
+        // 2. Filtrar solo las imágenes
+        var imagenes = _itemsActuales.Where(x => x.CategoriaVisual == "Imágenes").ToList();
+
+        foreach (var img in imagenes)
+        {
+            try
+            {
+                // Leemos la imagen en un hilo secundario
+                Bitmap miniatura = await Task.Run(() =>
+                {
+                    try
+                    {
+                        // Agregamos FileShare.ReadWrite por si otro programa está usando la imagen
+                        using var fs = new FileStream(img.RutaCompleta, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+                        using var original = Image.FromStream(fs);
+                        // Retornamos un clon redimensionado
+                        return new Bitmap(original, new Size(96, 96));
+                    }
+                    catch
+                    {
+                        // Si GDI+ no soporta la imagen (ej. WebP) o está corrupta, regresamos null
+                        return null;
+                    }
+                });
+
+                // Si la miniatura se generó con éxito, la agregamos a la UI
+                if (miniatura != null)
+                {
+                    _imageListMiniaturas.Images.Add(img.RutaCompleta, miniatura);
+
+                    // Actualizamos el ListViewItem en tiempo real
+                    var lvi = listViewPrincipal.Items.Cast<ListViewItem>().FirstOrDefault(x => x.Tag?.ToString() == img.RutaCompleta);
+                    if (lvi != null)
+                    {
+                        lvi.ImageKey = img.RutaCompleta;
+                    }
+                }
+            }
+            catch { /* Ignorar si la imagen se elimina justo mientras cargaba */ }
+        }
+    }
+
+    // Helper para dibujar un emoji grande como icono por defecto para carpetas/documentos
+    private Bitmap GenerarIconoBase(string emoji)
+    {
+        Bitmap bmp = new Bitmap(96, 96);
+        using (Graphics g = Graphics.FromImage(bmp))
+        {
+            g.Clear(ThemeRenderer.MainBg);
+            using Font font = new Font("Segoe UI Emoji", 40);
+            g.DrawString(emoji, font, Brushes.Black, new PointF(10, 10));
+        }
+        return bmp;
+    }
+
+    // Actualiza los breadcrumbs (migas de pan) cada vez que cambiamos de directorio
+    private void ActualizarBreadcrumbs()
+    {
+        _flpBreadcrumbs.Controls.Clear();
+        if (string.IsNullOrEmpty(_rutaActual)) return;
+
+        // Dividimos la ruta (Ej: C: \ Users \ Juan)
+        string[] partes = _rutaActual.Split(Path.DirectorySeparatorChar, StringSplitOptions.RemoveEmptyEntries);
+        string rutaAcumulada = "";
+
+        for (int i = 0; i < partes.Length; i++)
+        {
+            string parte = partes[i];
+            rutaAcumulada += parte + Path.DirectorySeparatorChar;
+
+            string rutaCapturada = rutaAcumulada; // Closure para el evento clic
+
+            Button btnCrumb = new Button
+            {
+                Text = parte + (i < partes.Length - 1 ? " ➔" : ""), // Flechita estilo Windows
+                AutoSize = true,
+                FlatStyle = FlatStyle.Flat,
+                BackColor = Color.Transparent,
+                ForeColor = ThemeRenderer.MainText,
+                Font = new Font("Segoe UI Semibold", 10),
+                Margin = new Padding(0, 3, 0, 0),
+                Cursor = Cursors.Hand
+            };
+            btnCrumb.FlatAppearance.BorderSize = 0;
+            btnCrumb.FlatAppearance.MouseOverBackColor = ThemeRenderer.Hover;
+
+            // Al hacer clic en un breadcrumb, navega a esa parte exacta
+            btnCrumb.Click += (s, e) => CargarDirectorio(rutaCapturada);
+
+            _flpBreadcrumbs.Controls.Add(btnCrumb);
+        }
+    }
+
+    private void MostrarTextBoxDireccion()
+    {
+        _flpBreadcrumbs.Visible = false;
+        txtDireccion.Visible = true;
+        txtDireccion.Text = _rutaActual;
+        txtDireccion.Focus();
+        txtDireccion.SelectAll();
+    }
+
+    private void OcultarTextBoxDireccion()
+    {
+        txtDireccion.Visible = false;
+        _flpBreadcrumbs.Visible = true;
+    }
+
+    private void ActualizarEstiloChips(Button chipActivo)
+    {
+        foreach (Control ctrl in _pnlFiltros.Controls)
+        {
+            if (ctrl is Button btn)
+            {
+                bool activo = (btn == chipActivo);
+                btn.BackColor = activo ? ThemeRenderer.Accent : ThemeRenderer.MainBg;
+                btn.ForeColor = activo ? Color.White : ThemeRenderer.MainText;
+            }
+        }
+    }
+
 
     private void ActualizarEstadisticas()
     {
