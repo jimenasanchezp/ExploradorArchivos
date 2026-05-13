@@ -83,7 +83,7 @@ public partial class Form1
                 BackColor = (f == "Todos") ? ThemeRenderer.MainBg : ThemeRenderer.SecondaryBg,
                 ForeColor = ThemeRenderer.MainText,
                 Tag = f,
-                Margin = new Padding(3, 0, 3, 0), // Separación
+                Margin = new Padding(8, 0, 8, 0), // Mayor separación para que respiren
                 Font = new Font("MS Sans Serif", 9, FontStyle.Bold)
             };
             btnTab.FlatAppearance.BorderSize = 0;

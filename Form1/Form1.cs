@@ -50,6 +50,11 @@ public partial class Form1 : Form
         // Configurar Vista de Detalles Clásica (Más ancha y limpia)
         listViewPrincipal.View = View.Details;
         listViewPrincipal.HeaderStyle = ColumnHeaderStyle.Clickable;
+        
+        // Aumentar la altura de las filas para que no se vea amontonado
+        var spacerList = new ImageList { ImageSize = new Size(1, 36) }; // 36px de alto
+        listViewPrincipal.SmallImageList = spacerList;
+        
         listViewPrincipal.Columns.Clear();
         listViewPrincipal.Columns.Add("Nombre", 450);
         listViewPrincipal.Columns.Add("Tipo", 120);
@@ -105,13 +110,13 @@ public partial class Form1 : Form
         pnlAddressBorder.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
         pnlTop.Controls.Add(pnlAddr);
 
-        // Grupo: Acciones
-        Panel pnlActions = CrearGrupoHerramientas("", pnlTop.Width - 370, 10, 360);
+        // Grupo: Acciones - Más espaciado para no verse amontonado
+        Panel pnlActions = CrearGrupoHerramientas("", pnlTop.Width - 410, 10, 400);
         pnlActions.Anchor = AnchorStyles.Top | AnchorStyles.Right;
         pnlActions.Controls.Add(btnActualizar); btnActualizar.Location = new Point(10, 18); btnActualizar.Size = new Size(35, 30);
-        pnlActions.Controls.Add(btnNuevaCarpeta); btnNuevaCarpeta.Location = new Point(50, 18); btnNuevaCarpeta.Size = new Size(90, 30);
-        pnlActions.Controls.Add(btnExportarCSV); btnExportarCSV.Location = new Point(145, 18); btnExportarCSV.Size = new Size(90, 30);
-        pnlActions.Controls.Add(_btnToggleVista); _btnToggleVista.Location = new Point(240, 18); _btnToggleVista.Size = new Size(90, 30);
+        pnlActions.Controls.Add(btnNuevaCarpeta); btnNuevaCarpeta.Location = new Point(60, 18); btnNuevaCarpeta.Size = new Size(100, 30);
+        pnlActions.Controls.Add(btnExportarCSV); btnExportarCSV.Location = new Point(175, 18); btnExportarCSV.Size = new Size(100, 30);
+        pnlActions.Controls.Add(_btnToggleVista); _btnToggleVista.Location = new Point(290, 18); _btnToggleVista.Size = new Size(100, 30);
         pnlTop.Controls.Add(pnlActions);
 
         // --- 2. REFINAMIENTO DEL PANEL LATERAL (Sidebar) ---
@@ -177,7 +182,7 @@ public partial class Form1 : Form
             WrapContents = false,
             AutoScroll = false,
             Cursor = Cursors.IBeam,
-            Padding = new Padding(5, 4, 0, 0)
+            Padding = new Padding(10, 6, 0, 0)
         };
         _flpBreadcrumbs.Click += (s, e) => MostrarTextBoxDireccion();
         pnlAddressBorder.Controls.Add(_flpBreadcrumbs);
