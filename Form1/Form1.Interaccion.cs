@@ -117,15 +117,40 @@ public partial class Form1
         {
             e.SuppressKeyPress = true;
             string filtro = txtBuscar.Text.ToLower();
-            if (string.IsNullOrWhiteSpace(filtro)) { PoblarTreeViewNormal(); return; }
+            
+            if (string.IsNullOrWhiteSpace(filtro)) 
+            { 
+                PoblarListViewDesdeMemoria(); 
+                return; 
+            }
 
-            treeViewLateral.Nodes.Clear();
-            var resultados = _itemsActuales.Where(x => x.Nombre.ToLower().Contains(filtro)).ToList();
-            TreeNode nodoSearch = new TreeNode($"Búsqueda: '{filtro}' ({resultados.Count})");
-            foreach (var r in resultados)
-                nodoSearch.Nodes.Add(new TreeNode(r.Nombre) { Tag = r.RutaCompleta });
-            treeViewLateral.Nodes.Add(nodoSearch);
-            nodoSearch.Expand();
+            // Filtrado en Memoria y afectando solo al ListView
+            listViewPrincipal.BeginUpdate();
+            listViewPrincipal.ListViewItemSorter = null; // Ordenamiento por Fecha (desactivar auto)
+            listViewPrincipal.Items.Clear();
+            listViewPrincipal.Groups.Clear();
+
+            var resultados = _itemsActuales
+                .Where(x => x.Nombre.ToLower().Contains(filtro))
+                .OrderByDescending(x => x.FechaModificacion)
+                .ToList();
+
+            foreach (var item in resultados)
+            {
+                var lvi = new ListViewItem(item.Nombre) { Tag = item.RutaCompleta };
+                lvi.SubItems.Add(item.Tipo);
+                lvi.SubItems.Add(item.TamanoTexto);
+                lvi.SubItems.Add(item.InfoAdicional);
+                lvi.SubItems.Add(item.FechaModificacion.ToString("dd/MM/yyyy HH:mm"));
+                listViewPrincipal.Items.Add(lvi);
+            }
+
+            listViewPrincipal.EndUpdate();
+            
+            // Preservación del Estilo Y2K (forzar redibujado)
+            listViewPrincipal.Invalidate();
+            
+            lblStatus.Text = $"Búsqueda: '{filtro}' ({resultados.Count} resultados)";
         }
     }
 }
