@@ -219,7 +219,7 @@ public partial class Form1 : Form
         listViewPrincipal.BringToFront(); // <-- CLAVE: listViewPrincipal debe estar al frente para que dockee al último y no quede bajo _pnlFiltros
 
         splitContainerMain.SplitterDistance = 280; // Más espacio para el sidebar
-    }
+    }//
 
     private Panel CrearGrupoHerramientas(string titulo, int x, int y, int ancho)
     {
