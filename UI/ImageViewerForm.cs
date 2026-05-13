@@ -1,14 +1,15 @@
 using System.Drawing;
 using System.Windows.Forms;
 
-namespace ExploradorArchivos;
+namespace ExploradorArchivos.UI;
 
 public class ImageViewerForm : Form
-{
-    private PictureBox _pictureBox;
-    private Panel _mainPanel;
+{    
+    private PictureBox _pictureBox = null!; 
+    private Panel _mainPanel = null!;      
     private float _zoomFactor = 1.0f;
-    private Image _originalImage;
+    private Image? _originalImage;          
+
 
     public ImageViewerForm(string imagePath)
     {
@@ -40,7 +41,6 @@ public class ImageViewerForm : Form
         this.Controls.Add(_mainPanel);
 
         this.KeyDown += ImageViewerForm_KeyDown;
-        //Form1.ApplyTheme(this);
     }
 
     private void LoadImage(string path)
@@ -61,7 +61,7 @@ public class ImageViewerForm : Form
         }
     }
 
-    private void ImageViewerForm_KeyDown(object sender, KeyEventArgs e)
+    private void ImageViewerForm_KeyDown(object? sender, KeyEventArgs e)
     {
         if (e.KeyCode == Keys.Escape)
         {
@@ -94,8 +94,7 @@ public class ImageViewerForm : Form
         int newHeight = (int)(_originalImage.Height * _zoomFactor);
 
         _pictureBox.Size = new Size(newWidth, newHeight);
-        
-        // Center image if smaller than panel
+
         if (newWidth < _mainPanel.Width)
             _pictureBox.Left = (_mainPanel.Width - newWidth) / 2;
         else

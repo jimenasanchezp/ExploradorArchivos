@@ -1,0 +1,255 @@
+using System;
+using System.IO;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
+using System.Windows.Forms;
+using ExploradorArchivos.Models;
+using ExploradorArchivos.Services;
+using ExploradorArchivos.UI;
+
+namespace ExploradorArchivos;
+
+/// <summary>
+/// Visualización: ListView, filtros, miniaturas, ordenamiento,
+/// estadísticas y exportación CSV.
+/// </summary>
+public partial class Form1
+{
+    private void PoblarListViewDesdeMemoria()
+    {
+        listViewPrincipal.BeginUpdate();
+        listViewPrincipal.Items.Clear();
+        listViewPrincipal.Groups.Clear();
+
+        var itemsFiltrados = _itemsActuales.Where(x =>
+            _filtroActivo == "Todos" ||
+            (_filtroActivo == "Carpetas" && x.EsCarpeta) ||
+            (!x.EsCarpeta && x.CategoriaVisual == _filtroActivo)
+        ).ToList();
+
+        foreach (var item in itemsFiltrados)
+        {
+            var lvi = new ListViewItem(item.Nombre) { Tag = item.RutaCompleta };
+            lvi.SubItems.Add(item.Tipo);
+            lvi.SubItems.Add(item.TamanoTexto);
+            lvi.SubItems.Add(item.InfoAdicional);
+            lvi.SubItems.Add(item.FechaModificacion.ToString("dd/MM/yyyy HH:mm"));
+
+            var grupo = listViewPrincipal.Groups[item.CategoriaVisual];
+            if (grupo == null)
+            {
+                grupo = new ListViewGroup(item.CategoriaVisual, item.CategoriaVisual);
+                listViewPrincipal.Groups.Add(grupo);
+            }
+            lvi.Group = grupo;
+            lvi.ImageKey = item.EsCarpeta ? "folder" : "file";
+            listViewPrincipal.Items.Add(lvi);
+        }
+        listViewPrincipal.EndUpdate();
+    }
+
+    // === FILTROS RÁPIDOS (CHIPS) ===
+
+    private void ConfigurarFiltrosRapidos()
+    {
+        _pnlFiltros = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Top,
+            Height = 40,
+            BackColor = ThemeRenderer.SecondaryBg,
+            Padding = new Padding(10, 5, 0, 0),
+            WrapContents = false
+        };
+
+        splitContainerMain.Panel1.Controls.Add(_pnlFiltros);
+        _pnlFiltros.BringToFront();
+
+        string[] filtros = { "Todos", "Carpetas", "Imágenes", "Texto/Código", "Audio", "Video" };
+
+        foreach (var f in filtros)
+        {
+            Button btnChip = new Button
+            {
+                Text = f,
+                FlatStyle = FlatStyle.Flat,
+                Height = 28,
+                AutoSize = true,
+                Cursor = Cursors.Hand,
+                BackColor = (f == "Todos") ? ThemeRenderer.Accent : ThemeRenderer.MainBg,
+                ForeColor = (f == "Todos") ? Color.White : ThemeRenderer.MainText,
+                Tag = f
+            };
+            btnChip.FlatAppearance.BorderSize = 0;
+
+            btnChip.Click += (s, e) =>
+            {
+                _filtroActivo = btnChip.Tag?.ToString() ?? "Todos";
+                ActualizarEstiloChips(btnChip);
+                PoblarListViewDesdeMemoria();
+            };
+
+            _pnlFiltros.Controls.Add(btnChip);
+        }
+    }
+
+    private void ActualizarEstiloChips(Button chipActivo)
+    {
+        foreach (Control ctrl in _pnlFiltros.Controls)
+        {
+            if (ctrl is Button btn)
+            {
+                bool activo = (btn == chipActivo);
+                btn.BackColor = activo ? ThemeRenderer.Accent : ThemeRenderer.MainBg;
+                btn.ForeColor = activo ? Color.White : ThemeRenderer.MainText;
+            }
+        }
+    }
+
+    // === VISTA DE MINIATURAS ===
+
+    private void ConfigurarVistaMiniaturas()
+    {
+        _imageListMiniaturas = new ImageList
+        {
+            ImageSize = new Size(96, 96),
+            ColorDepth = ColorDepth.Depth32Bit
+        };
+        listViewPrincipal.LargeImageList = _imageListMiniaturas;
+
+        _btnToggleVista = new Button
+        {
+            Text = "🖼️ Vista",
+            FlatStyle = FlatStyle.Flat,
+            BackColor = ThemeRenderer.MainBg,
+            ForeColor = ThemeRenderer.MainText,
+            Size = new Size(90, 30),
+            Cursor = Cursors.Hand,
+            Anchor = AnchorStyles.Top | AnchorStyles.Right,
+            Location = new Point(pnlTop.Width - 360, 10)
+        };
+        _btnToggleVista.FlatAppearance.BorderSize = 0;
+
+        _btnToggleVista.Click += (s, e) =>
+        {
+            if (listViewPrincipal.View == View.Details)
+            {
+                listViewPrincipal.View = View.LargeIcon;
+                listViewPrincipal.OwnerDraw = false;
+            }
+            else
+            {
+                listViewPrincipal.View = View.Details;
+                listViewPrincipal.OwnerDraw = true;
+            }
+        };
+
+        pnlTop.Controls.Add(_btnToggleVista);
+    }
+
+    private async Task GenerarMiniaturasAsync()
+    {
+        if (!_imageListMiniaturas.Images.ContainsKey("folder"))
+            _imageListMiniaturas.Images.Add("folder", GenerarIconoBase("📁"));
+
+        if (!_imageListMiniaturas.Images.ContainsKey("file"))
+            _imageListMiniaturas.Images.Add("file", GenerarIconoBase("📄"));
+
+        var imagenes = _itemsActuales.Where(x => x.CategoriaVisual == "Imágenes").ToList();
+
+        foreach (var img in imagenes)
+        {
+            try
+            {
+                Bitmap miniatura = await Task.Run(() =>
+                {
+                    try
+                    {
+                        using var fs = new FileStream(img.RutaCompleta, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+                        using var original = Image.FromStream(fs);
+                        return new Bitmap(original, new Size(96, 96));
+                    }
+                    catch { return null; }
+                });
+
+                if (miniatura != null)
+                {
+                    _imageListMiniaturas.Images.Add(img.RutaCompleta, miniatura);
+                    var lvi = listViewPrincipal.Items.Cast<ListViewItem>()
+                        .FirstOrDefault(x => x.Tag?.ToString() == img.RutaCompleta);
+                    if (lvi != null) lvi.ImageKey = img.RutaCompleta;
+                }
+            }
+            catch { /* Ignorar si la imagen se elimina mientras cargaba */ }
+        }
+    }
+
+    private Bitmap GenerarIconoBase(string emoji)
+    {
+        Bitmap bmp = new Bitmap(96, 96);
+        using (Graphics g = Graphics.FromImage(bmp))
+        {
+            g.Clear(ThemeRenderer.MainBg);
+            using Font font = new Font("Segoe UI Emoji", 40);
+            g.DrawString(emoji, font, Brushes.Black, new PointF(10, 10));
+        }
+        return bmp;
+    }
+
+    // === ORDENAMIENTO POR COLUMNAS ===
+
+    private void ListViewPrincipal_ColumnClick(object sender, ColumnClickEventArgs e)
+    {
+        if (e.Column == _sorter.ColumnToSort)
+        {
+            _sorter.OrderOfSort = _sorter.OrderOfSort == SortOrder.Ascending
+                ? SortOrder.Descending : SortOrder.Ascending;
+        }
+        else
+        {
+            _sorter.ColumnToSort = e.Column;
+            _sorter.OrderOfSort = SortOrder.Ascending;
+        }
+
+        foreach (ColumnHeader header in listViewPrincipal.Columns)
+            header.Text = header.Text.Replace(" ▲", "").Replace(" ▼", "");
+
+        string flecha = _sorter.OrderOfSort == SortOrder.Ascending ? " ▲" : " ▼";
+        listViewPrincipal.Columns[e.Column].Text += flecha;
+        listViewPrincipal.Sort();
+    }
+
+    // === EXPORTACIÓN CSV ===
+
+    private async void BtnExportarCSV_Click(object sender, EventArgs e)
+    {
+        SaveFileDialog sfd = new SaveFileDialog { Filter = "CSV|*.csv", FileName = "Indice.csv" };
+        if (sfd.ShowDialog() == DialogResult.OK)
+        {
+            btnExportarCSV.Enabled = false;
+            var progress = new Progress<string>(msg => lblStatus.Text = msg);
+            var cts = new CancellationTokenSource();
+
+            await CsvIndexer.ExportarAsync(_rutaActual, sfd.FileName, progress, cts.Token);
+
+            btnExportarCSV.Enabled = true;
+            lblStatus.Text = "Exportación completada.";
+            if (MessageBox.Show("Exportación exitosa. ¿Abrir archivo?", "Exportar", MessageBoxButtons.YesNo) == DialogResult.Yes)
+                AbrirArchivoConAppPredeterminada(sfd.FileName);
+        }
+    }
+
+    // === ESTADÍSTICAS ===
+
+    private void ActualizarEstadisticas()
+    {
+        int carpetas = _itemsActuales.Count(x => x.EsCarpeta);
+        int archivos = _itemsActuales.Count(x => !x.EsCarpeta);
+        int img = _itemsActuales.Count(x => x.CategoriaVisual == "Imágenes");
+        int audio = _itemsActuales.Count(x => x.CategoriaVisual == "Audio");
+        int video = _itemsActuales.Count(x => x.CategoriaVisual == "Video");
+        int txt = _itemsActuales.Count(x => x.CategoriaVisual == "Texto/Código");
+
+        lblStatus.Text = $"📁 {carpetas} carpetas  ·  📄 {archivos} archivos  ·  🖼️ {img} img  ·  🎵 {audio} audio  ·  🎬 {video} video  ·  📝 {txt} doc";
+    }
+}

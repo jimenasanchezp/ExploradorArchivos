@@ -8,9 +8,9 @@ namespace ExploradorArchivos.UI
 {
     public class QuickLookForm : Form
     {
-        private PictureBox _pictureBox;
-        private RichTextBox _richTextBox;
-        private WebView2 _webView;
+        private PictureBox? _pictureBox;
+        private RichTextBox? _richTextBox;
+        private WebView2? _webView;
 
         public QuickLookForm(string filePath)
         {
@@ -127,7 +127,7 @@ namespace ExploradorArchivos.UI
                 await _webView.EnsureCoreWebView2Async(null);
 
                 // Navegar al PDF
-                _webView.CoreWebView2.Navigate(filePath);
+                _webView?.CoreWebView2.Navigate(filePath);
             }
             catch (Exception)
             {

@@ -1,4 +1,4 @@
-﻿using System.Drawing;
+using System.Drawing;
 using System.Windows.Forms;
 
 namespace ExploradorArchivos.UI;
@@ -19,7 +19,7 @@ public static class ThemeRenderer
 
         using SolidBrush textBrush = new SolidBrush(SecondaryText);
         StringFormat format = new StringFormat { LineAlignment = StringAlignment.Center };
-        e.Graphics.DrawString(e.Header.Text, e.Font, textBrush, e.Bounds, format);
+        e.Graphics.DrawString(e.Header?.Text ?? string.Empty, e.Font ?? Control.DefaultFont, textBrush, e.Bounds, format);
 
         using Pen borderPen = new Pen(SecondaryBg);
         e.Graphics.DrawLine(borderPen, e.Bounds.Left, e.Bounds.Bottom - 1, e.Bounds.Right, e.Bounds.Bottom - 1);
@@ -30,9 +30,9 @@ public static class ThemeRenderer
     public static void DrawListViewSubItem(object sender, DrawListViewSubItemEventArgs e)
     {
         // Cebra sutil (Filas pares/impares)
-        Color defaultBg = (e.Item.Index % 2 == 0) ? MainBg : ColorTranslator.FromHtml("#FFF0F5");
-        Color backColor = e.Item.Selected ? Accent : defaultBg;
-        Color foreColor = e.Item.Selected ? Color.White : MainText;
+        Color defaultBg = ((e.Item?.Index ?? 0) % 2 == 0) ? MainBg : ColorTranslator.FromHtml("#FFF0F5");
+        Color backColor = (e.Item?.Selected ?? false) ? Accent : defaultBg;
+        Color foreColor = (e.Item?.Selected ?? false) ? Color.White : MainText;
 
         using SolidBrush bgBrush = new SolidBrush(backColor);
         e.Graphics.FillRectangle(bgBrush, e.Bounds);
@@ -45,13 +45,13 @@ public static class ThemeRenderer
         {
             // Determinar el icono según la categoría
             string icono = "📄"; // Default
-            string tipo = e.Item.SubItems[1].Text;
+            string tipo = e.Item?.SubItems[1].Text ?? string.Empty;
 
             if (tipo == "Carpeta") icono = "📁";
-            else if (e.Item.Group?.Name == "Imágenes") icono = "🖼️";
-            else if (e.Item.Group?.Name == "Audio") icono = "🎵";
-            else if (e.Item.Group?.Name == "Video") icono = "🎬";
-            else if (e.Item.Group?.Name == "Texto/Código") icono = "📝";
+            else if (e.Item?.Group?.Name == "Imágenes") icono = "🖼️";
+            else if (e.Item?.Group?.Name == "Audio") icono = "🎵";
+            else if (e.Item?.Group?.Name == "Video") icono = "🎬";
+            else if (e.Item?.Group?.Name == "Texto/Código") icono = "📝";
             else if (tipo.Contains("PDF")) icono = "📕";
             else if (tipo.Contains("XLS") || tipo.Contains("CSV")) icono = "📊";
 
@@ -61,13 +61,13 @@ public static class ThemeRenderer
 
             // Dibujar el texto desplazado a la derecha para dejar espacio al icono
             RectangleF textRect = new RectangleF(e.Bounds.X + 30, e.Bounds.Y, e.Bounds.Width - 30, e.Bounds.Height);
-            e.Graphics.DrawString(e.SubItem.Text, e.Item.ListView.Font, textBrush, textRect, format);
+            e.Graphics.DrawString(e.SubItem?.Text ?? string.Empty, e.Item?.ListView?.Font ?? Control.DefaultFont, textBrush, textRect, format);
         }
         else
         {
             // Las demás columnas (Tamaño, Fecha, etc.) se dibujan normal
             RectangleF textRect = new RectangleF(e.Bounds.X + 6, e.Bounds.Y, e.Bounds.Width, e.Bounds.Height);
-            e.Graphics.DrawString(e.SubItem.Text, e.Item.ListView.Font, textBrush, textRect, format);
+            e.Graphics.DrawString(e.SubItem?.Text ?? string.Empty, e.Item?.ListView?.Font ?? Control.DefaultFont, textBrush, textRect, format);
         }
     }
 
@@ -82,6 +82,6 @@ public static class ThemeRenderer
         e.Graphics.FillRectangle(bgBrush, e.Bounds);
 
         using SolidBrush textBrush = new SolidBrush(foreColor);
-        e.Graphics.DrawString(e.Node.Text, e.Node.TreeView.Font, textBrush, e.Bounds.X + 2, e.Bounds.Y + 2);
+        e.Graphics.DrawString(e.Node?.Text ?? string.Empty, e.Node?.TreeView?.Font ?? Control.DefaultFont, textBrush, e.Bounds.X + 2, e.Bounds.Y + 2);
     }
 }

@@ -1,0 +1,267 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Windows.Forms;
+using NAudio.Wave;
+
+namespace ExploradorArchivos.Mp3;
+
+public enum ModoRepetir { Desactivado, RepetirUno, RepetirTodos }
+
+public class GestorReproduccion : IDisposable
+{
+    private WaveOutEvent? _waveOut;
+    private AudioFileReader? _audioReader;
+    private readonly System.Windows.Forms.Timer _timerPosicion;
+
+
+    private List<Cancion> _cola = new();
+    private List<int> _ordenReproduccion = new();
+    private int _indiceCola = -1;
+
+    private bool _modoAleatorio;
+    private ModoRepetir _modoRepetir = ModoRepetir.Desactivado;
+    private float _volumen = 0.7f;
+
+    public event Action<Cancion>? CancionCambiada;
+    public event Action<TimeSpan, TimeSpan>? PosicionActualizada;
+    public event Action<bool>? EstadoCambiado;
+    public event Action? ReproduccionTerminada;
+    public int IndiceCola => _indiceCola;
+
+    public Cancion? CancionActual => _indiceCola >= 0 && _indiceCola < _ordenReproduccion.Count
+        ? _cola[_ordenReproduccion[_indiceCola]]
+        : null;
+
+    public bool EstaReproduciendo => _waveOut?.PlaybackState == PlaybackState.Playing;
+
+    public bool ModoAleatorio
+    {
+        get => _modoAleatorio;
+        set { _modoAleatorio = value; RegenerarOrden(); }
+    }
+
+    public ModoRepetir ModoRepetir { get => _modoRepetir; set => _modoRepetir = value; }
+
+    public float Volumen
+    {
+        get => _volumen;
+        set
+        {
+            _volumen = Math.Clamp(value, 0f, 1f);
+            if (_audioReader != null) _audioReader.Volume = _volumen;
+        }
+    }
+
+    public GestorReproduccion()
+    {
+        _timerPosicion = new System.Windows.Forms.Timer { Interval = 250 };
+        _timerPosicion.Tick += (s, e) =>
+        {
+            if (_audioReader != null && _waveOut?.PlaybackState == PlaybackState.Playing)
+                PosicionActualizada?.Invoke(_audioReader.CurrentTime, _audioReader.TotalTime);
+        };
+    }
+
+    public void CargarCola(List<string> rutas, string? rutaInicial = null)
+    {
+        DetenerInterno();
+        _cola.Clear();
+        foreach (var ruta in rutas)
+        {
+            try { _cola.Add(new Cancion(ruta)); } catch { }
+        }
+
+        if (_cola.Count == 0) return;
+        RegenerarOrden();
+
+        if (rutaInicial != null)
+        {
+            int idxReal = _cola.FindIndex(c => c.RutaArchivo == rutaInicial);
+            _indiceCola = idxReal >= 0 ? _ordenReproduccion.IndexOf(idxReal) : 0;
+        }
+        else { _indiceCola = 0; }
+
+        ReproducirActual();
+    }
+
+    public void Play()
+    {
+        if (_waveOut == null && CancionActual != null) { ReproducirActual(); return; }
+        if (_waveOut?.PlaybackState == PlaybackState.Paused)
+        {
+            _waveOut.Play();
+            _timerPosicion.Start();
+            EstadoCambiado?.Invoke(true);
+        }
+    }
+
+    public void Pause()
+    {
+        if (_waveOut?.PlaybackState == PlaybackState.Playing)
+        {
+            _waveOut.Pause();
+            _timerPosicion.Stop();
+            EstadoCambiado?.Invoke(false);
+        }
+    }
+
+    public void TogglePlayPause() { if (EstaReproduciendo) Pause(); else Play(); }
+
+    public void Stop() { DetenerInterno(); EstadoCambiado?.Invoke(false); }
+
+    public void Siguiente()
+    {
+        if (_cola.Count == 0) return;
+        _indiceCola++;
+
+        if (_indiceCola >= _ordenReproduccion.Count)
+        {
+            if (_modoRepetir == ModoRepetir.RepetirTodos)
+            {
+                _indiceCola = 0;
+                if (_modoAleatorio) RegenerarOrden();
+            }
+            else
+            {
+                _indiceCola = _ordenReproduccion.Count - 1;
+                Stop();
+                ReproduccionTerminada?.Invoke();
+                return;
+            }
+        }
+        ReproducirActual();
+    }
+
+    public void Anterior()
+    {
+        if (_cola.Count == 0) return;
+        if (_audioReader != null && _audioReader.CurrentTime.TotalSeconds > 3)
+        {
+            _audioReader.CurrentTime = TimeSpan.Zero;
+            return;
+        }
+
+        _indiceCola--;
+        if (_indiceCola < 0)
+        {
+            _indiceCola = _modoRepetir == ModoRepetir.RepetirTodos ? _ordenReproduccion.Count - 1 : 0;
+        }
+        ReproducirActual();
+    }
+
+    public void Seek(double porcentaje)
+    {
+        if (_audioReader != null)
+        {
+            _audioReader.CurrentTime = TimeSpan.FromSeconds(_audioReader.TotalTime.TotalSeconds * Math.Clamp(porcentaje, 0, 1));
+            PosicionActualizada?.Invoke(_audioReader.CurrentTime, _audioReader.TotalTime);
+        }
+    }
+
+    // CORRECCIÓN: Ahora mapea correctamente el índice seleccionado en la UI
+    public void ReproducirPorIndice(int indiceReal)
+    {
+        int idxEnCola = _ordenReproduccion.IndexOf(indiceReal);
+        if (idxEnCola >= 0)
+        {
+            _indiceCola = idxEnCola;
+            ReproducirActual();
+        }
+    }
+
+    private void ReproducirActual()
+    {
+        DetenerInterno();
+        var cancion = CancionActual;
+        if (cancion == null) return;
+
+        try
+        {
+            _audioReader = new AudioFileReader(cancion.RutaArchivo) { Volume = _volumen };
+            _waveOut = new WaveOutEvent();
+            _waveOut.Init(_audioReader);
+            _waveOut.PlaybackStopped += OnPlaybackStopped;
+            _waveOut.Play();
+            _timerPosicion.Start();
+
+            // Buscar letra automáticamente si no tiene una local
+            if (string.IsNullOrEmpty(cancion.Letra))
+            {
+                _ = Task.Run(async () =>
+                {
+                    var letraOnline = await LyricsService.BuscarLetraAsync(cancion.Artista, cancion.Titulo);
+                    if (!string.IsNullOrEmpty(letraOnline))
+                    {
+                        cancion.Letra = letraOnline;
+                        // Notificar a la UI para que actualice la letra
+                        CancionCambiada?.Invoke(cancion);
+                    }
+                });
+            }
+
+            CancionCambiada?.Invoke(cancion);
+            EstadoCambiado?.Invoke(true);
+        }
+        catch { Siguiente(); }
+    }
+
+    private void OnPlaybackStopped(object? sender, StoppedEventArgs e)
+    {
+        // Se añade un margen de 500ms para detectar el final real de la pista
+        if (_audioReader != null && _audioReader.CurrentTime >= _audioReader.TotalTime - TimeSpan.FromMilliseconds(500))
+        {
+            if (_modoRepetir == ModoRepetir.RepetirUno)
+            {
+                _audioReader.CurrentTime = TimeSpan.Zero;
+                _waveOut?.Play();
+                EstadoCambiado?.Invoke(true);
+            }
+            else { Siguiente(); }
+        }
+    }
+
+    private void DetenerInterno()
+    {
+        _timerPosicion.Stop();
+        if (_waveOut != null)
+        {
+            _waveOut.PlaybackStopped -= OnPlaybackStopped;
+            _waveOut.Stop();
+            _waveOut.Dispose();
+            _waveOut = null;
+        }
+        if (_audioReader != null) { _audioReader.Dispose(); _audioReader = null; }
+    }
+
+    private void RegenerarOrden()
+    {
+        int cancionActualRealIdx = (_indiceCola >= 0 && _indiceCola < _ordenReproduccion.Count)
+                                   ? _ordenReproduccion[_indiceCola] : -1;
+
+        _ordenReproduccion = Enumerable.Range(0, _cola.Count).ToList();
+
+        if (_modoAleatorio)
+        {
+            var rng = new Random();
+            for (int i = _ordenReproduccion.Count - 1; i > 0; i--)
+            {
+                int j = rng.Next(i + 1);
+                (_ordenReproduccion[i], _ordenReproduccion[j]) = (_ordenReproduccion[j], _ordenReproduccion[i]);
+            }
+
+            if (cancionActualRealIdx >= 0)
+            {
+                _ordenReproduccion.Remove(cancionActualRealIdx);
+                _ordenReproduccion.Insert(0, cancionActualRealIdx);
+                _indiceCola = 0;
+            }
+        }
+        else if (cancionActualRealIdx >= 0) { _indiceCola = cancionActualRealIdx; }
+    }
+
+    public List<(int IndiceReal, Cancion Cancion)> ObtenerColaOrdenada() =>
+        _ordenReproduccion.Select(idx => (idx, _cola[idx])).ToList();
+
+    public void Dispose() { DetenerInterno(); _timerPosicion.Dispose(); }
+}

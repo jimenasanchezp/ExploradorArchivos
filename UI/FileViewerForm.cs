@@ -1,7 +1,7 @@
 using System.Text.Json;
 using System.Xml.Linq;
 
-namespace ExploradorArchivos;
+namespace ExploradorArchivos.UI;
 
 public class FileViewerForm : Form
 {
@@ -24,14 +24,13 @@ public class FileViewerForm : Form
             Dock = DockStyle.Fill,
             Font = new Font("Consolas", 11f),
             ReadOnly = true,
-          //  BackColor = Form1.MainBg,
-            //ForeColor = Form1.MainText,
-            //BorderStyle = BorderStyle.None,
+            BackColor = ThemeRenderer.MainBg,
+            ForeColor = ThemeRenderer.MainText,
+            BorderStyle = BorderStyle.None,
             WordWrap = false
         };
 
         this.Controls.Add(_richTextBox);
-        //Form1.ApplyTheme(this);
     }
 
     private async void LoadFile(string path)
@@ -61,7 +60,6 @@ public class FileViewerForm : Form
                 }
                 catch { /* fallback to plain text */ }
             }
-
             else if (extension == ".csv")
             {
                 try
@@ -72,11 +70,11 @@ public class FileViewerForm : Form
                         var maxLen = lines.Select(l => l.Split(',').Length).Max();
                         var colsWidth = new int[maxLen];
                         var grid = lines.Select(l => l.Split(',')).ToList();
-                        
+
                         foreach (var row in grid)
                             for (int i = 0; i < row.Length; i++)
                                 colsWidth[i] = Math.Max(colsWidth[i], row[i].Trim().Length);
-                        
+
                         var sb = new System.Text.StringBuilder();
                         foreach (var row in grid)
                         {

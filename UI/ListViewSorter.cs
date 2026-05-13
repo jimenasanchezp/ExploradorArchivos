@@ -15,10 +15,10 @@ public class ListViewSorter : IComparer
         OrderOfSort = SortOrder.Ascending;
     }
 
-    public int Compare(object x, object y)
+    public int Compare(object? x, object? y)
     {
-        ListViewItem itemX = x as ListViewItem;
-        ListViewItem itemY = y as ListViewItem;
+        ListViewItem? itemX = x as ListViewItem;
+        ListViewItem? itemY = y as ListViewItem;
 
         if (itemX == null || itemY == null) return 0;
 
