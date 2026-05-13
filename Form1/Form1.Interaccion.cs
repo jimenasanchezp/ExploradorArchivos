@@ -7,6 +7,7 @@ using ExploradorArchivos.Mp3;
 using ExploradorArchivos.Services;
 using ExploradorArchivos.UI;
 using ExploradorArchivos.Video;
+using ExploradorArchivos.AppFoto;
 
 namespace ExploradorArchivos;
 
@@ -36,7 +37,7 @@ public partial class Form1
             string[] txtExt = { ".txt", ".json", ".xml", ".csv", ".cs", ".html", ".css", ".js", ".md", ".py" };
 
             if (imgExt.Contains(ext))
-            { new ImageViewerForm(ruta).Show(); return; }
+            { new AppFotoForm(ruta).Show(); return; }
 
             if (mediaExt.Contains(ext))
             {
