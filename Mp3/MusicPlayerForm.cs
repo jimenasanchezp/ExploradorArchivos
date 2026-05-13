@@ -9,7 +9,7 @@ namespace ExploradorArchivos.Mp3
 {
     public class MusicPlayerForm : Form
     {
-        // === Kawaii Glass Minimalist Palette ===
+        // === Glass Minimalist Palette ===
         private static readonly Color RosaPastel = ColorTranslator.FromHtml("#FFD9E8");
         private static readonly Color Lila = ColorTranslator.FromHtml("#E6D4F8");
         private static readonly Color AzulCielo = ColorTranslator.FromHtml("#CDE7F0");

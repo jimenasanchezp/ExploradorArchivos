@@ -9,7 +9,6 @@ using ExploradorArchivos.Models;
 using ExploradorArchivos.Services;
 using ExploradorArchivos.UI;
 using ExploradorArchivos.Mp3;
-using ExploradorArchivos.Video;
 
 namespace ExploradorArchivos;
 
@@ -71,7 +70,7 @@ public partial class Form1 : Form
 
         listViewPrincipal.ShowGroups = true;
 
-        // OwnerDraw para diseño Kawaii 95
+        // OwnerDraw para diseño Retro 95
         listViewPrincipal.OwnerDraw = true;
         listViewPrincipal.DrawColumnHeader += ThemeRenderer.DrawListViewColumnHeader;
         listViewPrincipal.DrawItem += ThemeRenderer.DrawListViewItem;

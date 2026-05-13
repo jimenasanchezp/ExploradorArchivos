@@ -43,7 +43,7 @@ public partial class AppFotoForm : Form
 
     private void InitializeCustomComponents()
     {
-        this.Text = "App Foto - Kawaii Studio";
+        this.Text = "App Foto - Premium Studio";
         this.Size = new Size(1100, 750);
         this.StartPosition = FormStartPosition.CenterScreen;
         this.BackColor = ThemeRenderer.MainBg;
@@ -66,7 +66,7 @@ public partial class AppFotoForm : Form
         int startX = 250;
         AgregarBotonEditor("↩️ Girar", startX, () => Rotar(RotateFlipType.Rotate270FlipNone));
         AgregarBotonEditor("↪️ Girar", startX + 90, () => Rotar(RotateFlipType.Rotate90FlipNone));
-        AgregarBotonEditor("✨ Kawaii", startX + 180, () => AplicarFiltro("Kawaii"));
+        AgregarBotonEditor("✨ Soft", startX + 180, () => AplicarFiltro("Soft"));
         AgregarBotonEditor("🎞️ Sepia", startX + 280, () => AplicarFiltro("Sepia"));
         AgregarBotonEditor("🌑 B&N", startX + 380, () => AplicarFiltro("BN"));
         
@@ -380,7 +380,7 @@ public partial class AppFotoForm : Form
 
         if (_currentMode == ToolMode.Text)
         {
-            string txt = Microsoft.VisualBasic.Interaction.InputBox("Escribe el texto:", "Añadir Texto", "¡Kawaii!");
+            string txt = Microsoft.VisualBasic.Interaction.InputBox("Escribe el texto:", "Añadir Texto", "¡Hola!");
             if (!string.IsNullOrWhiteSpace(txt))
             {
                 AppFotoProcessor.DibujarTexto(_imagenActual, txt, _startPoint, new Font("Segoe UI", 24, FontStyle.Bold), _drawColor);

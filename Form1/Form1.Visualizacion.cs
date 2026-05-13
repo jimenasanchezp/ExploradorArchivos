@@ -154,7 +154,7 @@ public partial class Form1
             {
                 listViewPrincipal.View = View.Details;
             }
-            listViewPrincipal.OwnerDraw = true; // Siempre activo para diseño Kawaii
+            listViewPrincipal.OwnerDraw = true; // Siempre activo para diseño Retro
             listViewPrincipal.Invalidate();
         };
 

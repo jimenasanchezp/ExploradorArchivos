@@ -41,7 +41,7 @@ public static class AppFotoProcessor
             {
                 "BN" => GetGrayscaleMatrix(),
                 "Sepia" => GetSepiaMatrix(),
-                "Kawaii" => GetKawaiiMatrix(),
+                "Soft" => GetSoftMatrix(),
                 _ => new ColorMatrix() // Identidad
             };
 
@@ -206,7 +206,7 @@ public static class AppFotoProcessor
         });
     }
 
-    private static ColorMatrix GetKawaiiMatrix()
+    private static ColorMatrix GetSoftMatrix()
     {
         // Tinte rosado pastel + Brillo
         return new ColorMatrix(new float[][]

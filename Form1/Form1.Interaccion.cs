@@ -6,7 +6,6 @@ using System.Windows.Forms;
 using ExploradorArchivos.Mp3;
 using ExploradorArchivos.Services;
 using ExploradorArchivos.UI;
-using ExploradorArchivos.Video;
 using ExploradorArchivos.AppFoto;
 
 namespace ExploradorArchivos;
@@ -48,9 +47,6 @@ public partial class Form1
                 new MusicPlayerForm(audioFiles, ruta).Show();
                 return;
             }
-
-            if (videoExt.Contains(ext))
-            { new VideoPlayerForm(ruta).Show(); return; }
 
             if (txtExt.Contains(ext))
             { new FileViewerForm(ruta).Show(); return; }
