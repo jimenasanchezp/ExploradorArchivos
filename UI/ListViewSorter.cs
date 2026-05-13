@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Windows.Forms;
 
@@ -66,12 +66,17 @@ public class ListViewSorter : IComparer
     // Helper: Convierte "1.5 MB" a número real para que no se ordene alfabéticamente
     private double ParsearTamano(string tamanoTexto)
     {
-        if (string.IsNullOrWhiteSpace(tamanoTexto) || tamanoTexto == "Carpeta") return 0;
+        if (string.IsNullOrWhiteSpace(tamanoTexto) || tamanoTexto == "Carpeta" || tamanoTexto == "0 KB") return 0;
 
-        string[] partes = tamanoTexto.Split(' ');
-        if (partes.Length != 2) return 0;
+        // Limpiar el texto de posibles caracteres no numéricos excepto el punto/coma y el espacio
+        string[] partes = tamanoTexto.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+        if (partes.Length < 1) return 0;
 
-        if (!double.TryParse(partes[0], out double valor)) return 0;
+        string valorTexto = partes[0].Replace(",", "."); // Normalizar a punto decimal
+        if (!double.TryParse(valorTexto, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out double valor)) 
+            return 0;
+
+        if (partes.Length < 2) return valor;
 
         return partes[1].ToUpper() switch
         {

@@ -8,7 +8,7 @@ namespace ExploradorArchivos.Services;
 
 public static class CsvIndexer
 {
-    public static async Task ExportarAsync(string rootPath, string outputFile, IProgress<string> progress, CancellationToken token)
+    public static async Task ExportarAsync(string rootPath, string outputFile, IProgress<string>? progress, CancellationToken token)
     {
         await Task.Run(() =>
         {
@@ -19,7 +19,7 @@ public static class CsvIndexer
         }, token);
     }
 
-    private static void ExportarRecursivo(string path, StreamWriter writer, IProgress<string> progress, CancellationToken token)
+    private static void ExportarRecursivo(string path, StreamWriter writer, IProgress<string>? progress, CancellationToken token)
     {
         if (token.IsCancellationRequested) return;
 

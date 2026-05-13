@@ -9,13 +9,13 @@ namespace ExploradorArchivos.Mp3
 {
     public class MusicPlayerForm : Form
     {
-        // === Kawaii 95 Palette ===
-        private static readonly Color RosaPastel = ColorTranslator.FromHtml("#F8C8DC");
-        private static readonly Color Lila = ColorTranslator.FromHtml("#D6C1F0");
+        // === Kawaii Glass Minimalist Palette ===
+        private static readonly Color RosaPastel = ColorTranslator.FromHtml("#FFD9E8");
+        private static readonly Color Lila = ColorTranslator.FromHtml("#E6D4F8");
         private static readonly Color AzulCielo = ColorTranslator.FromHtml("#CDE7F0");
         private static readonly Color VerdeMenta = ColorTranslator.FromHtml("#CFF5E7");
-        private static readonly Color BeigeClaro = ColorTranslator.FromHtml("#F5EBDD");
-        private static readonly Color GrisSuave = ColorTranslator.FromHtml("#EAEAEA");
+        private static readonly Color BeigeClaro = ColorTranslator.FromHtml("#FFF5F9");
+        private static readonly Color GrisSuave = ColorTranslator.FromHtml("#F9F9F9");
 
         private readonly GestorReproduccion _gestor;
         
@@ -63,7 +63,7 @@ namespace ExploradorArchivos.Mp3
             this.Size = new Size(850, 550);
             this.BackColor = BeigeClaro;
             this.StartPosition = FormStartPosition.CenterScreen;
-            this.Font = new Font("Microsoft Sans Serif", 9, FontStyle.Regular); 
+            try { this.Font = new Font("Inter", 9); } catch { this.Font = new Font("Segoe UI", 9); }
 
             this.Paint += (s, e) => DrawRetroBorder(e.Graphics, new Rectangle(0, 0, this.Width - 1, this.Height - 1), true);
 
@@ -73,20 +73,23 @@ namespace ExploradorArchivos.Mp3
             pnlTitleBar.MouseMove += TitleBar_MouseMove;
             pnlTitleBar.MouseUp += TitleBar_MouseUp;
 
-            Label lblTitle = new Label { Text = "🌸 mp3 🎧 ✨", ForeColor = Color.White, Font = new Font("Microsoft Sans Serif", 9, FontStyle.Bold), AutoSize = true, Location = new Point(5, 6) };
+            Label lblTitle = new Label { Text = "🌸 mp3 🎧 ✨", ForeColor = Color.FromArgb(45, 45, 45), Font = new Font(this.Font.FontFamily, 9, FontStyle.Bold), AutoSize = true, Location = new Point(70, 6) };
             lblTitle.MouseDown += TitleBar_MouseDown;
             lblTitle.MouseMove += TitleBar_MouseMove;
             lblTitle.MouseUp += TitleBar_MouseUp;
 
-            Button btnClose = CrearBotonTitle("X");
+            Button btnClose = CrearBotonSemaforo(Color.FromArgb(255, 95, 86), 10);
             btnClose.Click += (s, e) => this.Close();
-            btnClose.Location = new Point(this.Width - 25, 4);
 
-            Button btnMin = CrearBotonTitle("_");
+            Button btnMin = CrearBotonSemaforo(Color.FromArgb(255, 189, 46), 30);
             btnMin.Click += (s, e) => this.WindowState = FormWindowState.Minimized;
-            btnMin.Location = new Point(this.Width - 45, 4);
+            
+            Button btnMax = CrearBotonSemaforo(Color.FromArgb(39, 201, 63), 50);
+            btnMax.Click += (s, e) => {
+                this.WindowState = this.WindowState == FormWindowState.Normal ? FormWindowState.Maximized : FormWindowState.Normal;
+            };
 
-            pnlTitleBar.Controls.AddRange(new Control[] { lblTitle, btnMin, btnClose });
+            pnlTitleBar.Controls.AddRange(new Control[] { lblTitle, btnMin, btnMax, btnClose });
 
             // === MENU BAR ===
             MenuStrip menu = new MenuStrip { BackColor = GrisSuave, Dock = DockStyle.Top, Padding = new Padding(2,2,0,2) };
@@ -98,8 +101,7 @@ namespace ExploradorArchivos.Mp3
             // === SIDEBAR ===
             Panel pnlSidebar = new Panel { Dock = DockStyle.Left, Width = 160, BackColor = GrisSuave, Padding = new Padding(10, 20, 10, 10) };
             pnlSidebar.Paint += (s, e) => {
-                e.Graphics.DrawLine(Pens.White, pnlSidebar.Width - 2, 0, pnlSidebar.Width - 2, pnlSidebar.Height);
-                e.Graphics.DrawLine(Pens.Gray, pnlSidebar.Width - 1, 0, pnlSidebar.Width - 1, pnlSidebar.Height);
+                e.Graphics.DrawLine(new Pen(ColorTranslator.FromHtml("#DCDCDC")), pnlSidebar.Width - 1, 0, pnlSidebar.Width - 1, pnlSidebar.Height);
             };
 
             var btnMenuRep = CrearBotonSide("Reproductor 💖");
@@ -117,8 +119,7 @@ namespace ExploradorArchivos.Mp3
             // === BOTTOM BAR ===
             Panel pnlBottom = new Panel { Dock = DockStyle.Bottom, Height = 120, BackColor = GrisSuave };
             pnlBottom.Paint += (s, e) => {
-                e.Graphics.DrawLine(Pens.White, 0, 1, pnlBottom.Width, 1);
-                e.Graphics.DrawLine(Pens.Gray, 0, 0, pnlBottom.Width, 0);
+                e.Graphics.DrawLine(new Pen(ColorTranslator.FromHtml("#DCDCDC")), 0, 0, pnlBottom.Width, 0);
             };
 
             _lblTiempoActual = new Label { Text = "0:00", Location = new Point(20, 15), Size = new Size(40, 20) };
@@ -161,7 +162,7 @@ namespace ExploradorArchivos.Mp3
             pnlCoverContainer.Controls.Add(_picPortada);
 
             Panel pnlInfoContainer = new Panel { Location = new Point(280, 10), Size = new Size(350, 240) };
-            Label lblDeco1 = new Label { Text = "🦋 Now Playing", Font = new Font("Microsoft Sans Serif", 10, FontStyle.Bold), Location = new Point(0, 0), AutoSize = true, ForeColor = Color.DimGray };
+            Label lblDeco1 = new Label { Text = "🦋 Now Playing", Font = new Font(this.Font.FontFamily, 10, FontStyle.Bold), Location = new Point(0, 0), AutoSize = true, ForeColor = Color.DimGray };
             Button btnEdit = CrearBotonTitle("✏️");
             btnEdit.Size = new Size(30, 25);
             btnEdit.Location = new Point(310, 0);
@@ -181,8 +182,8 @@ namespace ExploradorArchivos.Mp3
 
             // 2. BIBLIOTECA PANEL
             _pnlBiblioteca = new Panel { Dock = DockStyle.Fill, Visible = false, Padding = new Padding(10) };
-            Label lblBib = new Label { Text = "🧸 Mi Biblioteca Musical", Dock = DockStyle.Top, Font = new Font("Microsoft Sans Serif", 12, FontStyle.Bold), Height = 30 };
-            _lstCola = new ListBox { Dock = DockStyle.Fill, BackColor = Color.White, Font = new Font("Microsoft Sans Serif", 10), DrawMode = DrawMode.OwnerDrawFixed, ItemHeight = 35 };
+            Label lblBib = new Label { Text = "🧸 Mi Biblioteca Musical", Dock = DockStyle.Top, Font = new Font(this.Font.FontFamily, 12, FontStyle.Bold), Height = 30 };
+            _lstCola = new ListBox { Dock = DockStyle.Fill, BackColor = Color.White, Font = new Font(this.Font.FontFamily, 10), DrawMode = DrawMode.OwnerDrawFixed, ItemHeight = 35 };
             _lstCola.DrawItem += LstCola_DrawItem;
             Panel pnlListBorder = new Panel { Dock = DockStyle.Fill, Padding = new Padding(2) };
             pnlListBorder.Paint += (s, e) => DrawRetroBorder(e.Graphics, pnlListBorder.ClientRectangle, false);
@@ -191,7 +192,7 @@ namespace ExploradorArchivos.Mp3
 
             // 3. CARPETAS PANEL
             _pnlCarpetas = new Panel { Dock = DockStyle.Fill, Visible = false, Padding = new Padding(10) };
-            Label lblCarp = new Label { Text = "🍧 Carpetas Locales", Dock = DockStyle.Top, Font = new Font("Microsoft Sans Serif", 12, FontStyle.Bold), Height = 30 };
+            Label lblCarp = new Label { Text = "🍧 Carpetas Locales", Dock = DockStyle.Top, Font = new Font(this.Font.FontFamily, 12, FontStyle.Bold), Height = 30 };
             _flowCarpetas = new FlowLayoutPanel { Dock = DockStyle.Fill, AutoScroll = true, BackColor = Color.White };
             Panel pnlFlowBorder = new Panel { Dock = DockStyle.Fill, Padding = new Padding(2) };
             pnlFlowBorder.Paint += (s, e) => DrawRetroBorder(e.Graphics, pnlFlowBorder.ClientRectangle, false);
@@ -200,8 +201,8 @@ namespace ExploradorArchivos.Mp3
 
             // 4. LETRAS PANEL
             _pnlLetras = new Panel { Dock = DockStyle.Fill, Visible = false, Padding = new Padding(10) };
-            Label lblLetras = new Label { Text = "🎀 Letras de la Canción", Dock = DockStyle.Top, Font = new Font("Microsoft Sans Serif", 12, FontStyle.Bold), Height = 30 };
-            _rtbLetras = new RichTextBox { Dock = DockStyle.Fill, BackColor = VerdeMenta, BorderStyle = BorderStyle.None, ReadOnly = true, Font = new Font("Microsoft Sans Serif", 12) };
+            Label lblLetras = new Label { Text = "🎀 Letras de la Canción", Dock = DockStyle.Top, Font = new Font(this.Font.FontFamily, 12, FontStyle.Bold), Height = 30 };
+            _rtbLetras = new RichTextBox { Dock = DockStyle.Fill, BackColor = VerdeMenta, BorderStyle = BorderStyle.None, ReadOnly = true, Font = new Font(this.Font.FontFamily, 11) };
             _rtbLetras.SelectionAlignment = HorizontalAlignment.Center;
             Panel pnlLetrasBorder = new Panel { Dock = DockStyle.Fill, Padding = new Padding(2) };
             pnlLetrasBorder.Paint += (s, e) => DrawRetroBorder(e.Graphics, pnlLetrasBorder.ClientRectangle, false);
@@ -233,23 +234,15 @@ namespace ExploradorArchivos.Mp3
 
         private void DrawRetroBorder(Graphics g, Rectangle bounds, bool raised)
         {
-            Color light = Color.White;
-            Color dark = Color.Gray;
-            
-            using Pen penLight = new Pen(raised ? light : dark, 2);
-            using Pen penDark = new Pen(raised ? dark : light, 2);
-
-            g.DrawLine(penLight, bounds.Left, bounds.Top, bounds.Right, bounds.Top);
-            g.DrawLine(penLight, bounds.Left, bounds.Top, bounds.Left, bounds.Bottom);
-            g.DrawLine(penDark, bounds.Left, bounds.Bottom - 1, bounds.Right, bounds.Bottom - 1);
-            g.DrawLine(penDark, bounds.Right - 1, bounds.Top, bounds.Right - 1, bounds.Bottom);
+            using Pen borderPen = new Pen(ColorTranslator.FromHtml("#DCDCDC"), 1);
+            g.DrawRectangle(borderPen, bounds.X, bounds.Y, bounds.Width - 1, bounds.Height - 1);
         }
 
         private Panel CrearPanelInfo(string title, int y, out Label lblValue)
         {
             Panel pnl = new Panel { Location = new Point(0, y), Size = new Size(340, 55) };
-            Label lblDesc = new Label { Text = title, Location = new Point(0, 0), AutoSize = true, ForeColor = Color.DimGray, Font = new Font("Microsoft Sans Serif", 8) };
-            lblValue = new Label { Text = "...", Location = new Point(8, 22), Size = new Size(310, 20), Font = new Font("Microsoft Sans Serif", 10, FontStyle.Bold), AutoEllipsis = true };
+            Label lblDesc = new Label { Text = title, Location = new Point(0, 0), AutoSize = true, ForeColor = Color.DimGray, Font = new Font(this.Font.FontFamily, 8) };
+            lblValue = new Label { Text = "...", Location = new Point(8, 22), Size = new Size(310, 20), Font = new Font(this.Font.FontFamily, 10, FontStyle.Bold), AutoEllipsis = true };
             
             pnl.Paint += (s, e) => {
                 var rect = new Rectangle(2, 18, 330, 30);
@@ -264,12 +257,24 @@ namespace ExploradorArchivos.Mp3
         {
             Button btn = new Button {
                 Text = text, Size = new Size(20, 20), FlatStyle = FlatStyle.Flat,
-                BackColor = GrisSuave, Font = new Font("Arial", 8, FontStyle.Bold),
+                BackColor = GrisSuave, Font = new Font(this.Font.FontFamily, 8, FontStyle.Bold),
                 Padding = new Padding(0), Margin = new Padding(0)
             };
             btn.FlatAppearance.BorderSize = 0;
-            btn.Paint += (s, e) => DrawRetroBorder(e.Graphics, new Rectangle(0,0,btn.Width-1,btn.Height-1), true);
             return btn;
+        }
+
+        private Button CrearBotonSemaforo(Color color, int x)
+        {
+            Button b = new Button { Location = new Point(x, 7), Size = new Size(14, 14), BackColor = color, FlatStyle = FlatStyle.Flat };
+            b.FlatAppearance.BorderSize = 0;
+            b.Paint += (s, e) => {
+                e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                e.Graphics.Clear(Lila);
+                e.Graphics.FillEllipse(new SolidBrush(color), 0, 0, b.Width - 1, b.Height - 1);
+                e.Graphics.DrawEllipse(new Pen(Color.FromArgb(50, Color.Black)), 0, 0, b.Width - 1, b.Height - 1);
+            };
+            return b;
         }
 
         private Button CrearBotonControl(string text, Color bgColor)
@@ -289,11 +294,10 @@ namespace ExploradorArchivos.Mp3
             Button btn = new Button {
                 Text = text, Width = 140, Height = 45, FlatStyle = FlatStyle.Flat,
                 TextAlign = ContentAlignment.MiddleLeft, BackColor = GrisSuave,
-                Font = new Font("Microsoft Sans Serif", 10, FontStyle.Bold), Margin = new Padding(0, 0, 0, 10),
+                Font = new Font(this.Font.FontFamily, 10, FontStyle.Bold), Margin = new Padding(0, 0, 0, 10),
                 Padding = new Padding(5, 0, 0, 0)
             };
             btn.FlatAppearance.BorderSize = 0;
-            btn.Paint += (s, e) => DrawRetroBorder(e.Graphics, new Rectangle(0,0, btn.Width - 1, btn.Height - 1), true);
             return btn;
         }
 
@@ -410,7 +414,7 @@ namespace ExploradorArchivos.Mp3
                     Size = new Size(180, 80),
                     FlatStyle = FlatStyle.Flat,
                     BackColor = GrisSuave,
-                    Font = new Font("Microsoft Sans Serif", 9, FontStyle.Bold),
+                    Font = new Font(this.Font.FontFamily, 9, FontStyle.Bold),
                     Margin = new Padding(10)
                 };
                 btn.FlatAppearance.BorderSize = 0;

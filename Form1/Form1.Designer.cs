@@ -341,11 +341,12 @@ namespace ExploradorArchivos
             Controls.Add(splitContainerMain);
             Controls.Add(pnlBottom);
             Controls.Add(pnlTop);
-            Font = new Font("Segoe UI", 10F, FontStyle.Regular, GraphicsUnit.Point, 0);
+            Font = new Font("Segoe UI", 10F, FontStyle.Regular, GraphicsUnit.Point, 0); // La fuente se establecerá dinámicamente en Form1.cs
             Margin = new Padding(4);
             MinimumSize = new Size(800, 500);
             Name = "Form1";
             StartPosition = FormStartPosition.CenterScreen;
+            FormBorderStyle = FormBorderStyle.None;
             Text = "Explorador de Archivos";
             pnlTop.ResumeLayout(false);
             pnlAddressBorder.ResumeLayout(false);

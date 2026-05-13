@@ -202,7 +202,7 @@ public partial class Form1
         treeViewLateral.EndUpdate();
     }
 
-    private void TreeViewLateral_NodeMouseDoubleClick(object sender, TreeNodeMouseClickEventArgs e)
+    private void TreeViewLateral_NodeMouseDoubleClick(object? sender, TreeNodeMouseClickEventArgs e)
     {
         if (e.Node.Tag != null)
         {

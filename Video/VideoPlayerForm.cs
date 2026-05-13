@@ -49,6 +49,10 @@ public class VideoPlayerForm : Form
     private FormBorderStyle _prevBorderStyle;
     private readonly System.Windows.Forms.Timer _timerUI;
 
+    // Arrastre
+    private bool _dragging = false;
+    private Point _startPoint = new Point(0, 0);
+
     public VideoPlayerForm(string filePath)
     {
         _filePath = filePath;
@@ -69,10 +73,16 @@ public class VideoPlayerForm : Form
         this.StartPosition = FormStartPosition.CenterScreen;
         this.BackColor = BgPrimary;
         this.ForeColor = TextPrimary;
-        this.Font = new Font("Segoe UI", 10);
+        try { this.Font = new Font("Inter", 10); } catch { this.Font = new Font("Segoe UI", 10); }
         this.DoubleBuffered = true;
         this.KeyPreview = true;
+        this.FormBorderStyle = FormBorderStyle.None;
         this.KeyDown += VideoPlayerForm_KeyDown;
+
+        // Borde plano opcional
+        this.Paint += (s, e) => {
+            e.Graphics.DrawRectangle(new Pen(ColorTranslator.FromHtml("#313145"), 1), 0, 0, this.Width - 1, this.Height - 1);
+        };
 
         // ==========================================
         // PANEL DE CONTROLES (Bottom)
@@ -89,9 +99,12 @@ public class VideoPlayerForm : Form
         _pnlInfo = new Panel
         {
             Dock = DockStyle.Top,
-            Height = 22,
+            Height = 25,
             BackColor = Color.Transparent
         };
+        _pnlInfo.MouseDown += (s, e) => { if (e.Button == MouseButtons.Left) { _dragging = true; _startPoint = e.Location; } };
+        _pnlInfo.MouseMove += (s, e) => { if (_dragging) { this.Location = new Point(this.Location.X + e.X - _startPoint.X, this.Location.Y + e.Y - _startPoint.Y); } };
+        _pnlInfo.MouseUp += (s, e) => { _dragging = false; };
 
         _lblTitulo = new Label
         {
