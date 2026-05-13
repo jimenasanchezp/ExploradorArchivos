@@ -39,7 +39,6 @@ public partial class Form1 : Form
 
     private void ConfigurarUI()
     {
-<<<<<<< HEAD
         try { this.Font = new Font("MS Sans Serif", 9); } catch { this.Font = new Font("Microsoft Sans Serif", 9); }
         this.BackColor = ThemeRenderer.MainBg;
         listViewPrincipal.BackColor = Color.White;
@@ -52,18 +51,12 @@ public partial class Form1 : Form
         listViewPrincipal.View = View.Details;
         listViewPrincipal.HeaderStyle = ColumnHeaderStyle.Clickable;
         listViewPrincipal.Columns.Clear();
-        listViewPrincipal.Columns.Add("Nombre", 350);
-        listViewPrincipal.Columns.Add("Fecha de modificación", 180);
-        listViewPrincipal.Columns.Add("Tipo", 150);
-        listViewPrincipal.Columns.Add("Tamaño", 120);
+        listViewPrincipal.Columns.Add("Nombre", 450);
+        listViewPrincipal.Columns.Add("Tipo", 120);
+        listViewPrincipal.Columns.Add("Tamaño", 100);
+        listViewPrincipal.Columns.Add("Info / Contenido", 150);
+        listViewPrincipal.Columns.Add("Fecha de modificación", 200);
         listViewPrincipal.GridLines = true;
-=======
-        this.BackColor = ThemeRenderer.MainBg;
-        listViewPrincipal.BackColor = Color.White;
-        listViewPrincipal.BorderStyle = BorderStyle.None;
-        treeViewLateral.BackColor = ThemeRenderer.SecondaryBg;
-        treeViewLateral.BorderStyle = BorderStyle.None;
->>>>>>> db432ec1f06873e5994f6c0eae4bb22c39c303a2
 
         _sorter = new ListViewSorter();
         listViewPrincipal.ListViewItemSorter = _sorter;
@@ -83,7 +76,6 @@ public partial class Form1 : Form
         treeViewLateral.DrawNode += ThemeRenderer.DrawTreeNode;
 
         // --- 1. REORGANIZACIÓN DE BARRA SUPERIOR (pnlTop) ---
-<<<<<<< HEAD
         pnlTop.BackColor = ThemeRenderer.SecondaryBg;
         pnlTop.Height = 70;
         pnlTop.Controls.Clear();
@@ -109,51 +101,23 @@ public partial class Form1 : Form
         pnlAddr.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
         pnlAddr.Controls.Add(pnlAddressBorder);
         pnlAddressBorder.Location = new Point(10, 18);
-=======
-        pnlTop.BackColor = ThemeRenderer.Lila;
-        pnlTop.Height = 70; // Aumentar altura para los grupos
-        pnlTop.Controls.Clear();
-        pnlTop.Paint += (s, e) => ThemeRenderer.DrawRetroBorder(e.Graphics, pnlTop.ClientRectangle, true);
-
-        // Grupo: Navegación
-        Panel pnlNav = CrearGrupoHerramientas("Navegación 🎀", 10, 10, 150);
-        pnlNav.Controls.Add(btnAtras); btnAtras.Location = new Point(10, 22); btnAtras.Size = new Size(35, 30);
-        pnlNav.Controls.Add(btnSubir); btnSubir.Location = new Point(50, 22); btnSubir.Size = new Size(35, 30);
-        pnlNav.Controls.Add(btnActualizar); btnActualizar.Location = new Point(90, 22); btnActualizar.Size = new Size(35, 30);
-        pnlTop.Controls.Add(pnlNav);
-
-        // Grupo: Dirección
-        Panel pnlAddr = CrearGrupoHerramientas("Dirección ✨", 170, 10, pnlTop.Width - 550);
-        pnlAddr.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
-        pnlAddr.Controls.Add(pnlAddressBorder);
-        pnlAddressBorder.Location = new Point(10, 22);
->>>>>>> db432ec1f06873e5994f6c0eae4bb22c39c303a2
         pnlAddressBorder.Size = new Size(pnlAddr.Width - 20, 30);
         pnlAddressBorder.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
         pnlTop.Controls.Add(pnlAddr);
 
         // Grupo: Acciones
-<<<<<<< HEAD
         Panel pnlActions = CrearGrupoHerramientas("", pnlTop.Width - 370, 10, 360);
         pnlActions.Anchor = AnchorStyles.Top | AnchorStyles.Right;
         pnlActions.Controls.Add(btnActualizar); btnActualizar.Location = new Point(10, 18); btnActualizar.Size = new Size(35, 30);
         pnlActions.Controls.Add(btnNuevaCarpeta); btnNuevaCarpeta.Location = new Point(50, 18); btnNuevaCarpeta.Size = new Size(90, 30);
         pnlActions.Controls.Add(btnExportarCSV); btnExportarCSV.Location = new Point(145, 18); btnExportarCSV.Size = new Size(90, 30);
         pnlActions.Controls.Add(_btnToggleVista); _btnToggleVista.Location = new Point(240, 18); _btnToggleVista.Size = new Size(90, 30);
-=======
-        Panel pnlActions = CrearGrupoHerramientas("Acciones 🌸", pnlTop.Width - 370, 10, 360);
-        pnlActions.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-        pnlActions.Controls.Add(btnNuevaCarpeta); btnNuevaCarpeta.Location = new Point(10, 22); btnNuevaCarpeta.Size = new Size(110, 30);
-        pnlActions.Controls.Add(btnExportarCSV); btnExportarCSV.Location = new Point(125, 22); btnExportarCSV.Size = new Size(110, 30);
-        pnlActions.Controls.Add(_btnToggleVista); _btnToggleVista.Location = new Point(240, 22); _btnToggleVista.Size = new Size(110, 30);
->>>>>>> db432ec1f06873e5994f6c0eae4bb22c39c303a2
         pnlTop.Controls.Add(pnlActions);
 
         // --- 2. REFINAMIENTO DEL PANEL LATERAL (Sidebar) ---
         pnlSearch.BackColor = ThemeRenderer.SecondaryBg;
         pnlSearch.Height = 65;
         pnlSearch.Controls.Clear();
-<<<<<<< HEAD
         pnlSearch.Paint += (s, e) => ThemeRenderer.DrawRetroBorder(e.Graphics, pnlSearch.ClientRectangle, true);
 
         pnlSearch.MouseDown += (s, e) => { if (e.Button == MouseButtons.Left) { isDragging = true; lastCursor = e.Location; } };
@@ -205,46 +169,11 @@ public partial class Form1 : Form
         pnlAddressBorder.Paint += (s, e) => {
             ThemeRenderer.DrawRetroBorder(e.Graphics, pnlAddressBorder.ClientRectangle, false); // Sunken
         };
-=======
-        pnlSearch.Paint += (s, e) => ThemeRenderer.DrawRetroBorder(e.Graphics, pnlSearch.ClientRectangle, false);
-
-        Label lblSearchTitle = new Label { Text = "✨ Buscar Cositas", Font = new Font("Segoe UI", 8, FontStyle.Bold), Location = new Point(10, 5), AutoSize = true };
-        pnlSearch.Controls.Add(lblSearchTitle);
-        pnlSearch.Controls.Add(pnlSearchBorder);
-        pnlSearchBorder.Location = new Point(10, 25);
-        pnlSearchBorder.Width = pnlSearch.Width - 95;
-        pnlSearch.Controls.Add(btnBuscar);
-        btnBuscar.Location = new Point(pnlSearch.Width - 80, 25);
-        btnBuscar.Size = new Size(70, 30);
-
-        // --- 3. BARRA DE FILTROS INTEGRADA ---
-        _pnlFiltros.BackColor = ThemeRenderer.MainBg;
-        _pnlFiltros.Height = 45;
-        _pnlFiltros.Padding = new Padding(10, 10, 0, 0);
-        _pnlFiltros.Paint += (s, e) => ThemeRenderer.DrawRetroBorder(e.Graphics, _pnlFiltros.ClientRectangle, false);
-
-        // --- Configurar Botones (Estilo Retro) ---
-        ConfigurarBotonRetro(btnAtras, "⬅️");
-        ConfigurarBotonRetro(btnSubir, "⬆️");
-        ConfigurarBotonRetro(btnActualizar, "🔄");
-        ConfigurarBotonRetro(btnNuevaCarpeta, "📁+");
-        ConfigurarBotonRetro(btnExportarCSV, "📊 CSV");
-        ConfigurarBotonRetro(btnBuscar, "🔍");
-        ConfigurarBotonRetro(_btnToggleVista, "🖼️ Vista");
-
-        // --- Barra de Direcciones ---
-        pnlAddressBorder.BackColor = Color.White;
-        pnlAddressBorder.Paint += (s, e) => ThemeRenderer.DrawRetroBorder(e.Graphics, pnlAddressBorder.ClientRectangle, false);
->>>>>>> db432ec1f06873e5994f6c0eae4bb22c39c303a2
         
         _flpBreadcrumbs = new FlowLayoutPanel
         {
             Dock = DockStyle.Fill,
-<<<<<<< HEAD
             BackColor = Color.White,
-=======
-            BackColor = ThemeRenderer.AddressYellow,
->>>>>>> db432ec1f06873e5994f6c0eae4bb22c39c303a2
             WrapContents = false,
             AutoScroll = false,
             Cursor = Cursors.IBeam,
@@ -254,28 +183,16 @@ public partial class Form1 : Form
         pnlAddressBorder.Controls.Add(_flpBreadcrumbs);
         _flpBreadcrumbs.BringToFront();
 
-<<<<<<< HEAD
         txtDireccion.BackColor = Color.White;
         txtDireccion.Visible = false;
         txtDireccion.Leave += (s, e) => OcultarTextBoxDireccion();
 
         // --- Elementos Decorativos y Barra de Estado ---
         pnlBottom.BackColor = ThemeRenderer.MainBg;
-=======
-        txtDireccion.BackColor = ThemeRenderer.AddressYellow;
-        txtDireccion.Visible = false;
-        txtDireccion.Leave += (s, e) => OcultarTextBoxDireccion();
-
-        // --- Elementos Decorativos ---
-        Label lblKawaii3 = new Label { Text = "🌸", Font = new Font("Segoe UI", 16), AutoSize = true, Anchor = AnchorStyles.Bottom | AnchorStyles.Left, Location = new Point(5, 5), BackColor = Color.Transparent };
-        pnlBottom.BackColor = ThemeRenderer.Lila;
-        pnlBottom.Controls.Add(lblKawaii3);
->>>>>>> db432ec1f06873e5994f6c0eae4bb22c39c303a2
         pnlBottom.Paint += (s, e) => ThemeRenderer.DrawRetroBorder(e.Graphics, pnlBottom.ClientRectangle, true);
 
         // --- Barra de Estado y Papelera ---
         lblStatus.ForeColor = ThemeRenderer.MainText;
-<<<<<<< HEAD
         lblStatus.Font = new Font(this.Font.FontFamily, 8);
         lblStatus.AutoSize = false;
         lblStatus.Dock = DockStyle.Fill;
@@ -288,13 +205,6 @@ public partial class Form1 : Form
         };
         lblTrash.ForeColor = ThemeRenderer.MainText;
         lblTrash.Text = "🗑️ Papelera";
-=======
-        lblStatus.Font = new Font("Segoe UI", 9, FontStyle.Italic);
-        pnlTrash.BackColor = ThemeRenderer.MainBg;
-        pnlTrash.Paint += (s, e) => ThemeRenderer.DrawRetroBorder(e.Graphics, pnlTrash.ClientRectangle, false);
-        lblTrash.ForeColor = ThemeRenderer.SecondaryText;
-        lblTrash.Text = "🌸 Papelera 🌸";
->>>>>>> db432ec1f06873e5994f6c0eae4bb22c39c303a2
 
         // --- Reordenar paneles ---
         splitContainerMain.Panel1.Controls.Clear();
@@ -303,22 +213,6 @@ public partial class Form1 : Form
         splitContainerMain.Panel1.Controls.Add(treeViewLateral);
         splitContainerMain.Panel1.Controls.Add(pnlSearch);
         
-<<<<<<< HEAD
-=======
-        // Sticker Kawaii en la esquina inferior del Sidebar
-        Label lblSticker = new Label 
-        { 
-            Text = "🐰✨", 
-            Font = new Font("Segoe UI", 24), 
-            AutoSize = true, 
-            BackColor = Color.Transparent, 
-            Anchor = AnchorStyles.Bottom | AnchorStyles.Right,
-            Location = new Point(180, splitContainerMain.Panel1.Height - 150)
-        };
-        splitContainerMain.Panel1.Controls.Add(lblSticker);
-        lblSticker.BringToFront();
-
->>>>>>> db432ec1f06873e5994f6c0eae4bb22c39c303a2
         pnlSearch.BringToFront();
 
         splitContainerMain.Panel2.Controls.Add(listViewPrincipal);
@@ -326,7 +220,7 @@ public partial class Form1 : Form
         listViewPrincipal.BringToFront(); // <-- CLAVE: listViewPrincipal debe estar al frente para que dockee al último y no quede bajo _pnlFiltros
 
         splitContainerMain.SplitterDistance = 280; // Más espacio para el sidebar
-    }//
+    }
 
     private Panel CrearGrupoHerramientas(string titulo, int x, int y, int ancho)
     {
@@ -387,40 +281,6 @@ public partial class Form1 : Form
             ThemeRenderer.DrawRetroBorder(e.Graphics, btn.ClientRectangle, !isPressed);
             if (isPressed)
             {
-                TextRenderer.DrawText(e.Graphics, btn.Text, btn.Font, 
-                    new Rectangle(btn.ClientRectangle.X + 1, btn.ClientRectangle.Y + 1, btn.ClientRectangle.Width, btn.ClientRectangle.Height), 
-                    btn.ForeColor, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
-            }
-        };
-    }
-
-    private Panel CrearGrupoHerramientas(string titulo, int x, int y, int ancho)
-    {
-        Panel pnl = new Panel { Location = new Point(x, y), Size = new Size(ancho, 55), BackColor = Color.Transparent };
-        Label lbl = new Label { Text = titulo, Location = new Point(5, 2), AutoSize = true, Font = new Font("Segoe UI", 7, FontStyle.Bold), ForeColor = ThemeRenderer.SecondaryText };
-        pnl.Controls.Add(lbl);
-        pnl.Paint += (s, e) => ThemeRenderer.DrawRetroBorder(e.Graphics, new Rectangle(0, 15, pnl.Width - 1, pnl.Height - 16), false);
-        return pnl;
-    }
-
-    private void ConfigurarBotonRetro(Button btn, string emoji)
-    {
-        btn.FlatStyle = FlatStyle.Flat;
-        btn.FlatAppearance.BorderSize = 0;
-        btn.BackColor = ThemeRenderer.Lila;
-        btn.Text = emoji + " " + btn.Text.Replace("📊 ", "").Replace("📁 ", "").Replace("⟳", "").Replace("▲", "").Replace("◄", "").Replace("🖼️ ", "");
-        btn.Font = new Font("Segoe UI Emoji", 9, FontStyle.Bold);
-        
-        bool isPressed = false;
-
-        btn.MouseDown += (s, e) => { isPressed = true; btn.Invalidate(); };
-        btn.MouseUp += (s, e) => { isPressed = false; btn.Invalidate(); };
-
-        btn.Paint += (s, e) => {
-            ThemeRenderer.DrawRetroBorder(e.Graphics, btn.ClientRectangle, !isPressed);
-            if (isPressed)
-            {
-                // Mover el texto 1px abajo y derecha cuando se presiona
                 TextRenderer.DrawText(e.Graphics, btn.Text, btn.Font, 
                     new Rectangle(btn.ClientRectangle.X + 1, btn.ClientRectangle.Y + 1, btn.ClientRectangle.Width, btn.ClientRectangle.Height), 
                     btn.ForeColor, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);

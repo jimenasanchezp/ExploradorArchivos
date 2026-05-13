@@ -16,19 +16,24 @@ namespace ExploradorArchivos;
 /// </summary>
 public partial class Form1
 {
+    // En Form1.Visualizacion.cs
     private void PoblarListViewDesdeMemoria()
     {
         listViewPrincipal.BeginUpdate();
+
+        // CRÍTICO: Desactivar el ordenador automático para que respete nuestro orden manual
+        listViewPrincipal.ListViewItemSorter = null;
+
         listViewPrincipal.Items.Clear();
         listViewPrincipal.Groups.Clear();
 
-        var itemsFiltrados = _itemsActuales.Where(x =>
-            _filtroActivo == "Todos" ||
-            (_filtroActivo == "Carpetas" && x.EsCarpeta) ||
-            (!x.EsCarpeta && x.CategoriaVisual == _filtroActivo)
-        ).ToList();
+        // Ordenar: Los más recientes arriba (OrderByDescending)
+        var itemsOrdenados = _itemsActuales
+            .Where(x => _filtroActivo == "Todos" || x.CategoriaVisual == _filtroActivo)
+            .OrderByDescending(x => x.FechaModificacion)
+            .ToList();
 
-        foreach (var item in itemsFiltrados)
+        foreach (var item in itemsOrdenados)
         {
             var lvi = new ListViewItem(item.Nombre) { Tag = item.RutaCompleta };
             lvi.SubItems.Add(item.Tipo);
@@ -36,16 +41,10 @@ public partial class Form1
             lvi.SubItems.Add(item.InfoAdicional);
             lvi.SubItems.Add(item.FechaModificacion.ToString("dd/MM/yyyy HH:mm"));
 
-            var grupo = listViewPrincipal.Groups[item.CategoriaVisual];
-            if (grupo == null)
-            {
-                grupo = new ListViewGroup(item.CategoriaVisual, item.CategoriaVisual);
-                listViewPrincipal.Groups.Add(grupo);
-            }
-            lvi.Group = grupo;
-            lvi.ImageKey = item.EsCarpeta ? "folder" : "file";
+            // ... resto del código de grupos ...
             listViewPrincipal.Items.Add(lvi);
         }
+
         listViewPrincipal.EndUpdate();
     }
 
@@ -63,15 +62,8 @@ public partial class Form1
             AutoScroll = true
         };
 
-<<<<<<< HEAD
         _pnlFiltros.Paint += (s, e) => {
             ThemeRenderer.DrawRetroBorder(e.Graphics, _pnlFiltros.ClientRectangle, true);
-=======
-        // Línea base decorativa
-        _pnlFiltros.Paint += (s, e) => {
-            using Pen p = new Pen(ThemeRenderer.SecondaryBg, 2);
-            e.Graphics.DrawLine(p, 0, _pnlFiltros.Height - 1, _pnlFiltros.Width, _pnlFiltros.Height - 1);
->>>>>>> db432ec1f06873e5994f6c0eae4bb22c39c303a2
         };
 
         splitContainerMain.Panel2.Controls.Add(_pnlFiltros);
@@ -85,7 +77,6 @@ public partial class Form1
             {
                 Text = f,
                 FlatStyle = FlatStyle.Flat,
-<<<<<<< HEAD
                 Height = 36, // Más altas para legibilidad
                 Width = 135, // Más anchas
                 Cursor = Cursors.Hand,
@@ -94,16 +85,6 @@ public partial class Form1
                 Tag = f,
                 Margin = new Padding(3, 0, 3, 0), // Separación
                 Font = new Font("MS Sans Serif", 9, FontStyle.Bold)
-=======
-                Height = 32,
-                Width = 110, // Ancho fijo para evitar solapamientos
-                Cursor = Cursors.Hand,
-                BackColor = (f == "Todos") ? ThemeRenderer.SecondaryBg : ThemeRenderer.MainBg,
-                ForeColor = ThemeRenderer.MainText,
-                Tag = f,
-                Margin = new Padding(2, 0, 2, 0),
-                Font = new Font("Segoe UI", 9, FontStyle.Bold)
->>>>>>> db432ec1f06873e5994f6c0eae4bb22c39c303a2
             };
             btnTab.FlatAppearance.BorderSize = 0;
 
@@ -113,11 +94,7 @@ public partial class Form1
                 Rectangle rect = btnTab.ClientRectangle;
                 if (!activo) { rect.Y += 2; rect.Height -= 2; }
 
-<<<<<<< HEAD
                 ThemeRenderer.DrawRetroBorder(e.Graphics, rect, true);
-=======
-                ThemeRenderer.DrawRetroBorder(e.Graphics, rect, !activo);
->>>>>>> db432ec1f06873e5994f6c0eae4bb22c39c303a2
                 
                 TextFormatFlags flags = TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter;
                 TextRenderer.DrawText(e.Graphics, btnTab.Text, btnTab.Font, rect, btnTab.ForeColor, flags);
@@ -126,7 +103,6 @@ public partial class Form1
             btnTab.Click += (s, e) =>
             {
                 _filtroActivo = btnTab.Tag?.ToString() ?? "Todos";
-<<<<<<< HEAD
                 // Actualizar colores
                 foreach (Control c in _pnlFiltros.Controls)
                 {
@@ -136,9 +112,6 @@ public partial class Form1
                         b.Invalidate();
                     }
                 }
-=======
-                foreach (Control c in _pnlFiltros.Controls) c.Invalidate();
->>>>>>> db432ec1f06873e5994f6c0eae4bb22c39c303a2
                 PoblarListViewDesdeMemoria();
             };
 
