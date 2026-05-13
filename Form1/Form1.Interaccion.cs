@@ -16,7 +16,7 @@ namespace ExploradorArchivos;
 /// </summary>
 public partial class Form1
 {
-    private void ListViewPrincipal_DoubleClick(object sender, EventArgs e)
+    private void ListViewPrincipal_DoubleClick(object? sender, EventArgs e)
     {
         if (listViewPrincipal.SelectedItems.Count == 0) return;
         string? ruta = listViewPrincipal.SelectedItems[0].Tag?.ToString();
@@ -59,26 +59,26 @@ public partial class Form1
         catch (Exception ex) { MessageBox.Show("No se pudo abrir: " + ex.Message); }
     }
 
-    private void PnlTrash_DragEnter(object sender, DragEventArgs e)
+    private void PnlTrash_DragEnter(object? sender, DragEventArgs e)
     {
-        if (e.Data.GetDataPresent(typeof(ListView.SelectedListViewItemCollection)))
+        if (e.Data != null && e.Data.GetDataPresent(typeof(ListView.SelectedListViewItemCollection)))
         {
             e.Effect = DragDropEffects.Move;
-            pnlTrash.BackColor = ColorTranslator.FromHtml("#FF8DA1");
-            lblTrash.ForeColor = Color.White;
+            pnlTrash.BackColor = ThemeRenderer.Accent;
+            lblTrash.ForeColor = Color.Black;
         }
     }
 
-    private void PnlTrash_DragLeave(object sender, EventArgs e)
+    private void PnlTrash_DragLeave(object? sender, EventArgs e)
     {
         pnlTrash.BackColor = ThemeRenderer.MainBg;
         lblTrash.ForeColor = ThemeRenderer.SecondaryText;
     }
 
-    private void PnlTrash_DragDrop(object sender, DragEventArgs e)
+    private void PnlTrash_DragDrop(object? sender, DragEventArgs e)
     {
-        PnlTrash_DragLeave(null, null);
-        if (e.Data.GetData(typeof(ListView.SelectedListViewItemCollection)) is ListView.SelectedListViewItemCollection items)
+        PnlTrash_DragLeave(sender, e);
+        if (e.Data != null && e.Data.GetData(typeof(ListView.SelectedListViewItemCollection)) is ListView.SelectedListViewItemCollection items)
         {
             foreach (ListViewItem item in items)
             {
@@ -89,7 +89,7 @@ public partial class Form1
         }
     }
 
-    private void ListViewPrincipal_KeyDown(object sender, KeyEventArgs e)
+    private void ListViewPrincipal_KeyDown(object? sender, KeyEventArgs e)
     {
         if (e.KeyCode == Keys.Space)
         {
@@ -110,7 +110,7 @@ public partial class Form1
         }
     }
 
-    private void TxtBuscar_KeyDown(object sender, KeyEventArgs e)
+    private void TxtBuscar_KeyDown(object? sender, KeyEventArgs e)
     {
         if (e.KeyCode == Keys.Enter)
         {

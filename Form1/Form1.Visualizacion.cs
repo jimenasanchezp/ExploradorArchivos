@@ -56,53 +56,61 @@ public partial class Form1
         _pnlFiltros = new FlowLayoutPanel
         {
             Dock = DockStyle.Top,
-            Height = 40,
-            BackColor = ThemeRenderer.SecondaryBg,
-            Padding = new Padding(10, 5, 0, 0),
-            WrapContents = false
+            Height = 45,
+            BackColor = ThemeRenderer.MainBg,
+            Padding = new Padding(10, 10, 0, 0),
+            WrapContents = false,
+            AutoScroll = true
         };
 
-        splitContainerMain.Panel1.Controls.Add(_pnlFiltros);
+        // Línea base decorativa
+        _pnlFiltros.Paint += (s, e) => {
+            using Pen p = new Pen(ThemeRenderer.SecondaryBg, 2);
+            e.Graphics.DrawLine(p, 0, _pnlFiltros.Height - 1, _pnlFiltros.Width, _pnlFiltros.Height - 1);
+        };
+
+        splitContainerMain.Panel2.Controls.Add(_pnlFiltros);
         _pnlFiltros.BringToFront();
 
-        string[] filtros = { "Todos", "Carpetas", "Imágenes", "Texto/Código", "Audio", "Video" };
+        string[] filtros = { "Todos", "Carpetas", "Imágenes", "Documentos", "Audio", "Video" };
 
         foreach (var f in filtros)
         {
-            Button btnChip = new Button
+            Button btnTab = new Button
             {
                 Text = f,
                 FlatStyle = FlatStyle.Flat,
-                Height = 28,
-                AutoSize = true,
+                Height = 32,
+                Width = 110, // Ancho fijo para evitar solapamientos
                 Cursor = Cursors.Hand,
-                BackColor = (f == "Todos") ? ThemeRenderer.Accent : ThemeRenderer.MainBg,
-                ForeColor = (f == "Todos") ? Color.White : ThemeRenderer.MainText,
-                Tag = f
+                BackColor = (f == "Todos") ? ThemeRenderer.SecondaryBg : ThemeRenderer.MainBg,
+                ForeColor = ThemeRenderer.MainText,
+                Tag = f,
+                Margin = new Padding(2, 0, 2, 0),
+                Font = new Font("Segoe UI", 9, FontStyle.Bold)
             };
-            btnChip.FlatAppearance.BorderSize = 0;
+            btnTab.FlatAppearance.BorderSize = 0;
 
-            btnChip.Click += (s, e) =>
+            btnTab.Paint += (s, e) =>
             {
-                _filtroActivo = btnChip.Tag?.ToString() ?? "Todos";
-                ActualizarEstiloChips(btnChip);
+                bool activo = (_filtroActivo == btnTab.Tag?.ToString());
+                Rectangle rect = btnTab.ClientRectangle;
+                if (!activo) { rect.Y += 2; rect.Height -= 2; }
+
+                ThemeRenderer.DrawRetroBorder(e.Graphics, rect, !activo);
+                
+                TextFormatFlags flags = TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter;
+                TextRenderer.DrawText(e.Graphics, btnTab.Text, btnTab.Font, rect, btnTab.ForeColor, flags);
+            };
+
+            btnTab.Click += (s, e) =>
+            {
+                _filtroActivo = btnTab.Tag?.ToString() ?? "Todos";
+                foreach (Control c in _pnlFiltros.Controls) c.Invalidate();
                 PoblarListViewDesdeMemoria();
             };
 
-            _pnlFiltros.Controls.Add(btnChip);
-        }
-    }
-
-    private void ActualizarEstiloChips(Button chipActivo)
-    {
-        foreach (Control ctrl in _pnlFiltros.Controls)
-        {
-            if (ctrl is Button btn)
-            {
-                bool activo = (btn == chipActivo);
-                btn.BackColor = activo ? ThemeRenderer.Accent : ThemeRenderer.MainBg;
-                btn.ForeColor = activo ? Color.White : ThemeRenderer.MainText;
-            }
+            _pnlFiltros.Controls.Add(btnTab);
         }
     }
 
@@ -161,7 +169,7 @@ public partial class Form1
         {
             try
             {
-                Bitmap miniatura = await Task.Run(() =>
+                Bitmap? miniatura = await Task.Run(() =>
                 {
                     try
                     {
@@ -198,7 +206,7 @@ public partial class Form1
 
     // === ORDENAMIENTO POR COLUMNAS ===
 
-    private void ListViewPrincipal_ColumnClick(object sender, ColumnClickEventArgs e)
+    private void ListViewPrincipal_ColumnClick(object? sender, ColumnClickEventArgs e)
     {
         if (e.Column == _sorter.ColumnToSort)
         {
@@ -221,7 +229,7 @@ public partial class Form1
 
     // === EXPORTACIÓN CSV ===
 
-    private async void BtnExportarCSV_Click(object sender, EventArgs e)
+    private async void BtnExportarCSV_Click(object? sender, EventArgs e)
     {
         SaveFileDialog sfd = new SaveFileDialog { Filter = "CSV|*.csv", FileName = "Indice.csv" };
         if (sfd.ShowDialog() == DialogResult.OK)
