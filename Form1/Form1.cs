@@ -9,6 +9,7 @@ using ExploradorArchivos.Models;
 using ExploradorArchivos.Services;
 using ExploradorArchivos.UI;
 using ExploradorArchivos.Mp3;
+using ExploradorArchivos.AppVideo;
 
 namespace ExploradorArchivos;
 
@@ -33,7 +34,32 @@ public partial class Form1 : Form
         InitializeComponent();
         ConfigurarUI();
         ConectarEventos();
+        ConfigurarMenuContextual();
         CargarDirectorio(_rutaActual);
+    }
+
+    private void ConfigurarMenuContextual()
+    {
+        ContextMenuStrip menu = new ContextMenuStrip();
+        ToolStripMenuItem itemAppVideo = new ToolStripMenuItem("🎬 Abrir en App Video", null, (s, e) => {
+            if (listViewPrincipal.SelectedItems.Count > 0)
+            {
+                string? ruta = listViewPrincipal.SelectedItems[0].Tag?.ToString();
+                if (!string.IsNullOrEmpty(ruta)) new AppVideoForm(ruta).Show();
+            }
+        });
+        menu.Items.Add(itemAppVideo);
+        
+        listViewPrincipal.ContextMenuStrip = menu;
+        
+        // Mostrar solo si es video
+        menu.Opening += (s, e) => {
+            if (listViewPrincipal.SelectedItems.Count == 0) { e.Cancel = true; return; }
+            string? ruta = listViewPrincipal.SelectedItems[0].Tag?.ToString();
+            string ext = Path.GetExtension(ruta ?? "").ToLower();
+            string[] videoExt = { ".mp4", ".mkv", ".avi", ".mov", ".webm", ".wmv", ".flv", ".m4v" };
+            itemAppVideo.Visible = videoExt.Contains(ext);
+        };
     }
 
     private void ConfigurarUI()
@@ -95,13 +121,13 @@ public partial class Form1 : Form
         ConfigurarSemaforos();
 
         // Grupo: Navegación
-        Panel pnlNav = CrearGrupoHerramientas("", 80, 10, 100);
+        Panel pnlNav = CrearGrupoHerramientas("", 85, 10, 100);
         pnlNav.Controls.Add(btnAtras); btnAtras.Location = new Point(10, 18); btnAtras.Size = new Size(35, 30);
         pnlNav.Controls.Add(btnSubir); btnSubir.Location = new Point(50, 18); btnSubir.Size = new Size(35, 30);
         pnlTop.Controls.Add(pnlNav);
 
         // Grupo: Dirección
-        Panel pnlAddr = CrearGrupoHerramientas("", 190, 10, pnlTop.Width - 570);
+        Panel pnlAddr = CrearGrupoHerramientas("", 195, 10, pnlTop.Width - 615);
         pnlAddr.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
         pnlAddr.Controls.Add(pnlAddressBorder);
         pnlAddressBorder.Location = new Point(10, 18);
@@ -181,7 +207,7 @@ public partial class Form1 : Form
             WrapContents = false,
             AutoScroll = false,
             Cursor = Cursors.IBeam,
-            Padding = new Padding(10, 6, 0, 0)
+            Padding = new Padding(10, 3, 0, 0)
         };
         _flpBreadcrumbs.Click += (s, e) => MostrarTextBoxDireccion();
         pnlAddressBorder.Controls.Add(_flpBreadcrumbs);

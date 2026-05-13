@@ -54,6 +54,51 @@ public static class AppFotoProcessor
         return bmp;
     }
 
+    public static Bitmap AjustarImagen(Image original, float brillo, float contraste, float saturacion, float luces, float sombras)
+    {
+        // brillo: -100 a 100 -> mBrillo: -1.0 a 1.0
+        // contraste: 0 a 200 -> mContraste: 0.0 a 2.0
+        // saturacion: 0 a 200 -> mSaturacion: 0.0 a 2.0
+        // luces/sombras: -100 a 100 (aproximación linear)
+
+        float b = brillo / 100f;
+        float c = contraste / 100f;
+        float s = saturacion / 100f;
+        float l = luces / 100f;
+        float sh = sombras / 100f;
+
+        // Combinar Brillo y Contraste
+        float t = (1.0f - c) / 2.0f;
+        
+        // Pesos para Saturación
+        float lumR = 0.3086f;
+        float lumG = 0.6094f;
+        float lumB = 0.0820f;
+
+        float sr = (1 - s) * lumR;
+        float sg = (1 - s) * lumG;
+        float sb = (1 - s) * lumB;
+
+        ColorMatrix matrix = new ColorMatrix(new float[][]
+        {
+            new float[] {c * (sr + s),  c * sr,          c * sr,          0, 0},
+            new float[] {c * sg,          c * (sg + s),  c * sg,          0, 0},
+            new float[] {c * sb,          c * sb,          c * (sb + s),  0, 0},
+            new float[] {0,               0,               0,               1, 0},
+            new float[] {t + b + l + sh,  t + b + l + sh,  t + b + l + sh,  0, 1}
+        });
+
+        Bitmap bmp = new Bitmap(original.Width, original.Height);
+        using (Graphics g = Graphics.FromImage(bmp))
+        {
+            using ImageAttributes attributes = new ImageAttributes();
+            attributes.SetColorMatrix(matrix);
+            g.DrawImage(original, new Rectangle(0, 0, original.Width, original.Height),
+                0, 0, original.Width, original.Height, GraphicsUnit.Pixel, attributes);
+        }
+        return bmp;
+    }
+
     public static void Rotar(Image img, RotateFlipType tipo)
     {
         img.RotateFlip(tipo);
