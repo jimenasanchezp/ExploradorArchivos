@@ -130,8 +130,8 @@ public partial class Form1 : Form
         Panel pnlAddr = CrearGrupoHerramientas("", 195, 10, pnlTop.Width - 615);
         pnlAddr.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
         pnlAddr.Controls.Add(pnlAddressBorder);
-        pnlAddressBorder.Location = new Point(10, 18);
-        pnlAddressBorder.Size = new Size(pnlAddr.Width - 20, 30);
+        pnlAddressBorder.Location = new Point(10, 16);
+        pnlAddressBorder.Size = new Size(pnlAddr.Width - 20, 36);
         pnlAddressBorder.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
         pnlTop.Controls.Add(pnlAddr);
 
@@ -207,7 +207,7 @@ public partial class Form1 : Form
             WrapContents = false,
             AutoScroll = false,
             Cursor = Cursors.IBeam,
-            Padding = new Padding(10, 3, 0, 0)
+            Padding = new Padding(10, 4, 0, 0)
         };
         _flpBreadcrumbs.Click += (s, e) => MostrarTextBoxDireccion();
         pnlAddressBorder.Controls.Add(_flpBreadcrumbs);
