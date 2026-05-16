@@ -124,17 +124,23 @@ public static class ThemeRenderer
 
         e.Graphics.FillRectangle(new SolidBrush(backColor), e.Bounds);
 
-        string emoji = e.Node.Tag?.ToString() == "Inicio" ? "🏠" :
-                       (e.Node.Tag?.ToString() == "EsteEquipo" ? "💻" : "📂");
-
-        if (e.Node.Text.Contains("Música")) emoji = "🎵";
+        // Icono simple basado en el tipo de nodo
+        string emoji = "📁";
+        if (e.Node.Tag?.ToString() == "Inicio") emoji = "🏠";
+        else if (e.Node.Tag?.ToString() == "EsteEquipo") emoji = "💻";
+        else if (e.Node.Text.Contains("Música")) emoji = "🎵";
         else if (e.Node.Text.Contains("Imágenes")) emoji = "🖼️";
+        else if (e.Node.Text.Contains("Vídeos") || e.Node.Text.Contains("Videos")) emoji = "🎬";
+        else if (e.Node.Text.Contains("Descargas")) emoji = "📥";
+        else if (e.Node.Text.Contains("Documentos")) emoji = "📄";
+        else if (e.Node.Text.Contains("Escritorio")) emoji = "🖥️";
 
         using Font iconFont = new Font("Segoe UI Emoji", 10);
         using Font textFont = new Font("Segoe UI", 9);
 
+        // Dibujar el emoji y luego el texto con un margen limpio
         e.Graphics.DrawString(emoji, iconFont, new SolidBrush(foreColor), e.Bounds.X + 2, e.Bounds.Y + 4);
-        e.Graphics.DrawString(e.Node.Text, textFont, new SolidBrush(foreColor), e.Bounds.X + 25, e.Bounds.Y + 5);
+        e.Graphics.DrawString(e.Node.Text, textFont, new SolidBrush(foreColor), e.Bounds.X + 22, e.Bounds.Y + 5);
     }
 
     private static string GetIconForType(string tipo, string ruta)

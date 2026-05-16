@@ -157,23 +157,23 @@ public partial class Form1
         treeViewLateral.Nodes.Clear();
 
         // Accesos Rápidos
-        TreeNode nodoFavoritos = new TreeNode("📌 Accesos Rápidos");
-        nodoFavoritos.Nodes.Add(new TreeNode("🏠 Inicio") { Tag = "Inicio" });
-        nodoFavoritos.Nodes.Add(new TreeNode("🖥️ Escritorio") { Tag = Environment.GetFolderPath(Environment.SpecialFolder.Desktop) });
-        nodoFavoritos.Nodes.Add(new TreeNode("📥 Descargas") { Tag = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads") });
-        nodoFavoritos.Nodes.Add(new TreeNode("📄 Documentos") { Tag = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments) });
-        nodoFavoritos.Nodes.Add(new TreeNode("🖼️ Imágenes") { Tag = Environment.GetFolderPath(Environment.SpecialFolder.MyPictures) });
-        nodoFavoritos.Nodes.Add(new TreeNode("🎵 Música") { Tag = Environment.GetFolderPath(Environment.SpecialFolder.MyMusic) });
-        nodoFavoritos.Nodes.Add(new TreeNode("🎬 Videos") { Tag = Environment.GetFolderPath(Environment.SpecialFolder.MyVideos) });
+        TreeNode nodoFavoritos = new TreeNode("Accesos Rápidos");
+        nodoFavoritos.Nodes.Add(new TreeNode("Inicio") { Tag = "Inicio" });
+        nodoFavoritos.Nodes.Add(new TreeNode("Escritorio") { Tag = Environment.GetFolderPath(Environment.SpecialFolder.Desktop) });
+        nodoFavoritos.Nodes.Add(new TreeNode("Descargas") { Tag = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads") });
+        nodoFavoritos.Nodes.Add(new TreeNode("Documentos") { Tag = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments) });
+        nodoFavoritos.Nodes.Add(new TreeNode("Imágenes") { Tag = Environment.GetFolderPath(Environment.SpecialFolder.MyPictures) });
+        nodoFavoritos.Nodes.Add(new TreeNode("Música") { Tag = Environment.GetFolderPath(Environment.SpecialFolder.MyMusic) });
+        nodoFavoritos.Nodes.Add(new TreeNode("Videos") { Tag = Environment.GetFolderPath(Environment.SpecialFolder.MyVideos) });
         treeViewLateral.Nodes.Add(nodoFavoritos);
         nodoFavoritos.Expand();
 
         // Este Equipo
-        TreeNode nodoEquipo = new TreeNode("💻 Este Equipo") { Tag = "EsteEquipo" };
+        TreeNode nodoEquipo = new TreeNode("Este Equipo") { Tag = "EsteEquipo" };
         foreach (var drive in DriveInfo.GetDrives())
         {
             if (drive.IsReady)
-                nodoEquipo.Nodes.Add(new TreeNode($"💽 {drive.Name} ({drive.VolumeLabel})") { Tag = drive.Name });
+                nodoEquipo.Nodes.Add(new TreeNode($"{drive.Name} ({drive.VolumeLabel})") { Tag = drive.Name });
         }
         treeViewLateral.Nodes.Add(nodoEquipo);
         nodoEquipo.Expand();
@@ -181,7 +181,7 @@ public partial class Form1
         // Carpeta actual (solo si estamos navegando en una ruta real)
         if (_rutaActual != "Inicio" && _rutaActual != "EsteEquipo" && Directory.Exists(_rutaActual))
         {
-            TreeNode nodoActual = new TreeNode($"📂 Abierto: {new DirectoryInfo(_rutaActual).Name}");
+            TreeNode nodoActual = new TreeNode($"Abierto: {new DirectoryInfo(_rutaActual).Name}");
             var grupos = _itemsActuales.GroupBy(x => x.CategoriaVisual);
 
             foreach (var grupo in grupos.OrderBy(g => g.Key))
@@ -190,7 +190,7 @@ public partial class Form1
                 foreach (var item in grupo)
                 {
                     if (item.EsCarpeta)
-                        nodoPadre.Nodes.Add(new TreeNode("📁 " + item.Nombre) { Tag = item.RutaCompleta });
+                        nodoPadre.Nodes.Add(new TreeNode(item.Nombre) { Tag = item.RutaCompleta });
                 }
                 if (nodoPadre.Nodes.Count > 0)
                     nodoActual.Nodes.Add(nodoPadre);

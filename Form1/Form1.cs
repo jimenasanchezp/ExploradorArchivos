@@ -37,62 +37,71 @@ public partial class Form1 : Form
         InitializeComponent();
         ConfigurarUI();
         ConectarEventos();
-        ConfigurarMenuContextual();
+        ConfigurarContextoMenu();
         CargarDirectorio(_rutaActual);
     }
 
-    private void ConfigurarMenuContextual()
+    private void ConfigurarContextoMenu()
     {
         ContextMenuStrip menu = new ContextMenuStrip();
+        menu.Renderer = new CustomMenuRenderer(); // Estilo retro/limpio
         
-        ToolStripMenuItem itemAbrirCon = new ToolStripMenuItem("Abrir con...");
+        ToolStripMenuItem itemAbrir = new ToolStripMenuItem("📄  Abrir");
+        ToolStripMenuItem itemAbrirCon = new ToolStripMenuItem("📁  Abrir con...");
         
-        ToolStripMenuItem itemAppVideo = new ToolStripMenuItem("🎬 App Video");
-        ToolStripMenuItem itemAppFoto = new ToolStripMenuItem("🖼️ App Foto");
-        ToolStripMenuItem itemAppData = new ToolStripMenuItem("📊 App Data");
-        ToolStripMenuItem itemMusic = new ToolStripMenuItem("🎵 App Music");
-        ToolStripMenuItem itemTexto = new ToolStripMenuItem("📝 Visor de Texto");
-        ToolStripMenuItem itemPredeterminada = new ToolStripMenuItem("💻 App Predeterminada del Sistema");
+        ToolStripMenuItem itemCortar = new ToolStripMenuItem("✂️  Cortar");
+        ToolStripMenuItem itemCopiar = new ToolStripMenuItem("📋  Copiar");
+        ToolStripMenuItem itemRenombrar = new ToolStripMenuItem("✏️  Cambiar nombre");
+        ToolStripMenuItem itemEliminar = new ToolStripMenuItem("🗑️  Eliminar");
+        ToolStripMenuItem itemPropiedades = new ToolStripMenuItem("🛠️  Propiedades");
 
-        itemAppVideo.Click += (s, e) => {
-            string? ruta = listViewPrincipal.SelectedItems[0].Tag?.ToString();
-            if (!string.IsNullOrEmpty(ruta)) new AppVideoForm(ruta).Show();
-        };
-        itemAppFoto.Click += (s, e) => {
-            string? ruta = listViewPrincipal.SelectedItems[0].Tag?.ToString();
-            if (!string.IsNullOrEmpty(ruta)) new AppFotoForm(ruta).Show();
-        };
-        itemAppData.Click += (s, e) => {
-            string? ruta = listViewPrincipal.SelectedItems[0].Tag?.ToString();
-            if (!string.IsNullOrEmpty(ruta)) {
-                var frm = new ExploradorArchivos.AppDataFusion.MainForm(ruta);
-                frm.Show();
-            }
-        };
-        itemMusic.Click += (s, e) => {
-            string? ruta = listViewPrincipal.SelectedItems[0].Tag?.ToString();
-            if (!string.IsNullOrEmpty(ruta)) new MusicPlayerForm(new List<string> { ruta }, ruta).Show();
-        };
-        itemTexto.Click += (s, e) => {
-            string? ruta = listViewPrincipal.SelectedItems[0].Tag?.ToString();
-            if (!string.IsNullOrEmpty(ruta)) new FileViewerForm(ruta).Show();
-        };
-        itemPredeterminada.Click += (s, e) => {
-            string? ruta = listViewPrincipal.SelectedItems[0].Tag?.ToString();
-            if (!string.IsNullOrEmpty(ruta)) Process.Start(new ProcessStartInfo { FileName = ruta, UseShellExecute = true });
-        };
+        // Submenú Abrir con...
+        ToolStripMenuItem itemAppVideo = new ToolStripMenuItem("🎬  App Video");
+        ToolStripMenuItem itemAppFoto = new ToolStripMenuItem("🖼️  App Foto");
+        ToolStripMenuItem itemAppData = new ToolStripMenuItem("📊  App Data");
+        ToolStripMenuItem itemMusic = new ToolStripMenuItem("🎵  App Music");
+        ToolStripMenuItem itemTexto = new ToolStripMenuItem("📝  Visor de Texto");
+        ToolStripMenuItem itemPredeterminada = new ToolStripMenuItem("💻  Sistema (App Predeterminada)");
+
+        // Eventos de apertura
+        itemAbrir.Click += (s, e) => ListViewPrincipal_DoubleClick(s, e);
+        
+        itemAppVideo.Click += (s, e) => AbrirCon(new AppVideoForm(GetSelectedPath()));
+        itemAppFoto.Click += (s, e) => AbrirCon(new AppFotoForm(GetSelectedPath()));
+        itemAppData.Click += (s, e) => AbrirCon(new ExploradorArchivos.AppDataFusion.MainForm(GetSelectedPath()));
+        itemMusic.Click += (s, e) => AbrirCon(new MusicPlayerForm(new List<string> { GetSelectedPath() }, GetSelectedPath()));
+        itemTexto.Click += (s, e) => AbrirCon(new FileViewerForm(GetSelectedPath()));
+        itemPredeterminada.Click += (s, e) => AbrirConSistema(GetSelectedPath());
+
+        // Eventos de archivo
+        itemCortar.Click += (s, e) => CortarArchivo(GetSelectedPath());
+        itemCopiar.Click += (s, e) => CopiarArchivo(GetSelectedPath());
+        itemRenombrar.Click += (s, e) => listViewPrincipal.SelectedItems[0].BeginEdit();
+        itemEliminar.Click += (s, e) => EliminarArchivo(GetSelectedPath());
+        itemPropiedades.Click += (s, e) => MostrarPropiedades(GetSelectedPath());
 
         itemAbrirCon.DropDownItems.AddRange(new ToolStripItem[] {
             itemAppVideo, itemAppFoto, itemAppData, itemMusic, itemTexto, new ToolStripSeparator(), itemPredeterminada
         });
 
-        menu.Items.Add(itemAbrirCon);
+        menu.Items.AddRange(new ToolStripItem[] {
+            itemAbrir, itemAbrirCon, new ToolStripSeparator(),
+            itemCortar, itemCopiar, itemRenombrar, itemEliminar,
+            new ToolStripSeparator(), itemPropiedades
+        });
+
         listViewPrincipal.ContextMenuStrip = menu;
-        
+        listViewPrincipal.LabelEdit = true;
+        listViewPrincipal.AfterLabelEdit += (s, e) => {
+            if (string.IsNullOrEmpty(e.Label)) { e.CancelEdit = true; return; }
+            string? rutaOld = listViewPrincipal.SelectedItems[0].Tag?.ToString();
+            if (rutaOld != null) RenombrarArchivo(rutaOld, e.Label);
+        };
+
         menu.Opening += (s, e) => {
             if (listViewPrincipal.SelectedItems.Count == 0) { e.Cancel = true; return; }
-            string? ruta = listViewPrincipal.SelectedItems[0].Tag?.ToString();
-            string ext = Path.GetExtension(ruta ?? "").ToLower();
+            string ruta = GetSelectedPath();
+            string ext = Path.GetExtension(ruta).ToLower();
             
             string[] imgExt = { ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp" };
             string[] mediaExt = { ".mp3", ".wav", ".flac", ".m4a", ".ogg", ".wma", ".aac" };
@@ -105,6 +114,75 @@ public partial class Form1 : Form
             itemMusic.Visible = mediaExt.Contains(ext);
             itemTexto.Visible = dataExt.Contains(ext) || new[] { ".cs", ".html", ".css", ".js", ".md", ".py" }.Contains(ext);
         };
+    }
+
+    private string GetSelectedPath() => listViewPrincipal.SelectedItems[0].Tag?.ToString() ?? "";
+    
+    private void AbrirCon(Form frm) => frm.Show();
+    private void AbrirConSistema(string ruta) => Process.Start(new ProcessStartInfo { FileName = ruta, UseShellExecute = true });
+
+    private void CortarArchivo(string ruta)
+    {
+        var paths = new System.Collections.Specialized.StringCollection { ruta };
+        DataObject data = new DataObject();
+        data.SetFileDropList(paths);
+        data.SetData("Preferred DropEffect", DragDropEffects.Move);
+        Clipboard.SetDataObject(data);
+    }
+
+    private void CopiarArchivo(string ruta)
+    {
+        var paths = new System.Collections.Specialized.StringCollection { ruta };
+        Clipboard.SetFileDropList(paths);
+    }
+
+    private void EliminarArchivo(string ruta)
+    {
+        if (MessageBox.Show("¿Seguro que deseas eliminar este archivo?", "Eliminar", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
+        {
+            FileService.EnviarAPapelera(ruta);
+            CargarDirectorio(_rutaActual, false);
+        }
+    }
+
+    private void RenombrarArchivo(string rutaOld, string nuevoNombre)
+    {
+        try
+        {
+            string dir = Path.GetDirectoryName(rutaOld)!;
+            string ext = Path.GetExtension(rutaOld);
+            string rutaNew = Path.Combine(dir, nuevoNombre + (nuevoNombre.EndsWith(ext) ? "" : ext));
+            if (rutaOld != rutaNew)
+            {
+                if (Directory.Exists(rutaOld)) Directory.Move(rutaOld, rutaNew);
+                else File.Move(rutaOld, rutaNew);
+                CargarDirectorio(_rutaActual, false);
+            }
+        }
+        catch (Exception ex) { MessageBox.Show("Error al renombrar: " + ex.Message); }
+    }
+
+    private void MostrarPropiedades(string ruta)
+    {
+        var info = new FileInfo(ruta);
+        string msg = $"Nombre: {info.Name}\n" +
+                     $"Tamaño: {info.Length / 1024.0:F2} KB\n" +
+                     $"Creado: {info.CreationTime}\n" +
+                     $"Modificado: {info.LastWriteTime}";
+        MessageBox.Show(msg, "Propiedades de Archivo", MessageBoxButtons.OK, MessageBoxIcon.Information);
+    }
+
+    class CustomMenuRenderer : ToolStripProfessionalRenderer
+    {
+        protected override void OnRenderMenuItemBackground(ToolStripItemRenderEventArgs e)
+        {
+            if (e.Item.Selected)
+            {
+                Rectangle rect = new Rectangle(Point.Empty, e.Item.Size);
+                using (SolidBrush brush = new SolidBrush(ThemeRenderer.Selection))
+                    e.Graphics.FillRectangle(brush, rect);
+            }
+        }
     }
 
     private void ConfigurarUI()
@@ -180,7 +258,7 @@ public partial class Form1 : Form
         pnlAddressBorder.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
         pnlTop.Controls.Add(pnlAddr);
 
-        // Grupo: Acciones - Más espaciado para no verse amontonado
+        // Grupo: Acciones
         Panel pnlActions = CrearGrupoHerramientas("", pnlTop.Width - 520, 12, 510);
         pnlActions.Anchor = AnchorStyles.Top | AnchorStyles.Right;
         pnlActions.Controls.Add(btnActualizar); btnActualizar.Location = new Point(10, 18); btnActualizar.Size = new Size(35, 30);
@@ -204,7 +282,7 @@ public partial class Form1 : Form
         pnlSearch.MouseUp += (s, e) => { isDragging = false; };
 
         pnlSearch.Controls.Add(pnlSearchBorder);
-        pnlSearchBorder.Location = new Point(20, 20);
+        pnlSearchBorder.Location = new Point(15, 15);
         pnlSearchBorder.Width = pnlSearch.Width - 40;
         pnlSearchBorder.Height = 30;
         pnlSearchBorder.BackColor = Color.White;
@@ -236,13 +314,13 @@ public partial class Form1 : Form
         _pnlFiltros.Paint += (s, e) => ThemeRenderer.DrawRetroBorder(e.Graphics, _pnlFiltros.ClientRectangle, true);
 
         // --- Configurar Botones (Estilo Clásico 3D) ---
-        ConfigurarBotonRetro(btnAtras, "<");
-        ConfigurarBotonRetro(btnSubir, ">");
-        ConfigurarBotonRetro(btnActualizar, "⟳");
-        ConfigurarBotonRetro(btnNuevaCarpeta, "Nueva Carpeta");
-        ConfigurarBotonRetro(btnExportarCSV, "Exportar CSV");
-        ConfigurarBotonRetro(_btnToggleVista, "Cambiar Vista");
-        ConfigurarBotonRetro(_btnAppData, "App Data");
+        ConfigurarBotonRetro(btnAtras, "◀️");
+        ConfigurarBotonRetro(btnSubir, "🔼");
+        ConfigurarBotonRetro(btnActualizar, "🔄");
+        ConfigurarBotonRetro(btnNuevaCarpeta, "📁 Nueva");
+        ConfigurarBotonRetro(btnExportarCSV, "📊 Exportar");
+        ConfigurarBotonRetro(_btnToggleVista, "🖼️ Vistas");
+        ConfigurarBotonRetro(_btnAppData, "💎 App Data");
 
         // --- Barra de Direcciones ---
         pnlAddressBorder.BackColor = Color.White;
@@ -305,7 +383,7 @@ public partial class Form1 : Form
     private Panel CrearGrupoHerramientas(string titulo, int x, int y, int ancho)
     {
         Panel pnl = new Panel { Location = new Point(x, y), Size = new Size(ancho, 55), BackColor = Color.Transparent };
-        Label lbl = new Label { Text = titulo, Location = new Point(5, 2), AutoSize = true, Font = new Font("Segoe UI", 7, FontStyle.Bold), ForeColor = ThemeRenderer.SecondaryText };
+        Label lbl = new Label { Text = titulo, Location = new Point(5, 0), AutoSize = true, Font = new Font("Segoe UI", 8.5f, FontStyle.Bold), ForeColor = ThemeRenderer.SecondaryText };
         pnl.Controls.Add(lbl);
         pnl.Paint += (s, e) => ThemeRenderer.DrawRetroBorder(e.Graphics, new Rectangle(0, 15, pnl.Width - 1, pnl.Height - 16), false);
         return pnl;
