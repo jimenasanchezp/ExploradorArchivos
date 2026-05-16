@@ -3,11 +3,13 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Windows.Forms;
+using System.Collections.Generic;
 using ExploradorArchivos.Mp3;
 using ExploradorArchivos.Services;
 using ExploradorArchivos.UI;
 using ExploradorArchivos.AppFoto;
 using ExploradorArchivos.AppVideo;
+using ExploradorArchivos.AppDataFusion;
 
 namespace ExploradorArchivos;
 
@@ -34,7 +36,8 @@ public partial class Form1
             string[] imgExt = { ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp" };
             string[] mediaExt = { ".mp3", ".wav", ".flac", ".m4a", ".ogg", ".wma", ".aac" };
             string[] videoExt = { ".mp4", ".mkv", ".avi", ".mov", ".webm", ".wmv", ".flv", ".m4v" };
-            string[] txtExt = { ".txt", ".json", ".xml", ".csv", ".cs", ".html", ".css", ".js", ".md", ".py" };
+            string[] txtExt = { ".cs", ".html", ".css", ".js", ".md", ".py" };
+            string[] dataExt = { ".csv", ".json", ".xml", ".txt" };
 
             if (imgExt.Contains(ext))
             { new AppFotoForm(ruta).Show(); return; }
@@ -51,6 +54,13 @@ public partial class Form1
 
             if (videoExt.Contains(ext))
             { new AppVideoForm(ruta).Show(); return; }
+
+            if (dataExt.Contains(ext))
+            { 
+                var frm = new ExploradorArchivos.AppDataFusion.MainForm(ruta);
+                frm.Show();
+                return; 
+            }
 
             if (txtExt.Contains(ext))
             { new FileViewerForm(ruta).Show(); return; }

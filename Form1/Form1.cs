@@ -10,6 +10,8 @@ using ExploradorArchivos.Services;
 using ExploradorArchivos.UI;
 using ExploradorArchivos.Mp3;
 using ExploradorArchivos.AppVideo;
+using ExploradorArchivos.AppFoto;
+using ExploradorArchivos.AppDataFusion;
 
 namespace ExploradorArchivos;
 
@@ -27,6 +29,7 @@ public partial class Form1 : Form
     private FlowLayoutPanel _pnlFiltros = default!;
     private ImageList _imageListMiniaturas = default!;
     private Button _btnToggleVista = default!;
+    private Button _btnAppData = default!;
     private FlowLayoutPanel _flpBreadcrumbs = default!;
 
     public Form1()
@@ -41,24 +44,66 @@ public partial class Form1 : Form
     private void ConfigurarMenuContextual()
     {
         ContextMenuStrip menu = new ContextMenuStrip();
-        ToolStripMenuItem itemAppVideo = new ToolStripMenuItem("🎬 Abrir en App Video", null, (s, e) => {
-            if (listViewPrincipal.SelectedItems.Count > 0)
-            {
-                string? ruta = listViewPrincipal.SelectedItems[0].Tag?.ToString();
-                if (!string.IsNullOrEmpty(ruta)) new AppVideoForm(ruta).Show();
-            }
-        });
-        menu.Items.Add(itemAppVideo);
         
+        ToolStripMenuItem itemAbrirCon = new ToolStripMenuItem("Abrir con...");
+        
+        ToolStripMenuItem itemAppVideo = new ToolStripMenuItem("🎬 App Video");
+        ToolStripMenuItem itemAppFoto = new ToolStripMenuItem("🖼️ App Foto");
+        ToolStripMenuItem itemAppData = new ToolStripMenuItem("📊 App Data");
+        ToolStripMenuItem itemMusic = new ToolStripMenuItem("🎵 App Music");
+        ToolStripMenuItem itemTexto = new ToolStripMenuItem("📝 Visor de Texto");
+        ToolStripMenuItem itemPredeterminada = new ToolStripMenuItem("💻 App Predeterminada del Sistema");
+
+        itemAppVideo.Click += (s, e) => {
+            string? ruta = listViewPrincipal.SelectedItems[0].Tag?.ToString();
+            if (!string.IsNullOrEmpty(ruta)) new AppVideoForm(ruta).Show();
+        };
+        itemAppFoto.Click += (s, e) => {
+            string? ruta = listViewPrincipal.SelectedItems[0].Tag?.ToString();
+            if (!string.IsNullOrEmpty(ruta)) new AppFotoForm(ruta).Show();
+        };
+        itemAppData.Click += (s, e) => {
+            string? ruta = listViewPrincipal.SelectedItems[0].Tag?.ToString();
+            if (!string.IsNullOrEmpty(ruta)) {
+                var frm = new ExploradorArchivos.AppDataFusion.MainForm(ruta);
+                frm.Show();
+            }
+        };
+        itemMusic.Click += (s, e) => {
+            string? ruta = listViewPrincipal.SelectedItems[0].Tag?.ToString();
+            if (!string.IsNullOrEmpty(ruta)) new MusicPlayerForm(new List<string> { ruta }, ruta).Show();
+        };
+        itemTexto.Click += (s, e) => {
+            string? ruta = listViewPrincipal.SelectedItems[0].Tag?.ToString();
+            if (!string.IsNullOrEmpty(ruta)) new FileViewerForm(ruta).Show();
+        };
+        itemPredeterminada.Click += (s, e) => {
+            string? ruta = listViewPrincipal.SelectedItems[0].Tag?.ToString();
+            if (!string.IsNullOrEmpty(ruta)) Process.Start(new ProcessStartInfo { FileName = ruta, UseShellExecute = true });
+        };
+
+        itemAbrirCon.DropDownItems.AddRange(new ToolStripItem[] {
+            itemAppVideo, itemAppFoto, itemAppData, itemMusic, itemTexto, new ToolStripSeparator(), itemPredeterminada
+        });
+
+        menu.Items.Add(itemAbrirCon);
         listViewPrincipal.ContextMenuStrip = menu;
         
-        // Mostrar solo si es video
         menu.Opening += (s, e) => {
             if (listViewPrincipal.SelectedItems.Count == 0) { e.Cancel = true; return; }
             string? ruta = listViewPrincipal.SelectedItems[0].Tag?.ToString();
             string ext = Path.GetExtension(ruta ?? "").ToLower();
+            
+            string[] imgExt = { ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp" };
+            string[] mediaExt = { ".mp3", ".wav", ".flac", ".m4a", ".ogg", ".wma", ".aac" };
             string[] videoExt = { ".mp4", ".mkv", ".avi", ".mov", ".webm", ".wmv", ".flv", ".m4v" };
+            string[] dataExt = { ".csv", ".json", ".xml", ".txt" };
+            
             itemAppVideo.Visible = videoExt.Contains(ext);
+            itemAppFoto.Visible = imgExt.Contains(ext);
+            itemAppData.Visible = dataExt.Contains(ext);
+            itemMusic.Visible = mediaExt.Contains(ext);
+            itemTexto.Visible = dataExt.Contains(ext) || new[] { ".cs", ".html", ".css", ".js", ".md", ".py" }.Contains(ext);
         };
     }
 
@@ -107,7 +152,7 @@ public partial class Form1 : Form
 
         // --- 1. REORGANIZACIÓN DE BARRA SUPERIOR (pnlTop) ---
         pnlTop.BackColor = ThemeRenderer.SecondaryBg;
-        pnlTop.Height = 70;
+        pnlTop.Height = 80;
         pnlTop.Controls.Clear();
         pnlTop.Paint += (s, e) => ThemeRenderer.DrawRetroBorder(e.Graphics, pnlTop.ClientRectangle, true);
 
@@ -121,13 +166,13 @@ public partial class Form1 : Form
         ConfigurarSemaforos();
 
         // Grupo: Navegación
-        Panel pnlNav = CrearGrupoHerramientas("", 85, 10, 100);
+        Panel pnlNav = CrearGrupoHerramientas("", 85, 12, 100);
         pnlNav.Controls.Add(btnAtras); btnAtras.Location = new Point(10, 18); btnAtras.Size = new Size(35, 30);
         pnlNav.Controls.Add(btnSubir); btnSubir.Location = new Point(50, 18); btnSubir.Size = new Size(35, 30);
         pnlTop.Controls.Add(pnlNav);
 
         // Grupo: Dirección
-        Panel pnlAddr = CrearGrupoHerramientas("", 195, 10, pnlTop.Width - 615);
+        Panel pnlAddr = CrearGrupoHerramientas("", 195, 12, pnlTop.Width - 725);
         pnlAddr.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
         pnlAddr.Controls.Add(pnlAddressBorder);
         pnlAddressBorder.Location = new Point(10, 16);
@@ -136,12 +181,16 @@ public partial class Form1 : Form
         pnlTop.Controls.Add(pnlAddr);
 
         // Grupo: Acciones - Más espaciado para no verse amontonado
-        Panel pnlActions = CrearGrupoHerramientas("", pnlTop.Width - 410, 10, 400);
+        Panel pnlActions = CrearGrupoHerramientas("", pnlTop.Width - 520, 12, 510);
         pnlActions.Anchor = AnchorStyles.Top | AnchorStyles.Right;
         pnlActions.Controls.Add(btnActualizar); btnActualizar.Location = new Point(10, 18); btnActualizar.Size = new Size(35, 30);
         pnlActions.Controls.Add(btnNuevaCarpeta); btnNuevaCarpeta.Location = new Point(60, 18); btnNuevaCarpeta.Size = new Size(100, 30);
         pnlActions.Controls.Add(btnExportarCSV); btnExportarCSV.Location = new Point(175, 18); btnExportarCSV.Size = new Size(100, 30);
         pnlActions.Controls.Add(_btnToggleVista); _btnToggleVista.Location = new Point(290, 18); _btnToggleVista.Size = new Size(100, 30);
+        
+        _btnAppData = new Button();
+        pnlActions.Controls.Add(_btnAppData); _btnAppData.Location = new Point(400, 18); _btnAppData.Size = new Size(100, 30);
+
         pnlTop.Controls.Add(pnlActions);
 
         // --- 2. REFINAMIENTO DEL PANEL LATERAL (Sidebar) ---
@@ -193,6 +242,7 @@ public partial class Form1 : Form
         ConfigurarBotonRetro(btnNuevaCarpeta, "Nueva Carpeta");
         ConfigurarBotonRetro(btnExportarCSV, "Exportar CSV");
         ConfigurarBotonRetro(_btnToggleVista, "Cambiar Vista");
+        ConfigurarBotonRetro(_btnAppData, "App Data");
 
         // --- Barra de Direcciones ---
         pnlAddressBorder.BackColor = Color.White;
@@ -263,7 +313,7 @@ public partial class Form1 : Form
 
     private void ConfigurarSemaforos()
     {
-        Panel pnlSemaforos = new Panel { Location = new Point(10, 25), Size = new Size(60, 20), BackColor = Color.Transparent };
+        Panel pnlSemaforos = new Panel { Location = new Point(10, 30), Size = new Size(60, 20), BackColor = Color.Transparent };
         
         Button btnClose = CrearBotonSemaforo(Color.FromArgb(255, 95, 86), 0);
         btnClose.Click += (s, e) => this.Close();
