@@ -10,6 +10,7 @@ public class FileViewerForm : Form
     public FileViewerForm(string filePath)
     {
         InitializeComponent();
+        ThemeRenderer.ApplyTheme(this);
         LoadFile(filePath);
     }
 

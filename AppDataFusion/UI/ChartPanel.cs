@@ -17,21 +17,20 @@ public class ChartPanel : Panel
     private TipoGrafica _tipo = TipoGrafica.Columnas;
     private string _titulo = "Sin datos — carga archivos primero";
 
-    // ── Paleta oscura del proyecto ────────────────────────────
+    // ── Paleta Kawaii 95 ────────────────────────────
     private static readonly Color[] Palette =
     {
-        Color.FromArgb(52,  211, 153), Color.FromArgb(251, 191,  36),
-        Color.FromArgb(125, 211, 252), Color.FromArgb(167, 139, 250),
-        Color.FromArgb(251, 113, 133), Color.FromArgb(110, 231, 183),
-        Color.FromArgb(252, 211, 77),  Color.FromArgb(147, 197, 253),
-        Color.FromArgb(196, 181, 253), Color.FromArgb(253, 164, 175),
-        Color.FromArgb( 52, 211, 153), Color.FromArgb(251, 191,  36)
+        Color.FromArgb(255, 128, 191), Color.FromArgb(255, 189, 227),
+        Color.FromArgb(230, 150, 255), Color.FromArgb(180, 130, 255),
+        Color.FromArgb(255, 160, 160), Color.FromArgb(255, 200, 150),
+        Color.FromArgb(160, 220, 255), Color.FromArgb(200, 180, 255),
+        Color.FromArgb(255, 100, 150), Color.FromArgb(220, 140, 240)
     };
 
-    private static readonly Color BgPanel = Color.FromArgb(13, 13, 18);
-    private static readonly Color Grid = Color.FromArgb(36, 36, 52);
-    private static readonly Color AxisClr = Color.FromArgb(55, 55, 75);
-    private static readonly Color LabelClr = Color.FromArgb(110, 110, 140);
+    private static readonly Color BgPanel = Color.FromArgb(255, 245, 249);
+    private static readonly Color Grid = Color.FromArgb(255, 209, 234);
+    private static readonly Color AxisClr = Color.FromArgb(150, 80, 110);
+    private static readonly Color LabelClr = Color.FromArgb(80, 40, 60);
 
     public ChartPanel()
     {
@@ -117,7 +116,7 @@ public class ChartPanel : Panel
             }
 
             string vs = FormatVal(val);
-            using var vf = new Font("Segoe UI", 7.5f, FontStyle.Bold);
+            using var vf = new Font("MS Sans Serif", 8f, FontStyle.Bold);
             var vs2 = g.MeasureString(vs, vf);
             if (vs2.Width < w + 4)
                 g.DrawString(vs, vf, new SolidBrush(Color.FromArgb(200, c)),
@@ -136,7 +135,7 @@ public class ChartPanel : Panel
         float titleH = DrawTitulo(g, TipoGrafica.Barras);
 
         // ── 1. Medir el label más largo para calcular el margen izquierdo
-        using var lblFont = new Font("Segoe UI", 8.5f);
+        using var lblFont = new Font("MS Sans Serif", 8.5f);
         float maxLabelW = 0f;
         foreach (var (lbl, _) in _data)
         {
@@ -191,7 +190,7 @@ public class ChartPanel : Panel
 
             // ── Valor a la derecha de la barra
             string vs = FormatVal(val);
-            using var vf = new Font("Segoe UI", 7.5f);
+            using var vf = new Font("MS Sans Serif", 8f);
             var vsz = g.MeasureString(vs, vf);
             g.DrawString(vs, vf,
                 new SolidBrush(Color.FromArgb(190, c)),
@@ -266,7 +265,7 @@ public class ChartPanel : Panel
                 float lx = cx + (float)(Math.Cos(midRad) * radius * 0.62f);
                 float ly = cy + (float)(Math.Sin(midRad) * radius * 0.62f);
                 string pct = $"{val / total:P0}";
-                using var pf = new Font("Segoe UI", 7.5f, FontStyle.Bold);
+                using var pf = new Font("MS Sans Serif", 8f, FontStyle.Bold);
                 var ps = g.MeasureString(pct, pf);
                 g.DrawString(pct, pf, Brushes.White,
                     lx - ps.Width / 2f, ly - ps.Height / 2f);
@@ -277,7 +276,7 @@ public class ChartPanel : Panel
         // Leyenda derecha
         float lx2 = Width - legendW + 10f;
         float ly2 = titleH + 30f;
-        using var legF = new Font("Segoe UI", 8f);
+        using var legF = new Font("MS Sans Serif", 8.5f);
 
         for (int i = 0; i < _data.Count && ly2 + 16 < Height - 10; i++)
         {
@@ -301,12 +300,12 @@ public class ChartPanel : Panel
     {
         var titleColor = t switch
         {
-            TipoGrafica.Columnas => Color.FromArgb(52, 211, 153),
-            TipoGrafica.Barras => Color.FromArgb(251, 191, 36),
-            TipoGrafica.Pastel => Color.FromArgb(125, 211, 252),
-            _ => Color.White
+            TipoGrafica.Columnas => Color.FromArgb(232, 48, 90), // Rose
+            TipoGrafica.Barras => Color.FromArgb(150, 80, 110),
+            TipoGrafica.Pastel => Color.FromArgb(120, 60, 150),
+            _ => Color.Black
         };
-        using var tf = new Font("Segoe UI", 10f, FontStyle.Bold);
+        using var tf = new Font("MS Sans Serif", 10.5f, FontStyle.Bold);
         var ts = g.MeasureString(_titulo, tf);
         g.DrawString(_titulo, tf, new SolidBrush(titleColor),
             (Width - ts.Width) / 2f, 8f);
@@ -329,7 +328,7 @@ public class ChartPanel : Panel
     private void DrawGridLinesH(Graphics g, RectangleF area, double max)
     {
         using var gp = new Pen(Grid, 1f) { DashStyle = DashStyle.Dash };
-        using var lf = new Font("Segoe UI", 7f);
+        using var lf = new Font("MS Sans Serif", 8f);
         const int n = 5;
         for (int i = 0; i <= n; i++)
         {
@@ -346,7 +345,7 @@ public class ChartPanel : Panel
     private void DrawGridLinesV(Graphics g, RectangleF area, double max)
     {
         using var gp = new Pen(Grid, 1f) { DashStyle = DashStyle.Dash };
-        using var lf = new Font("Segoe UI", 7f);
+        using var lf = new Font("MS Sans Serif", 8f);
         const int n = 5;
         for (int i = 0; i <= n; i++)
         {
@@ -371,7 +370,7 @@ public class ChartPanel : Panel
     {
         // Calculate max chars that fit given the available diagonal space
         // With 45° rotation and marginBottom=80, diagonal length ≈ 80/sin(45°) ≈ 113px
-        using var f = new Font("Segoe UI", 7.5f);
+        using var f = new Font("MS Sans Serif", 8f);
         string txt = label;
 
         // Measure and truncate if needed to fit within ~110px of diagonal space
@@ -390,7 +389,7 @@ public class ChartPanel : Panel
 
     private void DrawCentered(Graphics g, string text, Color c)
     {
-        using var f = new Font("Segoe UI", 11f);
+        using var f = new Font("MS Sans Serif", 11.5f, FontStyle.Bold);
         var sz = g.MeasureString(text, f);
         g.DrawString(text, f, new SolidBrush(c),
             (Width - sz.Width) / 2f,

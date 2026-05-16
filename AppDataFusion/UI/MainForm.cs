@@ -7,6 +7,7 @@ using System.Data;
 using System.Drawing.Drawing2D;
 using System.Globalization;
 using System.Reflection;
+using ExploradorArchivos.UI;
 
 namespace ExploradorArchivos.AppDataFusion;
 
@@ -70,6 +71,7 @@ public partial class MainForm : Form
 
         ConfigurarDataGridViews();
         dgvTodos.CellPainting += DgvTodos_CellPainting!;
+        ThemeRenderer.ApplyTheme(this);
 
         Text = "DATA FUSION ARENA · DATA ENGINE";
         

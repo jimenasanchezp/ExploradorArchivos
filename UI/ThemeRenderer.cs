@@ -143,6 +143,66 @@ public static class ThemeRenderer
         e.Graphics.DrawString(e.Node.Text, textFont, new SolidBrush(foreColor), e.Bounds.X + 22, e.Bounds.Y + 5);
     }
 
+    public static void ApplyTheme(Control parent)
+    {
+        if (parent is Form) parent.BackColor = MainBg;
+        
+        Font standardFont;
+        // Aumentamos de 9 a 10.5 para que el diseño se vea más lleno y legible
+        try { standardFont = new Font("MS Sans Serif", 10.5f); } catch { standardFont = new Font("Microsoft Sans Serif", 10.5f); }
+        parent.Font = standardFont;
+
+        foreach (Control c in parent.Controls)
+        {
+            // Respetamos los botones semáforo (no les cambiamos el BackColor)
+            bool isSemaforo = c is Button && (c.Width < 20 || c.Name.ToLower().Contains("semaforo") || c.Parent?.Name.ToLower().Contains("semaforo") == true);
+
+            if (c is Button btn && !isSemaforo)
+            {
+                btn.FlatStyle = FlatStyle.Flat;
+                btn.BackColor = MainBg;
+                btn.ForeColor = MainText;
+                btn.Font = new Font(standardFont, FontStyle.Bold);
+            }
+            else if (c is Label lbl)
+            {
+                lbl.ForeColor = MainText;
+                // Si es un título de grupo (en el sidebar por ejemplo), lo hacemos un poco más grande
+                if (lbl.Text.ToUpper() == lbl.Text && lbl.Text.Length > 3)
+                    lbl.Font = new Font(standardFont.FontFamily, 11.5f, FontStyle.Bold);
+            }
+            else if (c is Panel pnl)
+            {
+                if (pnl.Name.ToLower().Contains("sidebar") || pnl.Name.ToLower().Contains("pnlleft") || pnl.Name.ToLower().Contains("pnlsearch"))
+                    pnl.BackColor = SecondaryBg;
+            }
+            else if (c is TabPage tp)
+            {
+                tp.BackColor = SecondaryBg;
+            }
+            else if (c is MenuStrip ms)
+            {
+                ms.BackColor = SecondaryBg;
+                ms.ForeColor = MainText;
+            }
+            else if (c is DataGridView dgv)
+            {
+                dgv.BackgroundColor = MainBg;
+                dgv.DefaultCellStyle.BackColor = MainBg;
+                dgv.DefaultCellStyle.Font = standardFont;
+                dgv.ColumnHeadersDefaultCellStyle.BackColor = SecondaryBg;
+                dgv.EnableHeadersVisualStyles = false;
+            }
+
+            // Aplicamos recursivamente pero pasamos el standardFont para mantener consistencia
+            if (c.HasChildren) ApplyTheme(c);
+            
+            // Aseguramos que la fuente se aplique a todo después de la recursión si no fue capturado antes
+            if (!(c is Button && isSemaforo))
+                c.Font = standardFont;
+        }
+    }
+
     private static string GetIconForType(string tipo, string ruta)
     {
         string extension = Path.GetExtension(ruta).ToLower();

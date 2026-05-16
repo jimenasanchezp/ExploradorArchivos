@@ -1,9 +1,10 @@
 using ExploradorArchivos.AppDataFusion.Database;
+using ExploradorArchivos.UI;
 
 namespace ExploradorArchivos.AppDataFusion;
 
 // --------------------------------------------------------------
-//  DI¡LOGO ñ ConexiÛn BD con detecciÛn autom·tica de tablas
+//  DI√ÅLOGO ‚Äì Conexi√≥n BD con detecci√≥n autom√°tica de tablas
 // --------------------------------------------------------------
 public class FormConexionBD : Form
 {
@@ -23,14 +24,12 @@ public class FormConexionBD : Form
         _pd = _esPg ? "5432" : "3306";
         _ud = _esPg ? "postgres" : "root";
 
-        Text = $"ConexiÛn a {motor}";
+        ThemeRenderer.ApplyTheme(this);
+        Text = $"Conexi√≥n a {motor}";
         Size = new Size(490, 420);
         StartPosition = FormStartPosition.CenterParent;
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MaximizeBox = false;
-        BackColor = Color.FromArgb(18, 18, 26);
-        ForeColor = Color.FromArgb(220, 220, 232);
-        Font = new Font("Segoe UI", 9f);
 
         int y = 18;
         const int lx = 15, cx = 140, cw = 320;
@@ -38,18 +37,16 @@ public class FormConexionBD : Form
         Label Lbl(string t) => new()
         {
             Text = t,
-            AutoSize = true,
-            ForeColor = Color.FromArgb(100, 100, 130)
+            AutoSize = true
         };
         TextBox Txt(string d, bool p = false) => new()
         {
             Width = cw,
             Text = d,
-            BackColor = Color.FromArgb(26, 26, 36),
-            ForeColor = Color.FromArgb(220, 220, 232),
+            BackColor = Color.White,
+            ForeColor = ThemeRenderer.MainText,
             BorderStyle = BorderStyle.FixedSingle,
-            UseSystemPasswordChar = p,
-            Font = new Font("Segoe UI", 9f)
+            UseSystemPasswordChar = p
         };
 
         var l1 = Lbl("Host:"); l1.Location = new Point(lx, y + 3);
@@ -64,7 +61,7 @@ public class FormConexionBD : Form
         var l4 = Lbl("Usuario:"); l4.Location = new Point(lx, y + 3);
         txtUsuario = Txt(_ud); txtUsuario.Location = new Point(cx, y); y += 34;
 
-        var l5 = Lbl("ContraseÒa:"); l5.Location = new Point(lx, y + 3);
+        var l5 = Lbl("Contrase√±a:"); l5.Location = new Point(lx, y + 3);
         txtContrasena = Txt("", true); txtContrasena.Location = new Point(cx, y); y += 34;
 
         var sep = new Label
@@ -227,7 +224,7 @@ public class FormConexionBD : Form
 }
 
 // --------------------------------------------------------------
-//  DI¡LOGO ñ Exportar datos a BD
+//  DI√ÅLOGO ‚Äì Exportar datos a BD
 // --------------------------------------------------------------
 public class FormExportarBD : Form
 {
@@ -243,39 +240,37 @@ public class FormExportarBD : Form
 
     public FormExportarBD(int totalRegistros)
     {
+        ThemeRenderer.ApplyTheme(this);
         Text = "Exportar a Base de Datos";
         Size = new Size(510, 490);
         StartPosition = FormStartPosition.CenterParent;
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MaximizeBox = false;
-        BackColor = Color.FromArgb(18, 18, 26);
-        ForeColor = Color.FromArgb(220, 220, 232);
-        Font = new Font("Segoe UI", 9f);
 
         int y = 12;
         const int lx = 15, cx = 140, cw = 340;
 
         var lblInfo = new Label
         {
-            Text = $"Se enviar·n {totalRegistros:N0} registros. La tabla se crear· si no existe.",
+            Text = $"Se enviar√°n {totalRegistros:N0} registros. La tabla se crear√° si no existe.",
             Location = new Point(lx, y),
             Size = new Size(460, 32),
-            ForeColor = Color.FromArgb(52, 211, 153),
-            Font = new Font("Segoe UI", 8.5f)
+            ForeColor = ThemeRenderer.SecondaryText,
+            Font = new Font(this.Font, FontStyle.Bold)
         };
         y += 44;
 
-        var sep0 = new Label { Location = new Point(lx, y), Size = new Size(455, 1), BackColor = Color.FromArgb(36, 36, 52) };
+        var sep0 = new Label { Location = new Point(lx, y), Size = new Size(455, 1), BackColor = Color.Lavender };
         y += 10;
 
-        var lblMotor = new Label { Text = "Motor:", Location = new Point(lx, y + 3), AutoSize = true, ForeColor = Color.FromArgb(100, 100, 130) };
+        var lblMotor = new Label { Text = "Motor:", Location = new Point(lx, y + 3), AutoSize = true };
         rbPostgres = new RadioButton
         {
             Text = "PostgreSQL",
             Location = new Point(cx, y),
             AutoSize = true,
             Checked = true,
-            ForeColor = Color.FromArgb(125, 211, 252),
+            ForeColor = Color.Black,
             BackColor = Color.Transparent
         };
         rbMariaDB = new RadioButton
@@ -283,26 +278,25 @@ public class FormExportarBD : Form
             Text = "MariaDB",
             Location = new Point(cx + 140, y),
             AutoSize = true,
-            ForeColor = Color.FromArgb(251, 191, 36),
+            ForeColor = Color.Black,
             BackColor = Color.Transparent
         };
         rbPostgres.CheckedChanged += Motor_Changed!;
         rbMariaDB.CheckedChanged += Motor_Changed!;
         y += 30;
 
-        var sep1 = new Label { Location = new Point(lx, y), Size = new Size(455, 1), BackColor = Color.FromArgb(36, 36, 52) };
+        var sep1 = new Label { Location = new Point(lx, y), Size = new Size(455, 1), BackColor = Color.Lavender };
         y += 10;
 
-        Label Lbl(string t) => new() { Text = t, AutoSize = true, ForeColor = Color.FromArgb(100, 100, 130) };
+        Label Lbl(string t) => new() { Text = t, AutoSize = true };
         TextBox Txt(string d, bool p = false) => new()
         {
             Width = cw,
             Text = d,
-            BackColor = Color.FromArgb(26, 26, 36),
-            ForeColor = Color.FromArgb(220, 220, 232),
+            BackColor = Color.White,
+            ForeColor = ThemeRenderer.MainText,
             BorderStyle = BorderStyle.FixedSingle,
-            UseSystemPasswordChar = p,
-            Font = new Font("Segoe UI", 9f)
+            UseSystemPasswordChar = p
         };
 
         var l1 = Lbl("Host:"); l1.Location = new Point(lx, y + 3);
@@ -317,10 +311,10 @@ public class FormExportarBD : Form
         var l4 = Lbl("Usuario:"); l4.Location = new Point(lx, y + 3);
         txtUsuario = Txt("postgres"); txtUsuario.Location = new Point(cx, y); y += 32;
 
-        var l5 = Lbl("ContraseÒa:"); l5.Location = new Point(lx, y + 3);
+        var l5 = Lbl("Contrase√±a:"); l5.Location = new Point(lx, y + 3);
         txtContrasena = Txt("", true); txtContrasena.Location = new Point(cx, y); y += 32;
 
-        var sep2 = new Label { Location = new Point(lx, y), Size = new Size(455, 1), BackColor = Color.FromArgb(36, 36, 52) };
+        var sep2 = new Label { Location = new Point(lx, y), Size = new Size(455, 1), BackColor = Color.Lavender };
         y += 10;
 
         var lTabla = Lbl("Tabla destino:"); lTabla.Location = new Point(lx, y + 5);
@@ -329,10 +323,9 @@ public class FormExportarBD : Form
             Location = new Point(cx, y + 1),
             Width = 215,
             DropDownStyle = ComboBoxStyle.DropDown,
-            BackColor = Color.FromArgb(26, 26, 36),
-            ForeColor = Color.FromArgb(220, 220, 232),
-            FlatStyle = FlatStyle.Flat,
-            Font = new Font("Segoe UI", 9f)
+            BackColor = Color.White,
+            ForeColor = ThemeRenderer.MainText,
+            FlatStyle = FlatStyle.Flat
         };
         cmbTabla.Text = "datos_exportados";
 
@@ -342,22 +335,21 @@ public class FormExportarBD : Form
             Location = new Point(cx + 223, y),
             Width = 117,
             Height = 28,
-            BackColor = Color.FromArgb(8, 34, 55),
-            ForeColor = Color.FromArgb(125, 211, 252),
-            FlatStyle = FlatStyle.Flat,
-            Font = new Font("Segoe UI", 8.5f)
+            BackColor = ThemeRenderer.MainBg,
+            ForeColor = ThemeRenderer.MainText,
+            FlatStyle = FlatStyle.Flat
         };
         btnDetectarTablas.FlatAppearance.BorderSize = 0;
+        btnDetectarTablas.Paint += (s, e) => ThemeRenderer.DrawRetroBorder(e.Graphics, btnDetectarTablas.ClientRectangle, true);
         btnDetectarTablas.Click += BtnDetectarTablas_Click!;
         y += 36;
 
         lblEstadoTablas = new Label
         {
-            Text = "Ingresa la conexiÛn y pulsa 'Ver tablas', o escribe un nombre nuevo.",
+            Text = "Ingresa la conexi√≥n y pulsa 'Ver tablas', o escribe un nombre nuevo.",
             Location = new Point(cx, y),
             Size = new Size(cw, 30),
-            ForeColor = Color.FromArgb(80, 130, 100),
-            Font = new Font("Segoe UI", 7.8f)
+            ForeColor = ThemeRenderer.SecondaryText
         };
         y += 36;
 
@@ -368,12 +360,12 @@ public class FormExportarBD : Form
             Width = 200,
             Height = 30,
             DialogResult = DialogResult.OK,
-            BackColor = Color.FromArgb(13, 61, 40),
-            ForeColor = Color.FromArgb(52, 211, 153),
-            FlatStyle = FlatStyle.Flat,
-            Font = new Font("Segoe UI", 9f, FontStyle.Bold)
+            BackColor = ThemeRenderer.Accent,
+            ForeColor = Color.White,
+            FlatStyle = FlatStyle.Flat
         };
         ok.FlatAppearance.BorderSize = 0;
+        ok.Paint += (s, e) => ThemeRenderer.DrawRetroBorder(e.Graphics, ok.ClientRectangle, true);
 
         var can = new Button
         {
@@ -382,12 +374,12 @@ public class FormExportarBD : Form
             Width = 90,
             Height = 30,
             DialogResult = DialogResult.Cancel,
-            BackColor = Color.FromArgb(40, 18, 18),
-            ForeColor = Color.FromArgb(200, 100, 100),
-            FlatStyle = FlatStyle.Flat,
-            Font = new Font("Segoe UI", 9f)
+            BackColor = ThemeRenderer.MainBg,
+            ForeColor = ThemeRenderer.MainText,
+            FlatStyle = FlatStyle.Flat
         };
         can.FlatAppearance.BorderSize = 0;
+        can.Paint += (s, e) => ThemeRenderer.DrawRetroBorder(e.Graphics, can.ClientRectangle, true);
 
         ok.Click += (_, _) =>
         {
@@ -480,7 +472,7 @@ public class FormExportarBD : Form
             }
             else
             {
-                lblEstadoTablas.Text = "Sin tablas existentes. Se crear· la tabla que escribas.";
+                lblEstadoTablas.Text = "Sin tablas existentes. Se crear√° la tabla que escribas.";
                 lblEstadoTablas.ForeColor = Color.FromArgb(180, 140, 50);
             }
         }
@@ -497,7 +489,7 @@ public class FormExportarBD : Form
 }
 
 // --------------------------------------------------------------
-//  DI¡LOGO ñ SelecciÛn de columnas
+//  DI√ÅLOGO ‚Äì Selecci√≥n de columnas
 // --------------------------------------------------------------
 public class FormSeleccionColumnas : Form
 {
@@ -529,7 +521,7 @@ public class FormSeleccionColumnas : Form
 
         var intro = new Label
         {
-            Text = "Elige quÈ columna de tu tabla representa cada concepto:",
+            Text = "Elige qu√© columna de tu tabla representa cada concepto:",
             Location = new Point(lx, y),
             Size = new Size(440, 20),
             ForeColor = Color.FromArgb(100, 100, 130),
@@ -564,8 +556,8 @@ public class FormSeleccionColumnas : Form
             return c;
         }
 
-        var lC = Lbl("CategorÌa (eje X / agrupaciÛn):", sC); var cC = Cmb(sC); y += 30;
-        var lV = Lbl("Valor numÈrico (eje Y / suma):", sV); var cV = Cmb(sV); y += 30;
+        var lC = Lbl("Categor√≠a (eje X / agrupaci√≥n):", sC); var cC = Cmb(sC); y += 30;
+        var lV = Lbl("Valor num√©rico (eje Y / suma):", sV); var cV = Cmb(sV); y += 30;
         var lN = Lbl("Nombre / etiqueta:", sN); var cN = Cmb(sN); y += 30;
         var lF = Lbl("Fecha:", sF); var cF = Cmb(sF); y += 38;
 
@@ -617,8 +609,8 @@ public class FormSeleccionColumnas : Form
             if (usados.Count != usados.Distinct(StringComparer.OrdinalIgnoreCase).Count())
             {
                 MessageBox.Show(
-                    "No uses la misma columna para m·s de un campo.",
-                    "Mapeo inv·lido", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    "No uses la misma columna para m√°s de un campo.",
+                    "Mapeo inv√°lido", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 DialogResult = DialogResult.None;
             }
         };

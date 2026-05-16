@@ -137,7 +137,8 @@ partial class MainForm
         ForeColor = clrText;
         Font = new Font("Segoe UI", 9f);
         Text = "Data Fusion Arena";
-        WindowState = FormWindowState.Maximized;
+        WindowState = FormWindowState.Normal;
+        StartPosition = FormStartPosition.CenterScreen;
         FormBorderStyle = FormBorderStyle.None;
 
     // ──  ──────────────────────────────────────────────────────────

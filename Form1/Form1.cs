@@ -187,7 +187,8 @@ public partial class Form1 : Form
 
     private void ConfigurarUI()
     {
-        try { this.Font = new Font("MS Sans Serif", 9); } catch { this.Font = new Font("Microsoft Sans Serif", 9); }
+        ThemeRenderer.ApplyTheme(this);
+        ConfigurarSemaforos();
         this.BackColor = ThemeRenderer.MainBg;
         listViewPrincipal.BackColor = Color.White;
         listViewPrincipal.BorderStyle = BorderStyle.Fixed3D;

@@ -4,6 +4,7 @@ using System.Drawing;
 using System.IO;
 using System.Linq;
 using System.Windows.Forms;
+using ExploradorArchivos.UI;
 
 namespace ExploradorArchivos.Mp3
 {
@@ -59,16 +60,15 @@ namespace ExploradorArchivos.Mp3
 
         private void InicializarComponentes()
         {
+            ThemeRenderer.ApplyTheme(this);
             this.FormBorderStyle = FormBorderStyle.None;
             this.Size = new Size(850, 550);
-            this.BackColor = BeigeClaro;
             this.StartPosition = FormStartPosition.CenterScreen;
-            try { this.Font = new Font("Inter", 9); } catch { this.Font = new Font("Segoe UI", 9); }
 
             this.Paint += (s, e) => DrawRetroBorder(e.Graphics, new Rectangle(0, 0, this.Width - 1, this.Height - 1), true);
 
             // === TITLE BAR ===
-            Panel pnlTitleBar = new Panel { Dock = DockStyle.Top, Height = 28, BackColor = Lila };
+            Panel pnlTitleBar = new Panel { Dock = DockStyle.Top, Height = 32, BackColor = ThemeRenderer.SecondaryBg };
             pnlTitleBar.MouseDown += TitleBar_MouseDown;
             pnlTitleBar.MouseMove += TitleBar_MouseMove;
             pnlTitleBar.MouseUp += TitleBar_MouseUp;
@@ -126,16 +126,16 @@ namespace ExploradorArchivos.Mp3
             _trackProgreso = new CustomTrackBar { Size = new Size(720, 15), Location = new Point(65, 17), Value = 0 };
             _lblTiempoTotal = new Label { Text = "0:00", Location = new Point(790, 15), Size = new Size(40, 20) };
 
-            _btnShuffle = CrearBotonControl("🔀", GrisSuave);
+            _btnShuffle = CrearBotonControl("🔀", ThemeRenderer.MainBg);
             _btnShuffle.Location = new Point(200, 50);
-            _btnAnterior = CrearBotonControl("⏮️", AzulCielo);
+            _btnAnterior = CrearBotonControl("⏮️", ThemeRenderer.MainBg);
             _btnAnterior.Location = new Point(270, 50);
-            _btnPlayPause = CrearBotonControl("⏯️", RosaPastel);
+            _btnPlayPause = CrearBotonControl("⏯️", ThemeRenderer.Accent);
             _btnPlayPause.Size = new Size(70, 45);
             _btnPlayPause.Location = new Point(340, 47);
-            _btnSiguiente = CrearBotonControl("⏭️", AzulCielo);
+            _btnSiguiente = CrearBotonControl("⏭️", ThemeRenderer.MainBg);
             _btnSiguiente.Location = new Point(420, 50);
-            _btnRepeat = CrearBotonControl("🔁", GrisSuave);
+            _btnRepeat = CrearBotonControl("🔁", ThemeRenderer.MainBg);
             _btnRepeat.Location = new Point(490, 50);
 
             Label lblVolSticker = new Label { Text = "🔊", Font = new Font("Segoe UI", 14), Location = new Point(650, 55), AutoSize = true };
@@ -257,7 +257,7 @@ namespace ExploradorArchivos.Mp3
         {
             Button btn = new Button {
                 Text = text, Size = new Size(20, 20), FlatStyle = FlatStyle.Flat,
-                BackColor = GrisSuave, Font = new Font(this.Font.FontFamily, 8, FontStyle.Bold),
+                BackColor = ThemeRenderer.MainBg, Font = new Font(this.Font.FontFamily, 8, FontStyle.Bold),
                 Padding = new Padding(0), Margin = new Padding(0)
             };
             btn.FlatAppearance.BorderSize = 0;

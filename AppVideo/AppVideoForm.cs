@@ -41,10 +41,10 @@ public partial class AppVideoForm : Form
 
     private void InitializeCustomComponents()
     {
+        ThemeRenderer.ApplyTheme(this);
         this.Text = "App Video - Studio";
         this.Size = new Size(1100, 750);
         this.StartPosition = FormStartPosition.CenterScreen;
-        this.BackColor = ThemeRenderer.MainBg;
         this.FormBorderStyle = FormBorderStyle.None;
 
         // Barra Superior (80px de padding izquierdo para los semáforos)

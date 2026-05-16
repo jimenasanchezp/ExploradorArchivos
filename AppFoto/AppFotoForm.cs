@@ -56,11 +56,11 @@ public partial class AppFotoForm : Form
 
     private void InitializeCustomComponents()
     {
+        ThemeRenderer.ApplyTheme(this);
         this.Text = "App Foto - Premium Studio";
         this.Size = new Size(1200, 800);
         this.MinimumSize = new Size(800, 600);
         this.StartPosition = FormStartPosition.CenterScreen;
-        this.BackColor = ThemeRenderer.MainBg;
         this.FormBorderStyle = FormBorderStyle.None;
 
         // Barra Superior Responsiva (80px de padding izquierdo para los semáforos)
