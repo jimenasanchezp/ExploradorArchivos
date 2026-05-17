@@ -323,7 +323,7 @@ public partial class MainForm : Form
         if (gi >= 0 && gi < cmbGrupoGrafica.Items.Count) cmbGrupoGrafica.SelectedIndex = gi;
 
         int mi = cmbMetricaGrafica.FindStringExact(prevMetrica);
-        if (mi < 0) mi = cmbMetricaGrafica.Items.Count > 1 ? 1 : 0;
+        if (mi < 0) mi = 0; // Default to "Contar registros" (index 0)
         if (mi >= 0 && mi < cmbMetricaGrafica.Items.Count) cmbMetricaGrafica.SelectedIndex = mi;
     }
 
@@ -357,6 +357,8 @@ public partial class MainForm : Form
                 if (grupoClv == "fuente") return item.Fuente;
                 if (grupoClv == "valor") return item.Valor.ToString("F2");
                 if (grupoClv == "id") return item.Id.ToString();
+                if (grupoClv == "latitude") return item.Latitude?.ToString("F4") ?? "(vacío)";
+                if (grupoClv == "longitude") return item.Longitude?.ToString("F4") ?? "(vacío)";
                 
                 return BuscarExtra(item, grupoClv) is { Length: > 0 } ev ? ev : "(vacío)";
             }
@@ -367,6 +369,8 @@ public partial class MainForm : Form
                 if (metricaClv == "valor") return item.Valor;
                 if (metricaClv == "id") return item.Id;
                 if (metricaClv == "fecha") return item.Fecha.Day; // fallback
+                if (metricaClv == "latitude") return item.Latitude ?? 0;
+                if (metricaClv == "longitude") return item.Longitude ?? 0;
 
                 string valStr = BuscarExtra(item, metricaClv);
                 return double.TryParse(valStr, NumberStyles.Any, CultureInfo.InvariantCulture, out double v) ? v : 0;
@@ -1195,6 +1199,7 @@ public partial class MainForm : Form
 
     private static string BuscarExtra(DataItem item, string clave)
     {
+        if (string.IsNullOrEmpty(clave)) return "";
         if (item.CamposExtra.TryGetValue(clave, out var v)) return v;
         foreach (var kv in item.CamposExtra)
             if (string.Equals(kv.Key, clave, StringComparison.OrdinalIgnoreCase)) return kv.Value;
