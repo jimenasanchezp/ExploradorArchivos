@@ -18,13 +18,13 @@ namespace ExploradorArchivos;
 public partial class Form1 : Form
 {
     // === Estado de navegación ===
-    private string _rutaActual = "Inicio";
-    private Stack<string> _historial = new Stack<string>();
-    private List<FileSystemItem> _itemsActuales = new List<FileSystemItem>();
-    private string _filtroActivo = "Todos";
+    private string _rutaActual = "Inicio"; // Ruta actual mostrada en el ListView
+    private Stack<string> _historial = new Stack<string>(); // Historial tipo pila LIFO para navegación hacia atrás
+    private List<FileSystemItem> _itemsActuales = new List<FileSystemItem>(); // Lista de items actualmente mostrados (para filtros y búsqueda)
+    private string _filtroActivo = "Todos"; // filtro de visualización activo (Todos, Imágenes, Audio, Video, Texto/Código, Otros)
 
     // === Componentes de UI ===
-    private ListViewSorter _sorter = default!;
+    private ListViewSorter _sorter = default!; // Ordenador de ListView para ordenamiento por columnas
     private QuickLookForm? _quickLookForm;
     private FlowLayoutPanel _pnlFiltros = default!;
     private ImageList _imageListMiniaturas = default!;
@@ -41,6 +41,9 @@ public partial class Form1 : Form
         CargarDirectorio(_rutaActual);
     }
 
+    /* Construye dinamicamente el menu contextual de clic derecho (Abrir, 
+     * QuickLook, Cortar, Copiar, Pegar, Eliminar, Propiedades)
+     utilizando un renderizador personalizado de colores */
     private void ConfigurarContextoMenu()
     {
         ContextMenuStrip menu = new ContextMenuStrip();
@@ -64,7 +67,7 @@ public partial class Form1 : Form
         ToolStripMenuItem itemPredeterminada = new ToolStripMenuItem("💻  Sistema (App Predeterminada)");
 
         // Eventos de apertura
-        itemAbrir.Click += (s, e) => ListViewPrincipal_DoubleClick(s, e);
+        itemAbrir.Click += (s, e) => ListViewPrincipal_DoubleClick(s, e); 
         
         itemAppVideo.Click += (s, e) => AbrirCon(new AppVideoForm(GetSelectedPath()));
         itemAppFoto.Click += (s, e) => AbrirCon(new AppFotoForm(GetSelectedPath()));
@@ -116,11 +119,22 @@ public partial class Form1 : Form
         };
     }
 
+    /* Obtiene la ruta completa del item seleccionado en el ListView,
+     * para usar en acciones como abrir, cortar, copiar, eliminar, etc. 
+     * Si no hay item seleccionado, devuelve cadena vacía.*/
     private string GetSelectedPath() => listViewPrincipal.SelectedItems[0].Tag?.ToString() ?? "";
-    
+
+
+    /* Método helper generico que muestra subformularios del explorador
+     * (Visor de imágenes, Reproductor de música, Visor de texto, etc.)*/
     private void AbrirCon(Form frm) => frm.Show();
+
+    /* AbrirConSistema utiliza Process.Star UseShellExecute = True 
+     * para delegar la ejecucion al visor predeterminado
+     * del sistema operativo, lo que permite abrir cualquier tipo de archivo*/
     private void AbrirConSistema(string ruta) => Process.Start(new ProcessStartInfo { FileName = ruta, UseShellExecute = true });
 
+    //Almacenan la referencia del archivo en el portapapeles del sistema operativo para transacciones I/O futuras
     private void CortarArchivo(string ruta)
     {
         var paths = new System.Collections.Specialized.StringCollection { ruta };
@@ -136,6 +150,9 @@ public partial class Form1 : Form
         Clipboard.SetFileDropList(paths);
     }
 
+    // En lugar de eliminar permanentemente, se envía el archivo a la papelera
+    // de reciclaje utilizando la función SHFileOperation de Windows, lo que permite
+    // recuperar archivos eliminados accidentalmente.
     private void EliminarArchivo(string ruta)
     {
         if (MessageBox.Show("¿Seguro que deseas eliminar este archivo?", "Eliminar", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
@@ -144,24 +161,25 @@ public partial class Form1 : Form
             CargarDirectorio(_rutaActual, false);
         }
     }
-
+    // Ejecuta renombrado de archivos manejando errores comunes mediante File.Move o Directory.Move.
     private void RenombrarArchivo(string rutaOld, string nuevoNombre)
     {
         try
         {
-            string dir = Path.GetDirectoryName(rutaOld)!;
-            string ext = Path.GetExtension(rutaOld);
-            string rutaNew = Path.Combine(dir, nuevoNombre + (nuevoNombre.EndsWith(ext) ? "" : ext));
+            string dir = Path.GetDirectoryName(rutaOld)!; // Obtener el directorio padre para construir la nueva ruta
+            string ext = Path.GetExtension(rutaOld); // Obtener la extensión del archivo original
+            string rutaNew = Path.Combine(dir, nuevoNombre + (nuevoNombre.EndsWith(ext) ? "" : ext)); // Asegura que la extensión se mantenga si el usuario no la incluye al renombrar
             if (rutaOld != rutaNew)
             {
-                if (Directory.Exists(rutaOld)) Directory.Move(rutaOld, rutaNew);
-                else File.Move(rutaOld, rutaNew);
-                CargarDirectorio(_rutaActual, false);
+                if (Directory.Exists(rutaOld)) Directory.Move(rutaOld, rutaNew); 
+                else File.Move(rutaOld, rutaNew); 
+                CargarDirectorio(_rutaActual, false); 
             }
         }
         catch (Exception ex) { MessageBox.Show("Error al renombrar: " + ex.Message); }
     }
 
+    // Construye un cuadro de diálogo descriptivo sobre el archivo mostrando su peso exacto, fecha de creación y atributos.
     private void MostrarPropiedades(string ruta)
     {
         var info = new FileInfo(ruta);
@@ -172,6 +190,7 @@ public partial class Form1 : Form
         MessageBox.Show(msg, "Propiedades de Archivo", MessageBoxButtons.OK, MessageBoxIcon.Information);
     }
 
+    // Clase de pintura GDI+ encargada de forzar el dibujo de bordes y rellenos en menús contextuales para ajustarlos a la estética.
     class CustomMenuRenderer : ToolStripProfessionalRenderer
     {
         protected override void OnRenderMenuItemBackground(ToolStripItemRenderEventArgs e)
@@ -184,6 +203,8 @@ public partial class Form1 : Form
             }
         }
     }
+
+    // ===== CONFIGURACIÓN DE INTERFAZ Y ESTILO VISUAL ===
 
     private void ConfigurarUI()
     {

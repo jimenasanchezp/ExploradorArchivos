@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Windows.Forms;
@@ -100,28 +101,27 @@ public partial class Form1
 
         try
         {
-            var dirDocs = new DirectoryInfo(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments));
-            var recientes = dirDocs.GetFiles("*.*", SearchOption.TopDirectoryOnly)
-                                   .OrderByDescending(f => f.LastWriteTime)
-                                   .Take(15);
+            // Obtener los archivos abiertos recientemente mediante nuestro servicio de historial
+            var recientes = RecentFilesService.ObtenerArchivosRecientes();
 
             foreach (var f in recientes)
             {
                 var lvi = new ListViewItem(f.Name) { Tag = f.FullName, Group = grpRecientes };
                 lvi.SubItems.Add(f.Extension.ToUpper() + " File");
                 lvi.SubItems.Add((f.Length / 1024).ToString() + " KB");
-                lvi.SubItems.Add("Modificado recientemente");
+                lvi.SubItems.Add("Abierto recientemente");
                 lvi.SubItems.Add(f.LastWriteTime.ToString("dd/MM/yyyy HH:mm"));
                 listViewPrincipal.Items.Add(lvi);
             }
         }
-        catch { /* Ignorar errores de permisos */ }
+        catch { /* Ignorar errores */ }
 
         listViewPrincipal.EndUpdate();
         lblStatus.Text = "🏠 Vista de Inicio cargada.";
         _itemsActuales.Clear();
     }
 
+    // Vista de Este Equipo: muestra las unidades de disco disponibles
     private void GenerarVistaEsteEquipo()
     {
         listViewPrincipal.BeginUpdate();
@@ -131,9 +131,9 @@ public partial class Form1
         ListViewGroup grpDiscos = new ListViewGroup("Unidades de Disco", "💻 Unidades de Disco");
         listViewPrincipal.Groups.Add(grpDiscos);
 
-        foreach (var drive in DriveInfo.GetDrives())
+        foreach (var drive in DriveInfo.GetDrives()) // driveinfo.GetDrives() obtiene todas las unidades de disco disponibles en el sistema
         {
-            if (drive.IsReady)
+            if (drive.IsReady) // Verificar que la unidad esté lista para ser accedida (evita errores con unidades extraíbles sin medios)
             {
                 var lvi = new ListViewItem($"{drive.Name} ({drive.VolumeLabel})") { Tag = drive.Name, Group = grpDiscos };
                 lvi.SubItems.Add("Unidad Local");
@@ -157,6 +157,8 @@ public partial class Form1
         treeViewLateral.Nodes.Clear();
 
         // Accesos Rápidos
+        // Nodo principal "Accesos Rápidos" con subnodos para cada carpeta común del usuario
+        // Guarda la ruta completa en el Tag para facilitar la navegación
         TreeNode nodoFavoritos = new TreeNode("Accesos Rápidos");
         nodoFavoritos.Nodes.Add(new TreeNode("Inicio") { Tag = "Inicio" });
         nodoFavoritos.Nodes.Add(new TreeNode("Escritorio") { Tag = Environment.GetFolderPath(Environment.SpecialFolder.Desktop) });
@@ -166,13 +168,13 @@ public partial class Form1
         nodoFavoritos.Nodes.Add(new TreeNode("Música") { Tag = Environment.GetFolderPath(Environment.SpecialFolder.MyMusic) });
         nodoFavoritos.Nodes.Add(new TreeNode("Videos") { Tag = Environment.GetFolderPath(Environment.SpecialFolder.MyVideos) });
         treeViewLateral.Nodes.Add(nodoFavoritos);
-        nodoFavoritos.Expand();
+        nodoFavoritos.Expand(); // Expandir por defecto para mostrar los accesos rápidos
 
         // Este Equipo
         TreeNode nodoEquipo = new TreeNode("Este Equipo") { Tag = "EsteEquipo" };
-        foreach (var drive in DriveInfo.GetDrives())
+        foreach (var drive in DriveInfo.GetDrives()) //GetDrives() obtiene todas las unidades de disco disponibles en el sistema
         {
-            if (drive.IsReady)
+            if (drive.IsReady) // si el disco esta listo, añade un nodo para este unidad mostrando su letra y nombre
                 nodoEquipo.Nodes.Add(new TreeNode($"{drive.Name} ({drive.VolumeLabel})") { Tag = drive.Name });
         }
         treeViewLateral.Nodes.Add(nodoEquipo);
@@ -182,14 +184,16 @@ public partial class Form1
         if (_rutaActual != "Inicio" && _rutaActual != "EsteEquipo" && Directory.Exists(_rutaActual))
         {
             TreeNode nodoActual = new TreeNode($"Abierto: {new DirectoryInfo(_rutaActual).Name}");
-            var grupos = _itemsActuales.GroupBy(x => x.CategoriaVisual);
+            var grupos = _itemsActuales.GroupBy(x => x.CategoriaVisual); // Agrupa los archivos y carpetas del directorio según su tipo visual 
 
+            // Para cada grupo (Carpetas, Imágenes, Audio, etc.) se crea un nodo padre en el TreeView.
+            // Luego, se añaden como nodos hijos solo las carpetas de ese grupo 
             foreach (var grupo in grupos.OrderBy(g => g.Key))
             {
                 TreeNode nodoPadre = new TreeNode($"{grupo.Key} ({grupo.Count()})");
                 foreach (var item in grupo)
                 {
-                    if (item.EsCarpeta)
+                    if (item.EsCarpeta) // si es una carpeta, se añade como nodo hijo al nodo padre del grupo correspondiente con sus propiedades
                         nodoPadre.Nodes.Add(new TreeNode(item.Nombre) { Tag = item.RutaCompleta });
                 }
                 if (nodoPadre.Nodes.Count > 0)
@@ -202,6 +206,8 @@ public partial class Form1
         treeViewLateral.EndUpdate();
     }
 
+    // Evento que procesa la selección del panel lateral para redireccionar
+    // el explorador hacia la ruta física del nodo clickeado.
     private void TreeViewLateral_NodeMouseDoubleClick(object? sender, TreeNodeMouseClickEventArgs e)
     {
         if (e.Node.Tag != null)
@@ -209,10 +215,10 @@ public partial class Form1
             string? ruta = e.Node.Tag.ToString();
             if (string.IsNullOrEmpty(ruta)) return;
 
-            if (Directory.Exists(ruta))
-                CargarDirectorio(ruta);
+            if (ruta == "Inicio" || ruta == "EsteEquipo" || Directory.Exists(ruta))
+                CargarDirectorio(ruta); // Si es una ruta válida o una vista especial, cargarla en el explorador
             else
-                AbrirArchivoConAppPredeterminada(ruta);
+                AbrirArchivoConAppPredeterminada(ruta); // Si no es una ruta válida, intentar abrirla como archivo
         }
     }
 
@@ -223,9 +229,12 @@ public partial class Form1
         _flpBreadcrumbs.Controls.Clear();
         if (string.IsNullOrEmpty(_rutaActual)) return;
 
+        // Divide la ruta actual en partes usando el separador de directorios del sistema
         string[] partes = _rutaActual.Split(Path.DirectorySeparatorChar, StringSplitOptions.RemoveEmptyEntries);
         string rutaAcumulada = "";
 
+        // En cada vuelta del ciclo se va acumulando la ruta para cada parte, de modo que al hacer
+        // click en un breadcrumb se pueda navegar a esa ruta específica
         for (int i = 0; i < partes.Length; i++)
         {
             string parte = partes[i];

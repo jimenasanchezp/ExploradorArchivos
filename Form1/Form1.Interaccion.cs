@@ -19,19 +19,24 @@ namespace ExploradorArchivos;
 /// </summary>
 public partial class Form1
 {
+    // Doble clic en el ListView para abrir archivos o navegar a carpetas
     private void ListViewPrincipal_DoubleClick(object? sender, EventArgs e)
     {
         if (listViewPrincipal.SelectedItems.Count == 0) return;
         string? ruta = listViewPrincipal.SelectedItems[0].Tag?.ToString();
         if (string.IsNullOrEmpty(ruta)) return;
-        if (Directory.Exists(ruta)) CargarDirectorio(ruta);
+        if (ruta == "Inicio" || ruta == "EsteEquipo" || Directory.Exists(ruta)) CargarDirectorio(ruta);
         else AbrirArchivoConAppPredeterminada(ruta);
     }
 
+    // Método para abrir archivos con la aplicación predeterminada del sistema
     private void AbrirArchivoConAppPredeterminada(string ruta)
     {
         try
         {
+            // Registrar el archivo en nuestro historial persistente de archivos abiertos
+            RecentFilesService.RegistrarArchivoAbierto(ruta);
+
             string ext = Path.GetExtension(ruta).ToLower();
             string[] imgExt = { ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp" };
             string[] mediaExt = { ".mp3", ".wav", ".flac", ".m4a", ".ogg", ".wma", ".aac" };
@@ -100,6 +105,7 @@ public partial class Form1
         }
     }
 
+    // Mapea la tecla espacio para activar el Quick Look (vista previa rápida) de archivos
     private void ListViewPrincipal_KeyDown(object? sender, KeyEventArgs e)
     {
         if (e.KeyCode == Keys.Space)
@@ -121,6 +127,7 @@ public partial class Form1
         }
     }
 
+    // Mapea la tecla Enter para activar la búsqueda en el ListView
     private void TxtBuscar_KeyDown(object? sender, KeyEventArgs e)
     {
         if (e.KeyCode == Keys.Enter)
