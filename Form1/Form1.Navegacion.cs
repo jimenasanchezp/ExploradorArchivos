@@ -33,6 +33,17 @@ public partial class Form1
             return;
         }
 
+        // Vista de Favoritos (Elementos Fijados)
+        if (ruta == "Favoritos")
+        {
+            txtDireccion.Text = "⭐ Favoritos";
+            ActualizarBreadcrumbs();
+            OcultarTextBoxDireccion();
+            GenerarVistaFavoritos();
+            PoblarTreeViewNormal();
+            return;
+        }
+
         // Vista de Este Equipo (Discos duros)
         if (ruta == "EsteEquipo")
         {
@@ -60,6 +71,43 @@ public partial class Form1
         PoblarTreeViewNormal();
 
         _ = GenerarMiniaturasAsync();
+    }
+
+    private void GenerarVistaFavoritos()
+    {
+        listViewPrincipal.BeginUpdate();
+        listViewPrincipal.Items.Clear();
+        listViewPrincipal.Groups.Clear();
+
+        ListViewGroup grpFavoritos = new ListViewGroup("Favoritos", "⭐ Elementos Favoritos");
+        listViewPrincipal.Groups.Add(grpFavoritos);
+
+        foreach (var path in _elementosFavoritos)
+        {
+            if (Directory.Exists(path))
+            {
+                var lvi = new ListViewItem(Path.GetFileName(path)) { Tag = path, Group = grpFavoritos };
+                lvi.SubItems.Add("Carpeta");
+                lvi.SubItems.Add("");
+                lvi.SubItems.Add("Directorio favorito");
+                lvi.SubItems.Add("");
+                listViewPrincipal.Items.Add(lvi);
+            }
+            else if (File.Exists(path))
+            {
+                FileInfo fi = new FileInfo(path);
+                var lvi = new ListViewItem(fi.Name) { Tag = path, Group = grpFavoritos };
+                lvi.SubItems.Add(fi.Extension.ToUpper() + " File");
+                lvi.SubItems.Add((fi.Length / 1024.0).ToString("F1") + " KB");
+                lvi.SubItems.Add("Archivo favorito");
+                lvi.SubItems.Add("");
+                listViewPrincipal.Items.Add(lvi);
+            }
+        }
+
+        listViewPrincipal.EndUpdate();
+        lblStatus.Text = "⭐ Vista de Favoritos cargada.";
+        _itemsActuales.Clear();
     }
 
     private void GenerarVistaInicio()
@@ -156,21 +204,26 @@ public partial class Form1
         treeViewLateral.BeginUpdate();
         treeViewLateral.Nodes.Clear();
 
-        // Accesos Rápidos
-        // Nodo principal "Accesos Rápidos" con subnodos para cada carpeta común del usuario
-        // Guarda la ruta completa en el Tag para facilitar la navegación
-        TreeNode nodoFavoritos = new TreeNode("Accesos Rápidos");
-        nodoFavoritos.Nodes.Add(new TreeNode("Inicio") { Tag = "Inicio" });
-        nodoFavoritos.Nodes.Add(new TreeNode("Escritorio") { Tag = Environment.GetFolderPath(Environment.SpecialFolder.Desktop) });
-        nodoFavoritos.Nodes.Add(new TreeNode("Descargas") { Tag = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads") });
-        nodoFavoritos.Nodes.Add(new TreeNode("Documentos") { Tag = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments) });
-        nodoFavoritos.Nodes.Add(new TreeNode("Imágenes") { Tag = Environment.GetFolderPath(Environment.SpecialFolder.MyPictures) });
-        nodoFavoritos.Nodes.Add(new TreeNode("Música") { Tag = Environment.GetFolderPath(Environment.SpecialFolder.MyMusic) });
-        nodoFavoritos.Nodes.Add(new TreeNode("Videos") { Tag = Environment.GetFolderPath(Environment.SpecialFolder.MyVideos) });
-        treeViewLateral.Nodes.Add(nodoFavoritos);
-        nodoFavoritos.Expand(); // Expandir por defecto para mostrar los accesos rápidos
+        // 1. Elementos fijos del sistema y usuario ordenados exactamente
+        treeViewLateral.Nodes.Add(new TreeNode("Inicio") { Tag = "Inicio" });
+        treeViewLateral.Nodes.Add(new TreeNode("Escritorio") { Tag = Environment.GetFolderPath(Environment.SpecialFolder.Desktop) });
+        treeViewLateral.Nodes.Add(new TreeNode("Documentos") { Tag = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments) });
+        treeViewLateral.Nodes.Add(new TreeNode("Descargas") { Tag = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads") });
+        treeViewLateral.Nodes.Add(new TreeNode("Favoritos") { Tag = "Favoritos" });
+        treeViewLateral.Nodes.Add(new TreeNode("Imágenes") { Tag = Environment.GetFolderPath(Environment.SpecialFolder.MyPictures) });
+        treeViewLateral.Nodes.Add(new TreeNode("Música") { Tag = Environment.GetFolderPath(Environment.SpecialFolder.MyMusic) });
+        treeViewLateral.Nodes.Add(new TreeNode("Videos") { Tag = Environment.GetFolderPath(Environment.SpecialFolder.MyVideos) });
 
-        // Este Equipo
+        // 3. Elementos fijados individualmente por el usuario directos a la barra lateral izquierda
+        foreach (var path in _accesosDirectos)
+        {
+            if (Directory.Exists(path) || File.Exists(path))
+            {
+                treeViewLateral.Nodes.Add(new TreeNode(Path.GetFileName(path)) { Tag = path });
+            }
+        }
+
+        // 4. Este Equipo
         TreeNode nodoEquipo = new TreeNode("Este Equipo") { Tag = "EsteEquipo" };
         foreach (var drive in DriveInfo.GetDrives()) //GetDrives() obtiene todas las unidades de disco disponibles en el sistema
         {
@@ -180,8 +233,8 @@ public partial class Form1
         treeViewLateral.Nodes.Add(nodoEquipo);
         nodoEquipo.Expand();
 
-        // Carpeta actual (solo si estamos navegando en una ruta real)
-        if (_rutaActual != "Inicio" && _rutaActual != "EsteEquipo" && Directory.Exists(_rutaActual))
+        // 5. Carpeta actual (solo si estamos navegando en una ruta real)
+        if (_rutaActual != "Inicio" && _rutaActual != "Favoritos" && _rutaActual != "EsteEquipo" && Directory.Exists(_rutaActual))
         {
             TreeNode nodoActual = new TreeNode($"Abierto: {new DirectoryInfo(_rutaActual).Name}");
             var grupos = _itemsActuales.GroupBy(x => x.CategoriaVisual); // Agrupa los archivos y carpetas del directorio según su tipo visual 
@@ -215,7 +268,7 @@ public partial class Form1
             string? ruta = e.Node.Tag.ToString();
             if (string.IsNullOrEmpty(ruta)) return;
 
-            if (ruta == "Inicio" || ruta == "EsteEquipo" || Directory.Exists(ruta))
+            if (ruta == "Inicio" || ruta == "Favoritos" || ruta == "EsteEquipo" || Directory.Exists(ruta))
                 CargarDirectorio(ruta); // Si es una ruta válida o una vista especial, cargarla en el explorador
             else
                 AbrirArchivoConAppPredeterminada(ruta); // Si no es una ruta válida, intentar abrirla como archivo

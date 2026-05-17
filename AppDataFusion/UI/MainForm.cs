@@ -522,61 +522,7 @@ public partial class MainForm : Form
                 $"{nuevos.Count} registros cargados desde {Path.GetFileName(ruta)} — Total: {_datos.Count}");
     }
 
-    // ══════════════════════════════════════════════════════════════
-    //  EXPORT TO DATABASE
-    // ══════════════════════════════════════════════════════════════
 
-    private async void BtnExportarBD_Click(object? sender, EventArgs e)
-    {
-        var datos = _datosBase.Count > 0 ? _datosBase : _datos;
-        if (datos.Count == 0)
-        {
-            MessageBox.Show("No hay datos en memoria.\nCarga un archivo primero.",
-                "Sin datos", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-            return;
-        }
-
-        var infoColumnas = new List<(string Display, string Clave)>(_infoColumnas);
-
-        using var dlg = new FormExportarBD(datos.Count);
-        if (dlg.ShowDialog() != DialogResult.OK) return;
-
-        ActualizarEstadoBarra($"Enviando {datos.Count} registros a {dlg.Motor}...");
-
-        var progreso = new Progress<int>(pct =>
-            ActualizarEstadoBarra($"Enviando a BD... {pct}%"));
-
-        try
-        {
-            WriteResult result;
-            var snapshot = new List<DataItem>(datos);
-
-            if (dlg.Motor == "PostgreSQL")
-                result = await DatabaseWriter.EscribirEnPostgreSQLAsync(
-                    dlg.CadenaConexion, dlg.NombreTabla, snapshot, infoColumnas, progreso);
-            else
-                result = await DatabaseWriter.EscribirEnMariaDBAsync(
-                    dlg.CadenaConexion, dlg.NombreTabla, snapshot, infoColumnas, progreso);
-
-            ActualizarEstadoBarra(result.Mensaje);
-            MessageBox.Show(
-                $"{result.Mensaje}\n\n" +
-                $"Motor:      {dlg.Motor}\n" +
-                $"Tabla:      {dlg.NombreTabla}\n" +
-                $"Columnas:   {infoColumnas.Count}\n" +
-                $"Insertados: {result.Insertados:N0}\n" +
-                $"Errores:    {result.Errores}",
-                "Exportar a Base de Datos",
-                MessageBoxButtons.OK,
-                result.Exito ? MessageBoxIcon.Information : MessageBoxIcon.Error);
-        }
-        catch (Exception ex)
-        {
-            ActualizarEstadoBarra($"Error al exportar a BD: {ex.Message}");
-            MessageBox.Show($"Error inesperado:\n{ex.Message}",
-                "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-        }
-    }
 
     // ══════════════════════════════════════════════════════════════
     //  EXPORT FILES

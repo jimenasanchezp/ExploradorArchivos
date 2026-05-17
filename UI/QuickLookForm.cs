@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Drawing;
 using System.IO;
 using System.Windows.Forms;
@@ -60,9 +60,10 @@ namespace ExploradorArchivos.UI
             if (ext is ".jpg" or ".jpeg" or ".png" or ".gif" or ".bmp" or ".webp")
             {
                 _pictureBox = new PictureBox { Dock = DockStyle.Fill, SizeMode = PictureBoxSizeMode.Zoom };
-                using (FileStream fs = new FileStream(filePath, FileMode.Open, FileAccess.Read))
+                byte[] bytes = File.ReadAllBytes(filePath);
+                using (var ms = new MemoryStream(bytes))
                 {
-                    _pictureBox.Image = Image.FromStream(fs);
+                    _pictureBox.Image = Image.FromStream(ms);
                 }
                 this.Controls.Add(_pictureBox);
                 _pictureBox.BringToFront();

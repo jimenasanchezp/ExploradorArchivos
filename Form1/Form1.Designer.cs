@@ -138,7 +138,7 @@ namespace ExploradorArchivos
             txtDireccion.Font = new Font("Segoe UI", 11F);
             txtDireccion.ForeColor = Color.FromArgb(45, 45, 45);
             txtDireccion.Location = new Point(2, 2);
-            txtDireccion.Multiline = true;
+            txtDireccion.Multiline = false;
             txtDireccion.Name = "txtDireccion";
             txtDireccion.Size = new Size(762, 26);
             txtDireccion.TabIndex = 0;

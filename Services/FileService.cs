@@ -10,7 +10,7 @@ namespace ExploradorArchivos.Services;
 public static class FileService
 {
     // === P/INVOKE PARA LA PAPELERA DE RECICLAJE ===
-    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Auto)]
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Auto)] // Estructura para SHFileOperation
     struct SHFILEOPSTRUCT
     {
         public IntPtr hwnd;
@@ -30,26 +30,29 @@ public static class FileService
     private const ushort FOF_ALLOWUNDO = 0x0040; // Envía a la papelera
     private const ushort FOF_NOCONFIRMATION = 0x0010; // No pregunta "Estás seguro?"
 
-    public static bool EnviarAPapelera(string ruta)
+    public static bool EnviarAPapelera(string ruta) // Método para enviar archivos o carpetas a la papelera de reciclaje
     {
         try
         {
-            SHFILEOPSTRUCT shf = new SHFILEOPSTRUCT
+            SHFILEOPSTRUCT shf = new SHFILEOPSTRUCT // Configuración para eliminar sin confirmación y permitir deshacer
             {
                 wFunc = FO_DELETE,
                 pFrom = ruta + '\0' + '\0',
                 fFlags = FOF_ALLOWUNDO | FOF_NOCONFIRMATION
             };
-            int result = SHFileOperation(ref shf);
+            int result = SHFileOperation(ref shf); // Ejecuta la operación
             return result == 0;
         }
         catch { return false; }
     }
 
     // === LECTURA ASÍNCRONA DE DIRECTORIOS ===
+    // Motor de Búsqueda de archivos y carpetas en una ruta dada, con manejo de excepciones para permisos
     public static async Task<List<FileSystemItem>> ObtenerContenidoAsync(string rutaPath)
     {
         return await Task.Run(() =>
+        // task,run para ejecutar la operación de lectura en un hilo separado y evitar bloquear la UI
+        // await para esperar el resultado sin bloquear el hilo principal, lo que mejora la responsividad de la aplicación
         {
             var items = new List<FileSystemItem>();
             try
@@ -58,11 +61,14 @@ public static class FileService
 
                 // 1. Cargar Carpetas
                 foreach (var d in dir.GetDirectories())
+                //cuenta cuantas subcarpetas tiene cada carpeta, para mostrar esa información adicional en la UI.
+                //Si no se tienen permisos para acceder a una carpeta, se ignora y se continúa con la siguiente.
                 {
                     int subFolders = 0;
                     try { subFolders = d.GetDirectories().Length; } catch { } // Ignorar sin permisos
 
                     items.Add(new FileSystemItem
+                    // FileSystemItem transforma los datos de la carpeta de windows  a un modelo propio
                     {
                         Nombre = d.Name,
                         RutaCompleta = d.FullName,
@@ -75,7 +81,7 @@ public static class FileService
                 }
 
                 // 2. Cargar Archivos
-                foreach (var f in dir.GetFiles())
+                foreach (var f in dir.GetFiles()) // obtiene la lista de los archivos del directorio
                 {
                     items.Add(new FileSystemItem
                     {
@@ -94,6 +100,7 @@ public static class FileService
         });
     }
 
+    // Método auxiliar para formatear el tamaño de los archivos en una forma legible (B, KB, MB, etc.)
     private static string FormatearTamano(long bytes)
     {
         string[] sufijos = { "B", "KB", "MB", "GB", "TB" };

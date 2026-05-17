@@ -47,7 +47,8 @@ public class ImageViewerForm : Form
     {
         try
         {
-            using (var stream = new FileStream(path, FileMode.Open, FileAccess.Read))
+            byte[] bytes = File.ReadAllBytes(path);
+            using (var stream = new MemoryStream(bytes))
             {
                 _originalImage = Image.FromStream(stream);
                 _pictureBox.Image = (Image)_originalImage.Clone();

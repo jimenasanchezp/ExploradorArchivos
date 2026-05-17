@@ -126,21 +126,34 @@ public static class ThemeRenderer
 
         // Icono simple basado en el tipo de nodo
         string emoji = "📁";
-        if (e.Node.Tag?.ToString() == "Inicio") emoji = "🏠";
-        else if (e.Node.Tag?.ToString() == "EsteEquipo") emoji = "💻";
+        string? tagStr = e.Node.Tag?.ToString();
+
+        if (tagStr == "Inicio" || e.Node.Text == "Inicio") emoji = "🏠";
+        else if (tagStr == "EsteEquipo" || e.Node.Text == "Este Equipo") emoji = "💻";
+        else if (e.Node.Text == "Favoritos") emoji = "⭐";
         else if (e.Node.Text.Contains("Música")) emoji = "🎵";
         else if (e.Node.Text.Contains("Imágenes")) emoji = "🖼️";
         else if (e.Node.Text.Contains("Vídeos") || e.Node.Text.Contains("Videos")) emoji = "🎬";
         else if (e.Node.Text.Contains("Descargas")) emoji = "📥";
         else if (e.Node.Text.Contains("Documentos")) emoji = "📄";
         else if (e.Node.Text.Contains("Escritorio")) emoji = "🖥️";
+        else if (tagStr != null && File.Exists(tagStr))
+        {
+            // Es un archivo fijado
+            string ext = Path.GetExtension(tagStr).ToLower();
+            if (new[] { ".mp3", ".wav", ".flac", ".ogg", ".wma", ".aac" }.Contains(ext)) emoji = "🎵";
+            else if (new[] { ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp" }.Contains(ext)) emoji = "🖼️";
+            else if (new[] { ".mp4", ".mkv", ".avi", ".mov", ".webm", ".wmv", ".flv", ".m4v" }.Contains(ext)) emoji = "🎬";
+            else if (new[] { ".txt", ".cs", ".json", ".xml", ".md", ".html", ".css", ".js", ".py" }.Contains(ext)) emoji = "📄";
+            else emoji = "📄";
+        }
 
         using Font iconFont = new Font("Segoe UI Emoji", 10);
-        using Font textFont = new Font("Segoe UI", 9);
+        using Font textFont = new Font("Segoe UI", 9.5f);
 
-        // Dibujar el emoji y luego el texto con un margen limpio
-        e.Graphics.DrawString(emoji, iconFont, new SolidBrush(foreColor), e.Bounds.X + 2, e.Bounds.Y + 4);
-        e.Graphics.DrawString(e.Node.Text, textFont, new SolidBrush(foreColor), e.Bounds.X + 22, e.Bounds.Y + 5);
+        // Dibujar el emoji y luego el texto dejando dos espacios (desplazamiento de 28px)
+        e.Graphics.DrawString(emoji, iconFont, new SolidBrush(foreColor), e.Bounds.X + 4, e.Bounds.Y + 4);
+        e.Graphics.DrawString(e.Node.Text, textFont, new SolidBrush(foreColor), e.Bounds.X + 28, e.Bounds.Y + 5);
     }
 
     public static void ApplyTheme(Control parent)

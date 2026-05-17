@@ -13,8 +13,7 @@ partial class MainForm
     private ToolStripMenuItem menuPostgres, menuMariaDB;
     private ToolStripMenuItem menuAcercaDe;
     private ToolStripMenuItem menuExportar, menuExportCsv, menuExportJson, menuExportXml, menuExportTxt;
-    private ToolStripMenuItem menuExportarBD;
-    private ToolStripSeparator menuSep1, menuSep2, menuSepExport, menuSepBD;
+    private ToolStripSeparator menuSep1, menuSep2, menuSepExport;
 
     // ── Sidebar toolbar (left vertical panel) ──────────────────────────────────────────────────────────
     private Panel pnlSidebar;
@@ -166,8 +165,6 @@ partial class MainForm
         menuExportTxt = MI("TXT", clrText, (s, e) => BtnExportarTxt_Click(s, e));
         menuExportar.DropDownItems.AddRange(new ToolStripItem[]
             { menuExportCsv, menuExportJson, menuExportXml, menuExportTxt });
-        menuSepBD = new ToolStripSeparator();
-        menuExportarBD = MI("Exportar a Base de Datos...", clrAcento, (s, e) => BtnExportarBD_Click(s, e));
         menuSepExport = new ToolStripSeparator();
         menuLimpiarDatos = MI("Limpiar datos", clrRose, MenuLimpiarDatos_Click!);
         menuSep2 = new ToolStripSeparator();
@@ -176,7 +173,7 @@ partial class MainForm
         {
             menuCargarJson, menuCargarCsv, menuCargarXml, menuCargarTxt,
             menuCargarPersonalizado, menuSep1,
-            menuExportar, menuSepBD, menuExportarBD,
+            menuExportar,
             menuSepExport, menuLimpiarDatos, menuSep2, menuSalir
         });
         menuBaseDatos = MI("Base de Datos", clrText);
@@ -415,18 +412,7 @@ partial class MainForm
             BackColor = Color.Transparent
         };
 
-    // ── Texto en una sola l ──────────────────────────────────────────────────────────
-        var btnExportBD = new Button
-        {
-            Text = "📦  Exportar a BD",
-            Size = new Size(160, 40),
-            FlatStyle = FlatStyle.Flat,
-            BackColor = clrRose,
-            ForeColor = Color.White,
-        };
-        btnExportBD.FlatAppearance.BorderSize = 0;
-        btnExportBD.Click += BtnExportarBD_Click!;
-        pnlHeaderButtons.Controls.Add(btnExportBD);
+
 
         tblHeader.Controls.Add(pnlTitles, 0, 0);
         tblHeader.Controls.Add(pnlHeaderButtons, 1, 0);

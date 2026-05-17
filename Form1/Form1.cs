@@ -22,6 +22,66 @@ public partial class Form1 : Form
     private Stack<string> _historial = new Stack<string>(); // Historial tipo pila LIFO para navegación hacia atrás
     private List<FileSystemItem> _itemsActuales = new List<FileSystemItem>(); // Lista de items actualmente mostrados (para filtros y búsqueda)
     private string _filtroActivo = "Todos"; // filtro de visualización activo (Todos, Imágenes, Audio, Video, Texto/Código, Otros)
+    private static readonly List<string> _accesosDirectos = new List<string>();
+    private static readonly List<string> _elementosFavoritos = new List<string>();
+    private static readonly string AccesosDirectosFilePath = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+        "ExploradorArchivos",
+        "accesos_directos.txt"
+    );
+    private static readonly string ElementosFavoritosFilePath = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+        "ExploradorArchivos",
+        "favoritos.txt"
+    );
+
+    private void CargarDatosPersistentes()
+    {
+        try
+        {
+            _accesosDirectos.Clear();
+            if (File.Exists(AccesosDirectosFilePath))
+            {
+                var lineas = File.ReadAllLines(AccesosDirectosFilePath);
+                foreach (var l in lineas)
+                {
+                    if (!string.IsNullOrWhiteSpace(l) && (Directory.Exists(l) || File.Exists(l)))
+                    {
+                        _accesosDirectos.Add(l);
+                    }
+                }
+            }
+
+            _elementosFavoritos.Clear();
+            if (File.Exists(ElementosFavoritosFilePath))
+            {
+                var lineas = File.ReadAllLines(ElementosFavoritosFilePath);
+                foreach (var l in lineas)
+                {
+                    if (!string.IsNullOrWhiteSpace(l) && (Directory.Exists(l) || File.Exists(l)))
+                    {
+                        _elementosFavoritos.Add(l);
+                    }
+                }
+            }
+        }
+        catch { }
+    }
+
+    private void GuardarDatosPersistentes()
+    {
+        try
+        {
+            string? dir = Path.GetDirectoryName(AccesosDirectosFilePath);
+            if (dir != null && !Directory.Exists(dir))
+            {
+                Directory.CreateDirectory(dir);
+            }
+            File.WriteAllLines(AccesosDirectosFilePath, _accesosDirectos);
+            File.WriteAllLines(ElementosFavoritosFilePath, _elementosFavoritos);
+        }
+        catch { }
+    }
 
     // === Componentes de UI ===
     private ListViewSorter _sorter = default!; // Ordenador de ListView para ordenamiento por columnas
@@ -35,6 +95,7 @@ public partial class Form1 : Form
     public Form1()
     {
         InitializeComponent();
+        CargarDatosPersistentes();
         ConfigurarUI();
         ConectarEventos();
         ConfigurarContextoMenu();
@@ -76,9 +137,82 @@ public partial class Form1 : Form
         itemTexto.Click += (s, e) => AbrirCon(new FileViewerForm(GetSelectedPath()));
         itemPredeterminada.Click += (s, e) => AbrirConSistema(GetSelectedPath());
 
+        ToolStripMenuItem itemFijar = new ToolStripMenuItem("📌  Fijar a acceso directo");
+        itemFijar.Click += (s, e) => {
+            string ruta = GetSelectedPath();
+            if (string.IsNullOrEmpty(ruta)) return;
+
+            if (_accesosDirectos.Contains(ruta))
+            {
+                _accesosDirectos.Remove(ruta);
+                MessageBox.Show("Elemento desanclado de accesos directos.", "Accesos Directos", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+            else
+            {
+                _accesosDirectos.Add(ruta);
+                MessageBox.Show("Elemento anclado a accesos directos.", "Accesos Directos", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+            GuardarDatosPersistentes();
+            PoblarTreeViewNormal();
+        };
+
+        ToolStripMenuItem itemFavorito = new ToolStripMenuItem("⭐  Agregar a Favoritos");
+        itemFavorito.Click += (s, e) => {
+            string ruta = GetSelectedPath();
+            if (string.IsNullOrEmpty(ruta)) return;
+
+            if (_elementosFavoritos.Contains(ruta))
+            {
+                _elementosFavoritos.Remove(ruta);
+                MessageBox.Show("Elemento quitado de Favoritos.", "Favoritos", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+            else
+            {
+                _elementosFavoritos.Add(ruta);
+                MessageBox.Show("Elemento agregado a Favoritos.", "Favoritos", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+            GuardarDatosPersistentes();
+            PoblarTreeViewNormal();
+            if (_rutaActual == "Favoritos")
+            {
+                GenerarVistaFavoritos();
+            }
+        };
+
+        ToolStripMenuItem itemVaciarFavoritos = new ToolStripMenuItem("⭐  Vaciar Favoritos");
+        itemVaciarFavoritos.Click += (s, e) => {
+            var confirm = MessageBox.Show(
+                "¿Estás seguro de que deseas quitar todos los elementos de la lista de Favoritos?\n\n(Esto NO eliminará ni alterará los archivos o carpetas reales en tu disco duro, solo limpiará tu lista de favoritos).",
+                "Vaciar Favoritos",
+                MessageBoxButtons.YesNo,
+                MessageBoxIcon.Question
+            );
+            
+            if (confirm == DialogResult.Yes)
+            {
+                _elementosFavoritos.Clear();
+                GuardarDatosPersistentes();
+                PoblarTreeViewNormal();
+                if (_rutaActual == "Favoritos")
+                {
+                    GenerarVistaFavoritos();
+                }
+                MessageBox.Show("La lista de Favoritos ha sido vaciada.", "Favoritos", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+        };
+
+        ToolStripMenuItem itemPegar = new ToolStripMenuItem("📋  Pegar");
+        itemPegar.Click += (s, e) => PegarArchivos();
+
+        ToolStripMenuItem itemNuevaCarpeta = new ToolStripMenuItem("📁  Nueva carpeta");
+        itemNuevaCarpeta.Click += BtnNuevaCarpeta_Click;
+
+        ToolStripMenuItem itemActualizar = new ToolStripMenuItem("🔄  Actualizar");
+        itemActualizar.Click += (s, e) => CargarDirectorio(_rutaActual, false);
+
         // Eventos de archivo
-        itemCortar.Click += (s, e) => CortarArchivo(GetSelectedPath());
-        itemCopiar.Click += (s, e) => CopiarArchivo(GetSelectedPath());
+        itemCortar.Click += (s, e) => CortarSeleccionados();
+        itemCopiar.Click += (s, e) => CopiarSeleccionados();
         itemRenombrar.Click += (s, e) => listViewPrincipal.SelectedItems[0].BeginEdit();
         itemEliminar.Click += (s, e) => EliminarArchivo(GetSelectedPath());
         itemPropiedades.Click += (s, e) => MostrarPropiedades(GetSelectedPath());
@@ -87,10 +221,18 @@ public partial class Form1 : Form
             itemAppVideo, itemAppFoto, itemAppData, itemMusic, itemTexto, new ToolStripSeparator(), itemPredeterminada
         });
 
+        // Crear separadores explícitos
+        ToolStripSeparator sep1 = new ToolStripSeparator();
+        ToolStripSeparator sep2 = new ToolStripSeparator();
+        ToolStripSeparator sep3 = new ToolStripSeparator();
+        ToolStripSeparator sep4 = new ToolStripSeparator();
+
         menu.Items.AddRange(new ToolStripItem[] {
-            itemAbrir, itemAbrirCon, new ToolStripSeparator(),
-            itemCortar, itemCopiar, itemRenombrar, itemEliminar,
-            new ToolStripSeparator(), itemPropiedades
+            itemAbrir, itemAbrirCon, sep1,
+            itemCortar, itemCopiar, itemPegar, itemRenombrar, itemEliminar, sep2,
+            itemFijar, itemFavorito, itemVaciarFavoritos, sep3,
+            itemNuevaCarpeta, itemActualizar, sep4,
+            itemPropiedades
         });
 
         listViewPrincipal.ContextMenuStrip = menu;
@@ -102,20 +244,72 @@ public partial class Form1 : Form
         };
 
         menu.Opening += (s, e) => {
-            if (listViewPrincipal.SelectedItems.Count == 0) { e.Cancel = true; return; }
-            string ruta = GetSelectedPath();
-            string ext = Path.GetExtension(ruta).ToLower();
+            bool algunItemSeleccionado = listViewPrincipal.SelectedItems.Count > 0;
             
-            string[] imgExt = { ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp" };
-            string[] mediaExt = { ".mp3", ".wav", ".flac", ".m4a", ".ogg", ".wma", ".aac" };
-            string[] videoExt = { ".mp4", ".mkv", ".avi", ".mov", ".webm", ".wmv", ".flv", ".m4v" };
-            string[] dataExt = { ".csv", ".json", ".xml", ".txt" };
-            
-            itemAppVideo.Visible = videoExt.Contains(ext);
-            itemAppFoto.Visible = imgExt.Contains(ext);
-            itemAppData.Visible = dataExt.Contains(ext);
-            itemMusic.Visible = mediaExt.Contains(ext);
-            itemTexto.Visible = dataExt.Contains(ext) || new[] { ".cs", ".html", ".css", ".js", ".md", ".py" }.Contains(ext);
+            // Mostrar/ocultar según selección
+            itemAbrir.Visible = algunItemSeleccionado;
+            itemAbrirCon.Visible = algunItemSeleccionado;
+            itemCortar.Visible = algunItemSeleccionado;
+            itemCopiar.Visible = algunItemSeleccionado;
+            itemRenombrar.Visible = algunItemSeleccionado;
+            itemEliminar.Visible = algunItemSeleccionado;
+            itemFijar.Visible = algunItemSeleccionado;
+            itemFavorito.Visible = algunItemSeleccionado;
+            itemPropiedades.Visible = algunItemSeleccionado;
+
+            // Mostrar "Vaciar Favoritos" si estamos dentro de la vista Favoritos, o si el elemento seleccionado es la carpeta Favoritos
+            bool esFavoritosView = _rutaActual == "Favoritos";
+            bool esFavoritosItem = algunItemSeleccionado && listViewPrincipal.SelectedItems[0].Tag?.ToString() == "Favoritos";
+            itemVaciarFavoritos.Visible = esFavoritosView || esFavoritosItem;
+
+            sep1.Visible = algunItemSeleccionado;
+            sep2.Visible = algunItemSeleccionado;
+            sep3.Visible = true;
+            sep4.Visible = algunItemSeleccionado;
+
+            // Habilitar pegar si el clipboard tiene archivos y estamos en una ruta física real
+            bool puedePegar = Clipboard.ContainsFileDropList() &&
+                              _rutaActual != "Inicio" &&
+                              _rutaActual != "Favoritos" &&
+                              _rutaActual != "EsteEquipo" &&
+                              Directory.Exists(_rutaActual);
+            itemPegar.Enabled = puedePegar;
+
+            if (algunItemSeleccionado)
+            {
+                string ruta = GetSelectedPath();
+                
+                if (_accesosDirectos.Contains(ruta))
+                {
+                    itemFijar.Text = "📌  Desanclar de acceso directo";
+                }
+                else
+                {
+                    itemFijar.Text = "📌  Fijar a acceso directo";
+                }
+
+                if (_elementosFavoritos.Contains(ruta))
+                {
+                    itemFavorito.Text = "⭐  Quitar de Favoritos";
+                }
+                else
+                {
+                    itemFavorito.Text = "⭐  Agregar a Favoritos";
+                }
+
+                string ext = Path.GetExtension(ruta).ToLower();
+                
+                string[] imgExt = { ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp" };
+                string[] mediaExt = { ".mp3", ".wav", ".flac", ".m4a", ".ogg", ".wma", ".aac" };
+                string[] videoExt = { ".mp4", ".mkv", ".avi", ".mov", ".webm", ".wmv", ".flv", ".m4v" };
+                string[] dataExt = { ".csv", ".json", ".xml", ".txt" };
+                
+                itemAppVideo.Visible = videoExt.Contains(ext);
+                itemAppFoto.Visible = imgExt.Contains(ext);
+                itemAppData.Visible = dataExt.Contains(ext);
+                itemMusic.Visible = mediaExt.Contains(ext);
+                itemTexto.Visible = dataExt.Contains(ext) || new[] { ".cs", ".html", ".css", ".js", ".md", ".py" }.Contains(ext);
+            }
         };
     }
 
@@ -148,6 +342,204 @@ public partial class Form1 : Form
     {
         var paths = new System.Collections.Specialized.StringCollection { ruta };
         Clipboard.SetFileDropList(paths);
+    }
+
+    private void CopiarSeleccionados()
+    {
+        if (listViewPrincipal.SelectedItems.Count == 0) return;
+        var paths = new System.Collections.Specialized.StringCollection();
+        foreach (ListViewItem item in listViewPrincipal.SelectedItems)
+        {
+            string? ruta = item.Tag?.ToString();
+            if (!string.IsNullOrEmpty(ruta))
+            {
+                paths.Add(ruta);
+            }
+        }
+        if (paths.Count > 0)
+        {
+            Clipboard.SetFileDropList(paths);
+        }
+    }
+
+    private void CortarSeleccionados()
+    {
+        if (listViewPrincipal.SelectedItems.Count == 0) return;
+        var paths = new System.Collections.Specialized.StringCollection();
+        foreach (ListViewItem item in listViewPrincipal.SelectedItems)
+        {
+            string? ruta = item.Tag?.ToString();
+            if (!string.IsNullOrEmpty(ruta))
+            {
+                paths.Add(ruta);
+            }
+        }
+        if (paths.Count > 0)
+        {
+            DataObject data = new DataObject();
+            data.SetFileDropList(paths);
+            data.SetData("Preferred DropEffect", DragDropEffects.Move);
+            Clipboard.SetDataObject(data);
+        }
+    }
+
+    private void PegarArchivos()
+    {
+        try
+        {
+            if (!Clipboard.ContainsFileDropList()) return;
+            var paths = Clipboard.GetFileDropList();
+            if (paths.Count == 0) return;
+
+            string destinoDir = _rutaActual;
+            if (destinoDir == "Inicio" || destinoDir == "Favoritos" || destinoDir == "EsteEquipo" || !Directory.Exists(destinoDir))
+            {
+                MessageBox.Show("No se pueden pegar archivos en esta ubicación virtual.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            bool esMover = false;
+            var dropEffect = Clipboard.GetData("Preferred DropEffect");
+            if (dropEffect != null)
+            {
+                var effectValue = (int)dropEffect;
+                if (effectValue == (int)DragDropEffects.Move)
+                {
+                    esMover = true;
+                }
+            }
+
+            foreach (string origen in paths)
+            {
+                if (string.IsNullOrEmpty(origen)) continue;
+                string nombre = Path.GetFileName(origen);
+                string destino = Path.Combine(destinoDir, nombre);
+
+                if (string.Equals(origen, destino, StringComparison.OrdinalIgnoreCase))
+                {
+                    if (esMover) continue;
+                    string ext = Path.GetExtension(origen);
+                    string nombreSinExt = Path.GetFileNameWithoutExtension(origen);
+                    int contador = 1;
+                    do
+                    {
+                        destino = Path.Combine(destinoDir, $"{nombreSinExt} - Copia ({contador}){ext}");
+                        contador++;
+                    } while (File.Exists(destino) || Directory.Exists(destino));
+                }
+
+                if (Directory.Exists(origen))
+                {
+                    if (esMover)
+                    {
+                        if (Directory.Exists(destino))
+                        {
+                            MessageBox.Show($"Ya existe una carpeta con el nombre '{nombre}' en el destino.", "Conflicto", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                            continue;
+                        }
+                        Directory.Move(origen, destino);
+                    }
+                    else
+                    {
+                        CopiarDirectorioRecursivo(origen, destino);
+                    }
+                }
+                else if (File.Exists(origen))
+                {
+                    if (esMover)
+                    {
+                        if (File.Exists(destino))
+                        {
+                            var result = MessageBox.Show($"El archivo '{nombre}' ya existe. ¿Deseas reemplazarlo?\n\n[Sí] Reemplazar\n[No] Conservar ambos (renombrar)\n[Cancelar] Cancelar operación", "Confirmar reemplazo", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Question);
+                            if (result == DialogResult.Yes)
+                            {
+                                File.Delete(destino);
+                                File.Move(origen, destino);
+                            }
+                            else if (result == DialogResult.No)
+                            {
+                                string ext = Path.GetExtension(origen);
+                                string nombreSinExt = Path.GetFileNameWithoutExtension(origen);
+                                int contador = 1;
+                                do
+                                {
+                                    destino = Path.Combine(destinoDir, $"{nombreSinExt} ({contador}){ext}");
+                                    contador++;
+                                } while (File.Exists(destino));
+                                File.Move(origen, destino);
+                            }
+                            else
+                            {
+                                continue;
+                            }
+                        }
+                        else
+                        {
+                            File.Move(origen, destino);
+                        }
+                    }
+                    else
+                    {
+                        if (File.Exists(destino))
+                        {
+                            var result = MessageBox.Show($"El archivo '{nombre}' ya existe. ¿Deseas reemplazarlo?\n\n[Sí] Reemplazar\n[No] Conservar ambos (renombrar)\n[Cancelar] Cancelar operación", "Confirmar reemplazo", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Question);
+                            if (result == DialogResult.Yes)
+                            {
+                                File.Copy(origen, destino, true);
+                            }
+                            else if (result == DialogResult.No)
+                            {
+                                string ext = Path.GetExtension(origen);
+                                string nombreSinExt = Path.GetFileNameWithoutExtension(origen);
+                                int contador = 1;
+                                do
+                                {
+                                    destino = Path.Combine(destinoDir, $"{nombreSinExt} ({contador}){ext}");
+                                    contador++;
+                                } while (File.Exists(destino));
+                                File.Copy(origen, destino);
+                            }
+                            else
+                            {
+                                continue;
+                            }
+                        }
+                        else
+                        {
+                            File.Copy(origen, destino);
+                        }
+                    }
+                }
+            }
+
+            if (esMover)
+            {
+                Clipboard.Clear();
+            }
+
+            CargarDirectorio(_rutaActual, false);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Error al pegar elementos: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+    }
+
+    private void CopiarDirectorioRecursivo(string origenDir, string destinoDir)
+    {
+        Directory.CreateDirectory(destinoDir);
+
+        foreach (string file in Directory.GetFiles(origenDir))
+        {
+            string destFile = Path.Combine(destinoDir, Path.GetFileName(file));
+            File.Copy(file, destFile, true);
+        }
+
+        foreach (string folder in Directory.GetDirectories(origenDir))
+        {
+            string destFolder = Path.Combine(destinoDir, Path.GetFileName(folder));
+            CopiarDirectorioRecursivo(folder, destFolder);
+        }
     }
 
     // En lugar de eliminar permanentemente, se envía el archivo a la papelera
@@ -266,30 +658,47 @@ public partial class Form1 : Form
         ConfigurarSemaforos();
 
         // Grupo: Navegación
-        Panel pnlNav = CrearGrupoHerramientas("", 85, 12, 100);
+        Panel pnlNav = CrearGrupoHerramientas("", 15, 20, 130);
         pnlNav.Controls.Add(btnAtras); btnAtras.Location = new Point(10, 18); btnAtras.Size = new Size(35, 30);
         pnlNav.Controls.Add(btnSubir); btnSubir.Location = new Point(50, 18); btnSubir.Size = new Size(35, 30);
+        pnlNav.Controls.Add(btnActualizar); btnActualizar.Location = new Point(90, 18); btnActualizar.Size = new Size(35, 30);
         pnlTop.Controls.Add(pnlNav);
 
         // Grupo: Dirección
-        Panel pnlAddr = CrearGrupoHerramientas("", 195, 12, pnlTop.Width - 725);
+        Panel pnlAddr = CrearGrupoHerramientas("", 155, 20, pnlTop.Width - 365);
         pnlAddr.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+
+        Button btnCopiarRuta = new Button();
+        btnCopiarRuta.Size = new Size(35, 36);
+        btnCopiarRuta.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+        ConfigurarBotonRetro(btnCopiarRuta, "📋");
+        btnCopiarRuta.Click += (s, e) => {
+            if (!string.IsNullOrEmpty(_rutaActual))
+            {
+                Clipboard.SetText(_rutaActual);
+                MessageBox.Show("Ruta copiada al portapapeles:\n" + _rutaActual, "Copiar Ruta", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+        };
+
         pnlAddr.Controls.Add(pnlAddressBorder);
         pnlAddressBorder.Location = new Point(10, 16);
-        pnlAddressBorder.Size = new Size(pnlAddr.Width - 20, 36);
+        pnlAddressBorder.Size = new Size(pnlAddr.Width - 55, 36);
         pnlAddressBorder.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+
+        btnCopiarRuta.Location = new Point(pnlAddr.Width - 40, 16);
+        pnlAddr.Controls.Add(btnCopiarRuta);
+
         pnlTop.Controls.Add(pnlAddr);
 
         // Grupo: Acciones
-        Panel pnlActions = CrearGrupoHerramientas("", pnlTop.Width - 520, 12, 510);
+        Panel pnlActions = CrearGrupoHerramientas("", pnlTop.Width - 200, 20, 190);
         pnlActions.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-        pnlActions.Controls.Add(btnActualizar); btnActualizar.Location = new Point(10, 18); btnActualizar.Size = new Size(35, 30);
-        pnlActions.Controls.Add(btnNuevaCarpeta); btnNuevaCarpeta.Location = new Point(60, 18); btnNuevaCarpeta.Size = new Size(100, 30);
-        pnlActions.Controls.Add(btnExportarCSV); btnExportarCSV.Location = new Point(175, 18); btnExportarCSV.Size = new Size(100, 30);
-        pnlActions.Controls.Add(_btnToggleVista); _btnToggleVista.Location = new Point(290, 18); _btnToggleVista.Size = new Size(100, 30);
+        pnlActions.Controls.Add(btnNuevaCarpeta); btnNuevaCarpeta.Location = new Point(10, 18); btnNuevaCarpeta.Size = new Size(35, 30);
+        pnlActions.Controls.Add(btnExportarCSV); btnExportarCSV.Location = new Point(55, 18); btnExportarCSV.Size = new Size(35, 30);
+        pnlActions.Controls.Add(_btnToggleVista); _btnToggleVista.Location = new Point(100, 18); _btnToggleVista.Size = new Size(35, 30);
         
         _btnAppData = new Button();
-        pnlActions.Controls.Add(_btnAppData); _btnAppData.Location = new Point(400, 18); _btnAppData.Size = new Size(100, 30);
+        pnlActions.Controls.Add(_btnAppData); _btnAppData.Location = new Point(145, 18); _btnAppData.Size = new Size(35, 30);
 
         pnlTop.Controls.Add(pnlActions);
 
@@ -339,10 +748,10 @@ public partial class Form1 : Form
         ConfigurarBotonRetro(btnAtras, "◀️");
         ConfigurarBotonRetro(btnSubir, "🔼");
         ConfigurarBotonRetro(btnActualizar, "🔄");
-        ConfigurarBotonRetro(btnNuevaCarpeta, "📁 Nueva");
-        ConfigurarBotonRetro(btnExportarCSV, "📊 Exportar");
-        ConfigurarBotonRetro(_btnToggleVista, "🖼️ Vistas");
-        ConfigurarBotonRetro(_btnAppData, "💎 App Data");
+        ConfigurarBotonRetro(btnNuevaCarpeta, "📁");
+        ConfigurarBotonRetro(btnExportarCSV, "📤");
+        ConfigurarBotonRetro(_btnToggleVista, "🖼️");
+        ConfigurarBotonRetro(_btnAppData, "📊");
 
         // --- Barra de Direcciones ---
         pnlAddressBorder.BackColor = Color.White;
@@ -390,10 +799,10 @@ public partial class Form1 : Form
         splitContainerMain.Panel1.Controls.Clear();
         splitContainerMain.Panel2.Controls.Clear();
 
-        splitContainerMain.Panel1.Controls.Add(treeViewLateral);
         splitContainerMain.Panel1.Controls.Add(pnlSearch);
+        splitContainerMain.Panel1.Controls.Add(treeViewLateral);
         
-        pnlSearch.BringToFront();
+        treeViewLateral.BringToFront();
 
         splitContainerMain.Panel2.Controls.Add(listViewPrincipal);
         splitContainerMain.Panel2.Controls.Add(_pnlFiltros);
@@ -413,7 +822,7 @@ public partial class Form1 : Form
 
     private void ConfigurarSemaforos()
     {
-        Panel pnlSemaforos = new Panel { Location = new Point(10, 30), Size = new Size(60, 20), BackColor = Color.Transparent };
+        Panel pnlSemaforos = new Panel { Location = new Point(15, 5), Size = new Size(60, 20), BackColor = Color.Transparent };
         
         Button btnClose = CrearBotonSemaforo(Color.FromArgb(255, 95, 86), 0);
         btnClose.Click += (s, e) => this.Close();
@@ -501,15 +910,26 @@ public partial class Form1 : Form
             listViewPrincipal.Invalidate();
         };
 
-        // Drag & Drop a Papelera
+        // Drag & Drop a Papelera y Mover
         listViewPrincipal.ItemDrag += (s, e) => listViewPrincipal.DoDragDrop(listViewPrincipal.SelectedItems, DragDropEffects.Move);
         pnlTrash.DragEnter += PnlTrash_DragEnter;
         pnlTrash.DragLeave += PnlTrash_DragLeave;
         pnlTrash.DragDrop += PnlTrash_DragDrop;
 
-        // Búsqueda y Exportación
+        listViewPrincipal.DragEnter += ListViewPrincipal_DragEnter;
+        listViewPrincipal.DragOver += ListViewPrincipal_DragOver;
+        listViewPrincipal.DragLeave += ListViewPrincipal_DragLeave;
+        listViewPrincipal.DragDrop += ListViewPrincipal_DragDrop;
+
+        treeViewLateral.AllowDrop = true;
+        treeViewLateral.DragEnter += TreeViewLateral_DragEnter;
+        treeViewLateral.DragOver += TreeViewLateral_DragOver;
+        treeViewLateral.DragDrop += TreeViewLateral_DragDrop;
+
+        // Búsqueda, Creación y Exportación
         txtBuscar.KeyDown += TxtBuscar_KeyDown;
         btnExportarCSV.Click += BtnExportarCSV_Click;
+        btnNuevaCarpeta.Click += BtnNuevaCarpeta_Click;
 
         // Ordenamiento por columnas
         listViewPrincipal.ColumnClick += ListViewPrincipal_ColumnClick;

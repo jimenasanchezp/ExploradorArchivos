@@ -179,8 +179,12 @@ public partial class Form1
                 {
                     try
                     {
-                        using var fs = new FileStream(img.RutaCompleta, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
-                        using var original = Image.FromStream(fs);
+                        if (!File.Exists(img.RutaCompleta)) return null;
+
+                        // Leer todos los bytes en memoria para evitar bloquear el archivo físico
+                        byte[] bytes = File.ReadAllBytes(img.RutaCompleta);
+                        using var ms = new MemoryStream(bytes);
+                        using var original = Image.FromStream(ms);
                         return new Bitmap(original, new Size(96, 96));
                     }
                     catch { return null; }
