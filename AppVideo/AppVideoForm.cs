@@ -30,6 +30,7 @@ public partial class AppVideoForm : Form
     private Label lblTiempoFin = null!;
     private Button _btnPlayPause = null!;
     private System.Windows.Forms.Timer _timerUI = null!;
+    private float? _pendingPosition = null;
 
     public AppVideoForm(string ruta)
     {
@@ -96,7 +97,20 @@ public partial class AppVideoForm : Form
         // Controles Inferiores
         Panel pnlControls = new Panel { Dock = DockStyle.Bottom, Height = 80, BackColor = Color.Transparent };
         _trackProgreso = new CustomTrackBar { Dock = DockStyle.Top, Height = 20 };
-        _trackProgreso.ValueChangedByUser += (val) => { if(_mediaPlayer != null) _mediaPlayer.Position = (float)val; };
+        _trackProgreso.ValueChangedByUser += (val) => { 
+            if(_mediaPlayer != null) 
+            {
+                if (_mediaPlayer.State == VLCState.Ended || _mediaPlayer.State == VLCState.Stopped)
+                {
+                    _pendingPosition = (float)val;
+                    ReiniciarReproductor();
+                }
+                else
+                {
+                    _mediaPlayer.Position = (float)val; 
+                }
+            }
+        };
         
         _btnPlayPause = new Button { 
             Text = "▶", 
@@ -155,8 +169,13 @@ public partial class AppVideoForm : Form
 
         _timerUI = new System.Windows.Forms.Timer { Interval = 500 };
         _timerUI.Tick += (s, e) => {
-            if (_mediaPlayer != null && _mediaPlayer.IsPlaying)
-                _trackProgreso.Value = _mediaPlayer.Position;
+            if (_mediaPlayer != null)
+            {
+                if (_mediaPlayer.IsPlaying)
+                    _trackProgreso.Value = _mediaPlayer.Position;
+                
+                _btnPlayPause.Text = _mediaPlayer.IsPlaying ? "⏸" : "▶";
+            }
         };
     }
 
@@ -216,6 +235,15 @@ public partial class AppVideoForm : Form
         _mediaPlayer = new LibVLCSharp.Shared.MediaPlayer(_libVLC);
         _videoView.MediaPlayer = _mediaPlayer;
         
+        _mediaPlayer.Playing += (s, e) => {
+            if (_pendingPosition.HasValue)
+            {
+                // We use a small delay or set it directly. Direct set usually works in Playing event.
+                _mediaPlayer.Position = _pendingPosition.Value;
+                _pendingPosition = null;
+            }
+        };
+        
         using var media = new Media(_libVLC, _rutaVideo, FromType.FromPath);
         _mediaPlayer.Play(media);
         
@@ -247,6 +275,12 @@ public partial class AppVideoForm : Form
 
     private void TogglePlayPause()
     {
+        if (_mediaPlayer.State == VLCState.Ended || _mediaPlayer.State == VLCState.Stopped)
+        {
+            ReiniciarReproductor();
+            return;
+        }
+
         if (_mediaPlayer.IsPlaying) _mediaPlayer.Pause();
         else _mediaPlayer.Play();
         _btnPlayPause.Text = _mediaPlayer.IsPlaying ? "⏸" : "▶";
