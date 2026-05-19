@@ -432,5 +432,11 @@ namespace ExploradorArchivos.Mp3
                 _flowCarpetas.Controls.Add(btn);
             }
         }
+
+        protected override void OnFormClosing(FormClosingEventArgs e)
+        {
+            _gestor?.Dispose();
+            base.OnFormClosing(e);
+        }
     }
 }
