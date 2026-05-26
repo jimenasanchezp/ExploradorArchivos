@@ -18,6 +18,7 @@ public class GestorReproduccion : IDisposable
     private List<Cancion> _cola = new();
     private List<int> _ordenReproduccion = new();
     private int _indiceCola = -1;
+    private volatile bool _cambiando = false;
 
     private bool _modoAleatorio;
     private ModoRepetir _modoRepetir = ModoRepetir.Desactivado;
@@ -172,12 +173,15 @@ public class GestorReproduccion : IDisposable
 
     private void ReproducirActual()
     {
-        DetenerInterno();
-        var cancion = CancionActual;
-        if (cancion == null) return;
-
+        if (_cambiando) return;
+        _cambiando = true;
+        
         try
         {
+            DetenerInterno();
+            var cancion = CancionActual;
+            if (cancion == null) return;
+
             _audioReader = new AudioFileReader(cancion.RutaArchivo) { Volume = _volumen };
             _waveOut = new WaveOutEvent();
             _waveOut.Init(_audioReader);
@@ -194,7 +198,6 @@ public class GestorReproduccion : IDisposable
                     if (!string.IsNullOrEmpty(letraOnline))
                     {
                         cancion.Letra = letraOnline;
-                        // Notificar a la UI para que actualice la letra
                         CancionCambiada?.Invoke(cancion);
                     }
                 });
@@ -203,21 +206,38 @@ public class GestorReproduccion : IDisposable
             CancionCambiada?.Invoke(cancion);
             EstadoCambiado?.Invoke(true);
         }
-        catch { Siguiente(); }
+        catch { }
+        finally
+        {
+            _cambiando = false;
+        }
     }
 
     private void OnPlaybackStopped(object? sender, StoppedEventArgs e)
     {
-        // Se añade un margen de 500ms para detectar el final real de la pista
-        if (_audioReader != null && _audioReader.CurrentTime >= _audioReader.TotalTime - TimeSpan.FromMilliseconds(500))
+        // OnPlaybackStopped se ejecuta en un hilo de NAudio.
+        // Despachamos la lógica al timer (hilo de UI) para evitar condiciones de carrera.
+        _timerPosicion.Tick -= AvanzarCancionPendiente; // evitar suscripciones duplicadas
+        _timerPosicion.Tick += AvanzarCancionPendiente;
+    }
+
+    private void AvanzarCancionPendiente(object? sender, EventArgs e)
+    {
+        _timerPosicion.Tick -= AvanzarCancionPendiente;
+        
+        // Solo avanzamos si la canción terminó naturalmente (no por Stop() manual)
+        if (_waveOut == null && _audioReader == null) return;
+        if (_audioReader != null && _audioReader.CurrentTime < _audioReader.TotalTime - TimeSpan.FromMilliseconds(500)) return;
+
+        if (_modoRepetir == ModoRepetir.RepetirUno)
         {
-            if (_modoRepetir == ModoRepetir.RepetirUno)
-            {
-                _audioReader.CurrentTime = TimeSpan.Zero;
-                _waveOut?.Play();
-                EstadoCambiado?.Invoke(true);
-            }
-            else { Siguiente(); }
+            if (_audioReader != null) _audioReader.CurrentTime = TimeSpan.Zero;
+            _waveOut?.Play();
+            EstadoCambiado?.Invoke(true);
+        }
+        else
+        {
+            Siguiente();
         }
     }
 

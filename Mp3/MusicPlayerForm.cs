@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Windows.Forms;
 using ExploradorArchivos.UI;
+using ExploradorArchivos.AppGrabadora;
 
 namespace ExploradorArchivos.Mp3
 {
@@ -35,6 +36,12 @@ namespace ExploradorArchivos.Mp3
         private Button _btnSiguiente = null!;
         private Button _btnShuffle = null!;
         private Button _btnRepeat = null!;
+        private Button _btnGrabar = null!;
+        
+        private GestorGrabacion _grabadora = new GestorGrabacion();
+        private bool _estaGrabando = false;
+        private System.Windows.Forms.Timer _timerGrabacion = null!;
+        private DateTime _inicioGrabacion;
         
         private ListBox _lstCola = null!;
         private RichTextBox _rtbLetras = null!;
@@ -44,6 +51,7 @@ namespace ExploradorArchivos.Mp3
         private Panel _pnlBiblioteca = null!;
         private Panel _pnlCarpetas = null!;
         private Panel _pnlLetras = null!;
+        private Panel _pnlGrabacion = null!;
 
         // Dragging
         private bool _dragging = false;
@@ -56,6 +64,17 @@ namespace ExploradorArchivos.Mp3
             ConectarEventos();
             _gestor.CargarCola(rutas, rutaInicial);
             CargarCarpetasMusica();
+        }
+
+        /// <summary>
+        /// Reutiliza la ventana existente cargando una nueva cola de audio.
+        /// </summary>
+        public void CargarNuevaCola(List<string> rutas, string? rutaInicial = null)
+        {
+            _gestor.CargarCola(rutas, rutaInicial);
+            MostrarPanel(_pnlReproductor);
+            this.BringToFront();
+            this.WindowState = FormWindowState.Normal;
         }
 
         private void InicializarComponentes()
@@ -108,9 +127,10 @@ namespace ExploradorArchivos.Mp3
             var btnMenuBib = CrearBotonSide("Biblioteca 🧸");
             var btnMenuCarp = CrearBotonSide("Carpetas 🍧");
             var btnMenuLetras = CrearBotonSide("Letras 🎀");
+            var btnMenuGrabar = CrearBotonSide("Grabadora 🎙️");
 
             FlowLayoutPanel flowSide = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown };
-            flowSide.Controls.AddRange(new Control[] { btnMenuRep, btnMenuBib, btnMenuCarp, btnMenuLetras });
+            flowSide.Controls.AddRange(new Control[] { btnMenuRep, btnMenuBib, btnMenuCarp, btnMenuLetras, btnMenuGrabar });
             
             Label lblStickerSide = new Label { Text = "🐰🌷", Font = new Font("Segoe UI", 24), AutoSize = true, Margin = new Padding(30, 100, 0, 0), BackColor = Color.Transparent };
             flowSide.Controls.Add(lblStickerSide);
@@ -122,9 +142,9 @@ namespace ExploradorArchivos.Mp3
                 e.Graphics.DrawLine(new Pen(ColorTranslator.FromHtml("#DCDCDC")), 0, 0, pnlBottom.Width, 0);
             };
 
-            _lblTiempoActual = new Label { Text = "0:00", Location = new Point(20, 15), Size = new Size(40, 20) };
-            _trackProgreso = new CustomTrackBar { Size = new Size(720, 15), Location = new Point(65, 17), Value = 0 };
-            _lblTiempoTotal = new Label { Text = "0:00", Location = new Point(790, 15), Size = new Size(40, 20) };
+            _lblTiempoActual = new Label { Text = "0:00", Location = new Point(8, 15), Size = new Size(75, 20), AutoEllipsis = false };
+            _trackProgreso = new CustomTrackBar { Size = new Size(660, 15), Location = new Point(90, 17), Value = 0 };
+            _lblTiempoTotal = new Label { Text = "0:00", Location = new Point(758, 15), Size = new Size(55, 20), AutoEllipsis = false };
 
             _btnShuffle = CrearBotonControl("🔀", ThemeRenderer.MainBg);
             _btnShuffle.Location = new Point(200, 50);
@@ -209,7 +229,25 @@ namespace ExploradorArchivos.Mp3
             pnlLetrasBorder.Controls.Add(_rtbLetras);
             _pnlLetras.Controls.AddRange(new Control[] { pnlLetrasBorder, lblLetras });
 
-            pnlMain.Controls.AddRange(new Control[] { _pnlReproductor, _pnlBiblioteca, _pnlCarpetas, _pnlLetras });
+            // 5. GRABACION PANEL
+            _pnlGrabacion = new Panel { Dock = DockStyle.Fill, Visible = false, Padding = new Padding(10) };
+            Label lblGrab = new Label { Text = "🎙️ Grabadora de Voz", Dock = DockStyle.Top, Font = new Font(this.Font.FontFamily, 12, FontStyle.Bold), Height = 30 };
+            Panel pnlGrabBorder = new Panel { Dock = DockStyle.Fill, Padding = new Padding(2) };
+            pnlGrabBorder.Paint += (s, e) => DrawRetroBorder(e.Graphics, pnlGrabBorder.ClientRectangle, false);
+            
+            _btnGrabar = new Button {
+                Text = "🎙️ Grabar", Size = new Size(180, 60), FlatStyle = FlatStyle.Flat,
+                BackColor = RosaPastel, Font = new Font(this.Font.FontFamily, 14, FontStyle.Bold),
+                Cursor = Cursors.Hand
+            };
+            _btnGrabar.FlatAppearance.BorderSize = 0;
+            _btnGrabar.Location = new Point(250, 150);
+            _btnGrabar.Paint += (s, e) => DrawRetroBorder(e.Graphics, new Rectangle(0,0, _btnGrabar.Width - 1, _btnGrabar.Height - 1), true);
+            pnlGrabBorder.Controls.Add(_btnGrabar);
+
+            _pnlGrabacion.Controls.AddRange(new Control[] { pnlGrabBorder, lblGrab });
+
+            pnlMain.Controls.AddRange(new Control[] { _pnlReproductor, _pnlBiblioteca, _pnlCarpetas, _pnlLetras, _pnlGrabacion });
 
             this.Controls.Add(pnlMain);
             this.Controls.Add(pnlSidebar);
@@ -222,6 +260,7 @@ namespace ExploradorArchivos.Mp3
             btnMenuBib.Click += (s, e) => MostrarPanel(_pnlBiblioteca);
             btnMenuCarp.Click += (s, e) => MostrarPanel(_pnlCarpetas);
             btnMenuLetras.Click += (s, e) => MostrarPanel(_pnlLetras);
+            btnMenuGrabar.Click += (s, e) => MostrarPanel(_pnlGrabacion);
         }
 
         private void MostrarPanel(Panel p)
@@ -230,6 +269,7 @@ namespace ExploradorArchivos.Mp3
             _pnlBiblioteca.Visible = (p == _pnlBiblioteca);
             _pnlCarpetas.Visible = (p == _pnlCarpetas);
             _pnlLetras.Visible = (p == _pnlLetras);
+            _pnlGrabacion.Visible = (p == _pnlGrabacion);
         }
 
         private void DrawRetroBorder(Graphics g, Rectangle bounds, bool raised)
@@ -327,6 +367,11 @@ namespace ExploradorArchivos.Mp3
                 };
                 ActualizarIconoRepeat();
             };
+            
+            _timerGrabacion = new System.Windows.Forms.Timer { Interval = 1000 };
+            _timerGrabacion.Tick += TimerGrabacion_Tick;
+            
+            _btnGrabar.Click += BtnGrabar_Click;
 
             _trackProgreso.ValueChangedByUser += (val) => _gestor.Seek(val);
             _trackVolumen.ValueChangedByUser += (val) => _gestor.Volumen = (float)val;
@@ -341,6 +386,51 @@ namespace ExploradorArchivos.Mp3
             _gestor.CancionCambiada += OnCancionCambiada;
             _gestor.PosicionActualizada += OnPosicionActualizada;
             _gestor.EstadoCambiado += OnEstadoCambiado;
+        }
+
+        private void TimerGrabacion_Tick(object? sender, EventArgs e)
+        {
+            var elapsed = DateTime.Now - _inicioGrabacion;
+            
+            string tiempoFormateado = elapsed.TotalHours >= 1 
+                ? elapsed.ToString(@"h\:mm\:ss") 
+                : $"{(int)elapsed.TotalMinutes}:{elapsed.Seconds:D2}";
+                
+            _lblTiempoActual.Text = $"🔴 {tiempoFormateado}";
+            
+            double fakeProgress = (elapsed.TotalSeconds % 3) / 3.0; 
+            _trackProgreso.Value = fakeProgress;
+        }
+
+        private void BtnGrabar_Click(object? sender, EventArgs e)
+        {
+            if (!_estaGrabando)
+            {
+                _gestor.Pause();
+                string ruta = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyMusic), $"Grabacion_{DateTime.Now:yyyyMMdd_HHmmss}.wav");
+                _grabadora.IniciarGrabacion(ruta);
+                _estaGrabando = true;
+                _btnGrabar.Text = "⏹️ Detener"; 
+                _btnGrabar.BackColor = Color.FromArgb(255, 95, 86); 
+                
+                _inicioGrabacion = DateTime.Now;
+                _lblTiempoTotal.Text = "REC";
+                _timerGrabacion.Start();
+            }
+            else
+            {
+                _grabadora.DetenerGrabacion();
+                _estaGrabando = false;
+                _timerGrabacion.Stop();
+                
+                _btnGrabar.Text = "🎙️ Grabar";
+                _btnGrabar.BackColor = RosaPastel;
+                _trackProgreso.Value = 0;
+                _lblTiempoActual.Text = "0:00";
+                _lblTiempoTotal.Text = _gestor.CancionActual?.DuracionTexto ?? "0:00";
+                
+                MessageBox.Show("¡Audio guardado exitosamente en Mi Música! 🌸", "Grabadora", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
         }
 
         private void ActualizarIconoRepeat()
@@ -373,8 +463,12 @@ namespace ExploradorArchivos.Mp3
         private void OnPosicionActualizada(TimeSpan actual, TimeSpan total)
         {
             if (InvokeRequired) { BeginInvoke(new Action(() => OnPosicionActualizada(actual, total))); return; }
+            if (_estaGrabando) return;
             if (total.TotalSeconds > 0) _trackProgreso.Value = actual.TotalSeconds / total.TotalSeconds;
             _lblTiempoActual.Text = actual.ToString(@"m\:ss");
+            
+            // Sincronizar el tiempo total real (útil para archivos .wav que no cargan su duración inicial)
+            _lblTiempoTotal.Text = total.TotalHours >= 1 ? total.ToString(@"h\:mm\:ss") : total.ToString(@"m\:ss");
         }
 
         private void OnEstadoCambiado(bool repro) => _btnPlayPause.Text = repro ? "⏸️" : "⏯️";
@@ -421,12 +515,16 @@ namespace ExploradorArchivos.Mp3
                 btn.Paint += (s, e) => DrawRetroBorder(e.Graphics, new Rectangle(0,0, btn.Width - 1, btn.Height - 1), true);
                 
                 btn.Click += (s, e) => {
-                    var mp3s = Directory.GetFiles(r, "*.mp3", SearchOption.TopDirectoryOnly).ToList();
-                    if (mp3s.Count > 0) {
-                        _gestor.CargarCola(mp3s);
+                    var archivos = Directory.GetFiles(r, "*.*", SearchOption.TopDirectoryOnly)
+                                     .Where(f => f.EndsWith(".mp3", StringComparison.OrdinalIgnoreCase) || 
+                                                 f.EndsWith(".wav", StringComparison.OrdinalIgnoreCase))
+                                     .ToList();
+                                     
+                    if (archivos.Count > 0) {
+                        _gestor.CargarCola(archivos);
                         MostrarPanel(_pnlReproductor);
                     } else {
-                        MessageBox.Show("No se encontraron archivos MP3 en esta carpeta. 😢");
+                        MessageBox.Show("No se encontraron archivos MP3 o WAV en esta carpeta. 😢");
                     }
                 };
                 _flowCarpetas.Controls.Add(btn);
@@ -436,6 +534,8 @@ namespace ExploradorArchivos.Mp3
         protected override void OnFormClosing(FormClosingEventArgs e)
         {
             _gestor?.Dispose();
+            _grabadora?.Dispose();
+            _timerGrabacion?.Dispose();
             base.OnFormClosing(e);
         }
     }

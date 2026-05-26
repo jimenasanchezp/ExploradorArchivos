@@ -53,7 +53,7 @@ public partial class Form1
                     .Where(x => !x.EsCarpeta && mediaExt.Contains(Path.GetExtension(x.RutaCompleta).ToLower()))
                     .Select(x => x.RutaCompleta).ToList();
                 if (audioFiles.Count == 0) audioFiles.Add(ruta);
-                new MusicPlayerForm(audioFiles, ruta).Show();
+                AbrirReproductor(audioFiles, ruta);
                 return;
             }
 

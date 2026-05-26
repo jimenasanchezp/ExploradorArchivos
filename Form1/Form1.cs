@@ -91,6 +91,7 @@ public partial class Form1 : Form
     private Button _btnToggleVista = default!;
     private Button _btnAppData = default!;
     private FlowLayoutPanel _flpBreadcrumbs = default!;
+    private MusicPlayerForm? _reproductorMusica;
 
     public Form1()
     {
@@ -133,7 +134,7 @@ public partial class Form1 : Form
         itemAppVideo.Click += (s, e) => AbrirCon(new AppVideoForm(GetSelectedPath()));
         itemAppFoto.Click += (s, e) => AbrirCon(new AppFotoForm(GetSelectedPath()));
         itemAppData.Click += (s, e) => AbrirCon(new ExploradorArchivos.AppDataFusion.MainForm(GetSelectedPath()));
-        itemMusic.Click += (s, e) => AbrirCon(new MusicPlayerForm(new List<string> { GetSelectedPath() }, GetSelectedPath()));
+        itemMusic.Click += (s, e) => AbrirReproductor(new List<string> { GetSelectedPath() }, GetSelectedPath());
         itemTexto.Click += (s, e) => AbrirCon(new FileViewerForm(GetSelectedPath()));
         itemPredeterminada.Click += (s, e) => AbrirConSistema(GetSelectedPath());
 
@@ -322,6 +323,25 @@ public partial class Form1 : Form
     /* Método helper generico que muestra subformularios del explorador
      * (Visor de imágenes, Reproductor de música, Visor de texto, etc.)*/
     private void AbrirCon(Form frm) => frm.Show();
+
+    /// <summary>
+    /// Abre el reproductor de música reutilizando la ventana existente si ya está abierta.
+    /// </summary>
+    private void AbrirReproductor(List<string> rutas, string? rutaInicial = null)
+    {
+        if (_reproductorMusica == null || _reproductorMusica.IsDisposed)
+        {
+            _reproductorMusica = new MusicPlayerForm(rutas, rutaInicial);
+            _reproductorMusica.Show();
+        }
+        else
+        {
+            _reproductorMusica.CargarNuevaCola(rutas, rutaInicial);
+            if (_reproductorMusica.WindowState == FormWindowState.Minimized)
+                _reproductorMusica.WindowState = FormWindowState.Normal;
+            _reproductorMusica.BringToFront();
+        }
+    }
 
     /* AbrirConSistema utiliza Process.Star UseShellExecute = True 
      * para delegar la ejecucion al visor predeterminado
