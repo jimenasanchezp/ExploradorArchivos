@@ -6,6 +6,7 @@ using LibVLCSharp.Shared;
 using LibVLCSharp.WinForms;
 using ExploradorArchivos.UI;
 using ExploradorArchivos.Mp3; // Para CustomTrackBar si es necesario
+using Microsoft.Web.WebView2.WinForms;
 
 namespace ExploradorArchivos.AppVideo;
 
@@ -24,13 +25,14 @@ public partial class AppVideoForm : Form
     private Panel pnlSidebar = default!;
     private Label lblMetaInfo = default!;
     private CustomTrackBar _trackProgreso = null!;
-    private CustomTrackBar trackInicio = null!;
-    private CustomTrackBar trackFin = null!;
-    private Label lblTiempoInicio = null!;
     private Label lblTiempoFin = null!;
     private Button _btnPlayPause = null!;
     private System.Windows.Forms.Timer _timerUI = null!;
     private float? _pendingPosition = null;
+    
+    // Geolocalización
+    private WebView2 webMap = default!;
+    private Button btnSetLocation = default!;
 
     public AppVideoForm(string ruta)
     {
@@ -73,11 +75,10 @@ public partial class AppVideoForm : Form
         // Botones de edición (startX relativo al padding si fuera un FlowPanel, pero aquí es absoluto)
         // Ajustamos startX para que no pise el título
         int startX = 280; 
-        AgregarBotonEditor("✂️ Recortar", startX, () => MostrarDialogoRecorte());
-        AgregarBotonEditor("✨ Soft", startX + 100, () => AplicarFiltro("Soft"));
-        AgregarBotonEditor("🎞️ Sepia", startX + 200, () => AplicarFiltro("Sepia"));
-        AgregarBotonEditor("🌑 B&N", startX + 300, () => AplicarFiltro("BN"));
-        AgregarBotonEditor("🎵 Audio", startX + 400, ExtraerAudio);
+        AgregarBotonEditor("✨ Soft", startX, () => AplicarFiltro("Soft"));
+        AgregarBotonEditor("🎞️ Sepia", startX + 100, () => AplicarFiltro("Sepia"));
+        AgregarBotonEditor("🌑 B&N", startX + 200, () => AplicarFiltro("BN"));
+        AgregarBotonEditor("🎵 Audio", startX + 300, ExtraerAudio);
 
         // Main Layout
         SplitContainer split = new SplitContainer { Dock = DockStyle.Fill, SplitterDistance = 800 };
@@ -122,7 +123,16 @@ public partial class AppVideoForm : Form
         };
         _btnPlayPause.Click += (s, e) => TogglePlayPause();
 
+        lblTiempoFin = new Label { 
+            Text = "00:00:00", 
+            Location = new Point(80, 40),
+            AutoSize = true,
+            Font = new Font("Consolas", 10),
+            ForeColor = ThemeRenderer.Accent
+        };
+
         pnlControls.Controls.Add(_btnPlayPause);
+        pnlControls.Controls.Add(lblTiempoFin);
         pnlControls.Controls.Add(_trackProgreso);
 
         pnlPlayer.Controls.Add(pnlVideoBorder);
@@ -132,34 +142,24 @@ public partial class AppVideoForm : Form
         // Sidebar
         pnlSidebar = new Panel { Dock = DockStyle.Fill, Padding = new Padding(15), BackColor = ThemeRenderer.SecondaryBg };
         Label lblMetaTitle = new Label { Text = "📊 Metadatos", Dock = DockStyle.Top, Font = new Font("MS Sans Serif", 10, FontStyle.Bold), Height = 30 };
-        lblMetaInfo = new Label { Dock = DockStyle.Top, Height = 120, Font = new Font("Consolas", 9), ForeColor = ThemeRenderer.SecondaryText };
+        lblMetaInfo = new Label { Dock = DockStyle.Top, Height = 140, Font = new Font("Consolas", 9), ForeColor = ThemeRenderer.SecondaryText };
         
-        // Controles de Recorte en Sidebar
-        Label lblRecorteTitle = new Label { Text = "✂️ Selección de Recorte", Dock = DockStyle.Top, Font = new Font("MS Sans Serif", 10, FontStyle.Bold), Height = 30, Margin = new Padding(0, 20, 0, 0) };
-        
-        Label lblStart = new Label { Text = "Inicio:", Dock = DockStyle.Top, Height = 20 };
-        lblTiempoInicio = new Label { Text = "00:00:00", Dock = DockStyle.Top, Height = 20, Font = new Font("Consolas", 9), ForeColor = ThemeRenderer.Accent };
-        trackInicio = new CustomTrackBar { Dock = DockStyle.Top, Height = 25, Value = 0 };
-        trackInicio.ValueChangedByUser += (val) => { 
-            lblTiempoInicio.Text = FormatearTiempoDesdePorcentaje(val);
-            if (val > trackFin.Value) trackFin.Value = val; 
-        };
+        webMap = new WebView2 { Dock = DockStyle.Fill, MinimumSize = new Size(150, 150) };
+        webMap.WebMessageReceived += WebMap_WebMessageReceived;
 
-        Label lblEnd = new Label { Text = "Fin:", Dock = DockStyle.Top, Height = 20, Margin = new Padding(0, 10, 0, 0) };
-        lblTiempoFin = new Label { Text = "00:00:00", Dock = DockStyle.Top, Height = 20, Font = new Font("Consolas", 9), ForeColor = ThemeRenderer.Accent };
-        trackFin = new CustomTrackBar { Dock = DockStyle.Top, Height = 25, Value = 1.0 };
-        trackFin.ValueChangedByUser += (val) => { 
-            lblTiempoFin.Text = FormatearTiempoDesdePorcentaje(val);
-            if (val < trackInicio.Value) trackInicio.Value = val;
+        btnSetLocation = new Button {
+            Text = "📍 Registrar Ubicación",
+            Dock = DockStyle.Bottom,
+            Height = 40,
+            FlatStyle = FlatStyle.Flat,
+            BackColor = ThemeRenderer.Accent,
+            ForeColor = Color.White,
+            Visible = false
         };
+        btnSetLocation.Click += (s, e) => ActivarModoMapaPicker();
 
-        pnlSidebar.Controls.Add(trackFin);
-        pnlSidebar.Controls.Add(lblTiempoFin);
-        pnlSidebar.Controls.Add(lblEnd);
-        pnlSidebar.Controls.Add(trackInicio);
-        pnlSidebar.Controls.Add(lblTiempoInicio);
-        pnlSidebar.Controls.Add(lblStart);
-        pnlSidebar.Controls.Add(lblRecorteTitle);
+        pnlSidebar.Controls.Add(webMap);
+        pnlSidebar.Controls.Add(btnSetLocation);
         pnlSidebar.Controls.Add(lblMetaInfo);
         pnlSidebar.Controls.Add(lblMetaTitle);
         split.Panel2.Controls.Add(pnlSidebar);
@@ -256,21 +256,86 @@ public partial class AppVideoForm : Form
         _timerUI.Start();
     }
 
-    private string FormatearTiempoDesdePorcentaje(double porcentaje)
-    {
-        if (_mediaPlayer == null || _mediaPlayer.Length <= 0) return "00:00:00";
-        long ms = (long)(porcentaje * _mediaPlayer.Length);
-        return TimeSpan.FromMilliseconds(ms).ToString(@"hh\:mm\:ss");
-    }
-
     private void CargarMetadatos()
     {
+        CargarMetadatosAsync();
+    }
+
+    private async void CargarMetadatosAsync()
+    {
         _metadata = AppVideoProcessor.ObtenerMetadataManual(_rutaVideo);
+        ActualizarInfoMetadata();
+
+        try
+        {
+            await webMap.EnsureCoreWebView2Async();
+            if (_metadata.TieneUbicacion)
+            {
+                string html = AppVideoMapService.GenerarMapaHtml(_metadata.Latitud!.Value, _metadata.Longitud!.Value);
+                webMap.NavigateToString(html);
+                btnSetLocation.Visible = false;
+            }
+            else
+            {
+                webMap.NavigateToString("<html><body style='background:#f9f9f9; display:flex; justify-content:center; align-items:center; height:100vh; font-family:sans-serif; text-align:center;'><div><h3>No hay datos de GPS 📍</h3><p style='font-size:12px; color:#666;'>Usa el botón de abajo para registrar la ubicación manualmente.</p></div></body></html>");
+                btnSetLocation.Visible = true;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error al cargar mapa: {ex.Message}");
+        }
+    }
+
+    private void ActualizarInfoMetadata()
+    {
         lblMetaInfo.Text = $"Archivo: {_metadata.Nombre}\n" +
                            $"Ext: {_metadata.Extension}\n" +
                            $"Tamaño: {(_metadata.TamanoBytes / 1024.0 / 1024.0):F2} MB\n" +
                            $"Resolución: {_metadata.Resolucion}\n" +
-                           $"Codec: {_metadata.Codec}";
+                           $"Codec: {_metadata.Codec}\n" +
+                           $"Latitud: {(_metadata.Latitud?.ToString("F5") ?? "N/A")}\n" +
+                           $"Longitud: {(_metadata.Longitud?.ToString("F5") ?? "N/A")}";
+    }
+
+    private void ActivarModoMapaPicker()
+    {
+        webMap.NavigateToString(AppVideoMapService.GenerarMapaPickerHtml());
+        btnSetLocation.Text = "✅ Guardar Ubicación";
+        btnSetLocation.BackColor = Color.LightGreen;
+        btnSetLocation.ForeColor = Color.Black;
+        btnSetLocation.Click -= ConfirmarUbicacionManual;
+        btnSetLocation.Click += ConfirmarUbicacionManual;
+    }
+
+    private void ConfirmarUbicacionManual(object? sender, EventArgs e)
+    {
+        btnSetLocation.Text = "📍 Registrar Ubicación";
+        btnSetLocation.BackColor = ThemeRenderer.Accent;
+        btnSetLocation.ForeColor = Color.White;
+        btnSetLocation.Click -= ConfirmarUbicacionManual;
+        
+        ActualizarInfoMetadata();
+        if (_metadata.TieneUbicacion)
+        {
+            AppVideoProcessor.GuardarMetadata(_metadata);
+            string html = AppVideoMapService.GenerarMapaHtml(_metadata.Latitud!.Value, _metadata.Longitud!.Value);
+            webMap.NavigateToString(html);
+            btnSetLocation.Visible = false;
+        }
+        MessageBox.Show("Ubicación registrada y guardada.");
+    }
+
+    private void WebMap_WebMessageReceived(object? sender, Microsoft.Web.WebView2.Core.CoreWebView2WebMessageReceivedEventArgs e)
+    {
+        try
+        {
+            string json = e.WebMessageAsJson;
+            using var doc = System.Text.Json.JsonDocument.Parse(json);
+            _metadata.Latitud = doc.RootElement.GetProperty("lat").GetDouble();
+            _metadata.Longitud = doc.RootElement.GetProperty("lng").GetDouble();
+        }
+        catch { }
     }
 
     private void TogglePlayPause()
@@ -298,38 +363,6 @@ public partial class AppVideoForm : Form
         else MessageBox.Show("Error al aplicar filtro. Asegúrate de que ffmpeg.exe esté en la carpeta de la app.");
         
         CargarMetadatos();
-        ReiniciarReproductor();
-    }
-
-    private void MostrarDialogoRecorte()
-    {
-        if (_mediaPlayer == null || _mediaPlayer.Length <= 0) return;
-
-        TimeSpan inicio = TimeSpan.FromMilliseconds(trackInicio.Value * _mediaPlayer.Length);
-        TimeSpan fin = TimeSpan.FromMilliseconds(trackFin.Value * _mediaPlayer.Length);
-        TimeSpan duracion = fin - inicio;
-
-        if (duracion.TotalSeconds <= 0)
-        {
-            MessageBox.Show("El punto de inicio debe ser anterior al punto de fin.");
-            return;
-        }
-
-        if (MessageBox.Show($"¿Recortar desde {inicio:hh\\:mm\\:ss} hasta {fin:hh\\:mm\\:ss}?\nDuración total: {duracion:hh\\:mm\\:ss}", "Confirmar Recorte", MessageBoxButtons.YesNo) == DialogResult.Yes)
-        {
-            ProcesarRecorte(inicio, duracion);
-        }
-    }
-
-    private async void ProcesarRecorte(TimeSpan inicio, TimeSpan duracion)
-    {
-        PrepararParaProcesar();
-        string output = Path.Combine(Path.GetDirectoryName(_rutaVideo)!, "Recorte_" + Path.GetFileName(_rutaVideo));
-        bool ok = await AppVideoProcessor.Recortar(_rutaVideo, output, inicio, duracion);
-        
-        if (ok) MessageBox.Show("Recorte guardado: " + output);
-        else MessageBox.Show("Error al recortar. Asegúrate de que ffmpeg.exe esté en la carpeta de la app.");
-        
         ReiniciarReproductor();
     }
 

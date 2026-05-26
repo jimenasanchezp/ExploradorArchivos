@@ -665,7 +665,7 @@ public partial class Form1 : Form
         pnlTop.Controls.Add(pnlNav);
 
         // Grupo: Dirección
-        Panel pnlAddr = CrearGrupoHerramientas("", 155, 20, pnlTop.Width - 365);
+        Panel pnlAddr = CrearGrupoHerramientas("", 155, 20, pnlTop.Width - 410);
         pnlAddr.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
 
         Button btnCopiarRuta = new Button();
@@ -691,7 +691,7 @@ public partial class Form1 : Form
         pnlTop.Controls.Add(pnlAddr);
 
         // Grupo: Acciones
-        Panel pnlActions = CrearGrupoHerramientas("", pnlTop.Width - 200, 20, 190);
+        Panel pnlActions = CrearGrupoHerramientas("", pnlTop.Width - 245, 20, 235);
         pnlActions.Anchor = AnchorStyles.Top | AnchorStyles.Right;
         pnlActions.Controls.Add(btnNuevaCarpeta); btnNuevaCarpeta.Location = new Point(10, 18); btnNuevaCarpeta.Size = new Size(35, 30);
         pnlActions.Controls.Add(btnExportarCSV); btnExportarCSV.Location = new Point(55, 18); btnExportarCSV.Size = new Size(35, 30);
@@ -699,6 +699,7 @@ public partial class Form1 : Form
         
         _btnAppData = new Button();
         pnlActions.Controls.Add(_btnAppData); _btnAppData.Location = new Point(145, 18); _btnAppData.Size = new Size(35, 30);
+        pnlActions.Controls.Add(btnCamara); btnCamara.Location = new Point(190, 18); btnCamara.Size = new Size(35, 30);
 
         pnlTop.Controls.Add(pnlActions);
 
@@ -752,6 +753,7 @@ public partial class Form1 : Form
         ConfigurarBotonRetro(btnExportarCSV, "📤");
         ConfigurarBotonRetro(_btnToggleVista, "🖼️");
         ConfigurarBotonRetro(_btnAppData, "📊");
+        ConfigurarBotonRetro(btnCamara, "📷");
 
         // --- Barra de Direcciones ---
         pnlAddressBorder.BackColor = Color.White;
@@ -939,5 +941,27 @@ public partial class Form1 : Form
 
         // TreeView
         treeViewLateral.NodeMouseDoubleClick += TreeViewLateral_NodeMouseDoubleClick;
+
+        // Cámara
+        btnCamara.Click += BtnCamara_Click;
+    }
+
+    private void BtnCamara_Click(object? sender, EventArgs e)
+    {
+        if (_rutaActual == "Inicio" || _rutaActual == "Favoritos" || _rutaActual == "EsteEquipo" || !Directory.Exists(_rutaActual))
+        {
+            MessageBox.Show("No se pueden guardar fotos en una ubicación virtual. Por favor, navega a una carpeta física.", "Aviso", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
+
+        using (var camaraForm = new ExploradorArchivos.AppCamara.AppCamaraForm(_rutaActual))
+        {
+            if (camaraForm.ShowDialog(this) == DialogResult.OK && !string.IsNullOrEmpty(camaraForm.RutaFotoGuardada))
+            {
+                CargarDirectorio(_rutaActual, false);
+                var editor = new AppFotoForm(camaraForm.RutaFotoGuardada);
+                editor.Show();
+            }
+        }
     }
 }

@@ -508,7 +508,7 @@ public partial class AppFotoForm : Form
 
     private void GuardarImagen()
     {
-        using SaveFileDialog sfd = new SaveFileDialog { Filter = "Imagen JPEG|*.jpg|Imagen PNG|*.png", FileName = "Editada_" + _metadata.Nombre };
+        using SaveFileDialog sfd = new SaveFileDialog { Filter = "Imagen JPEG|*.jpg|Imagen PNG|*.png", FileName =  _metadata.Nombre };
         if (sfd.ShowDialog() == DialogResult.OK) {
             string ext = Path.GetExtension(sfd.FileName).ToLower();
             if (_metadata.TieneUbicacion && (ext == ".jpg" || ext == ".jpeg")) {

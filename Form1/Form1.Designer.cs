@@ -32,6 +32,7 @@ namespace ExploradorArchivos
             btnExportarCSV = new Button();
             btnActualizar = new Button();
             btnNuevaCarpeta = new Button();
+            btnCamara = new Button();
             pnlAddressBorder = new Panel();
             txtDireccion = new TextBox();
             btnSubir = new Button();
@@ -376,6 +377,7 @@ namespace ExploradorArchivos
         public System.Windows.Forms.Button btnNuevaCarpeta = null!;
         public System.Windows.Forms.Button btnActualizar = null!;
         public System.Windows.Forms.Button btnExportarCSV = null!;
+        public System.Windows.Forms.Button btnCamara = null!;
 
         public System.Windows.Forms.Panel pnlBottom = null!;
         public System.Windows.Forms.Label lblStatus = null!;

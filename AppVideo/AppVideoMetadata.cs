@@ -13,4 +13,7 @@ public class AppVideoMetadata
     public string Codec { get; set; } = "Desconocido";
     public long TamanoBytes { get; set; }
     public float FrameRate { get; set; }
+    public double? Latitud { get; set; }
+    public double? Longitud { get; set; }
+    public bool TieneUbicacion => Latitud.HasValue && Longitud.HasValue;
 }

@@ -66,7 +66,7 @@ public static class AppVideoProcessor
     public static AppVideoMetadata ObtenerMetadataManual(string ruta)
     {
         var info = new FileInfo(ruta);
-        return new AppVideoMetadata
+        var metadata = new AppVideoMetadata
         {
             RutaArchivo = ruta,
             Nombre = info.Name,
@@ -77,5 +77,42 @@ public static class AppVideoProcessor
             Resolucion = "Desconocida",
             Codec = "Desconocido"
         };
+
+        // Cargar desde archivo companion JSON si existe
+        string metaPath = ruta + ".meta.json";
+        if (File.Exists(metaPath))
+        {
+            try
+            {
+                string jsonString = File.ReadAllText(metaPath);
+                var savedData = JsonSerializer.Deserialize<AppVideoMetadata>(jsonString);
+                if (savedData != null)
+                {
+                    metadata.Latitud = savedData.Latitud;
+                    metadata.Longitud = savedData.Longitud;
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error al cargar metadatos companion: {ex.Message}");
+            }
+        }
+
+        return metadata;
+    }
+
+    public static void GuardarMetadata(AppVideoMetadata metadata)
+    {
+        try
+        {
+            string metaPath = metadata.RutaArchivo + ".meta.json";
+            var options = new JsonSerializerOptions { WriteIndented = true };
+            string jsonString = JsonSerializer.Serialize(metadata, options);
+            File.WriteAllText(metaPath, jsonString);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error al guardar metadatos companion: {ex.Message}");
+        }
     }
 }
