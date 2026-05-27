@@ -182,7 +182,7 @@ public partial class Form1
 
             listViewPrincipal.EndUpdate();
             
-            // Preservación del Estilo Y2K (forzar redibujado)
+            // Preservación del estilo clásico (forzar redibujado)
             listViewPrincipal.Invalidate();
             
             lblStatus.Text = $"Búsqueda: '{filtro}' ({resultados.Count} resultados)";

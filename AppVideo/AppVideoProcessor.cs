@@ -22,7 +22,7 @@ public static class AppVideoProcessor
         {
             "BN" => "colorchannelmixer=.3:.4:.3:0:.3:.4:.3:0:.3:.4:.3",
             "Sepia" => "colorchannelmixer=.393:.769:.189:0:.349:.686:.168:0:.272:.534:.131",
-            "Soft" => "hue=s=0.8, curves=m='0/0.1 0.5/0.5 1/0.9'", // Algo similar a Soft/Kawaii
+            "Soft" => "hue=s=0.8, curves=m='0/0.1 0.5/0.5 1/0.9'", // Algo similar a Soft/Estilizado
             _ => ""
         };
 

@@ -50,7 +50,7 @@ public class InputDialog : Form
             FlatStyle = FlatStyle.Flat
         };
         btnOk.FlatAppearance.BorderSize = 0;
-        btnOk.Paint += (s, e) => ThemeRenderer.DrawRetroBorder(e.Graphics, btnOk.ClientRectangle, true);
+        btnOk.Paint += (s, e) => ThemeRenderer.DrawClassicBorder(e.Graphics, btnOk.ClientRectangle, true);
 
         btnCancel = new Button
         {
@@ -61,14 +61,14 @@ public class InputDialog : Form
             FlatStyle = FlatStyle.Flat
         };
         btnCancel.FlatAppearance.BorderSize = 0;
-        btnCancel.Paint += (s, e) => ThemeRenderer.DrawRetroBorder(e.Graphics, btnCancel.ClientRectangle, true);
+        btnCancel.Paint += (s, e) => ThemeRenderer.DrawClassicBorder(e.Graphics, btnCancel.ClientRectangle, true);
 
         this.Controls.AddRange(new Control[] { lblPrompt, txtInput, btnOk, btnCancel });
         
         this.AcceptButton = btnOk;
         this.CancelButton = btnCancel;
 
-        // Apply retro standard theme styling
+        // Apply classic standard theme styling
         ThemeRenderer.ApplyTheme(this);
         this.BackColor = ThemeRenderer.MainBg;
         

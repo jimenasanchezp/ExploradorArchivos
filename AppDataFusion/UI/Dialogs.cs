@@ -4,28 +4,29 @@ using ExploradorArchivos.UI;
 namespace ExploradorArchivos.AppDataFusion;
 
 // --------------------------------------------------------------
-//  DIÁLOGO – Conexión BD con detección automática de tablas
+//  DIÃLOGO â€“ ConexiÃ³n BD con detecciÃ³n automÃ¡tica de tablas
 // --------------------------------------------------------------
 public class FormConexionBD : Form
 {
     public string CadenaConexion { get; private set; } = "";
     public string NombreTabla { get; private set; } = "";
 
-    private readonly TextBox txtHost, txtPuerto, txtBD, txtUsuario, txtContrasena;
+    private readonly TextBox txtHost, txtPuerto, txtUsuario, txtContrasena;
+    private readonly ComboBox cmbBD;
     private readonly ComboBox cmbTabla;
+    private readonly Button btnCargarBDs;
     private readonly Button btnDetectarTablas;
     private readonly Label lblEstadoTablas;
     private readonly bool _esPg;
     private readonly string _pd, _ud;
 
-    public FormConexionBD(string motor)
+    public FormConexionBD(string motor, bool esEscritura = false)
     {
         _esPg = motor == "PostgreSQL";
         _pd = _esPg ? "5432" : "3306";
         _ud = _esPg ? "postgres" : "root";
 
-        ThemeRenderer.ApplyTheme(this);
-        Text = $"Conexión a {motor}";
+        Text = esEscritura ? $"Migrar datos a {motor}" : $"Conexión a {motor}";
         Size = new Size(490, 420);
         StartPosition = FormStartPosition.CenterParent;
         FormBorderStyle = FormBorderStyle.FixedDialog;
@@ -56,7 +57,27 @@ public class FormConexionBD : Form
         txtPuerto = Txt(_pd); txtPuerto.Location = new Point(cx, y); y += 34;
 
         var l3 = Lbl("Base de datos:"); l3.Location = new Point(lx, y + 3);
-        txtBD = Txt(""); txtBD.Location = new Point(cx, y); y += 34;
+        cmbBD = new ComboBox
+        {
+            Location = new Point(cx, y + 1),
+            Width = 210,
+            DropDownStyle = ComboBoxStyle.DropDown,
+            BackColor = Color.White,
+            ForeColor = ThemeRenderer.MainText,
+            FlatStyle = FlatStyle.Flat
+        };
+        btnCargarBDs = new Button
+        {
+            Text = "Cargar BDs",
+            Location = new Point(cx + 218, y),
+            Width = 107,
+            Height = 28,
+            FlatStyle = FlatStyle.Flat
+        };
+        btnCargarBDs.FlatAppearance.BorderSize = 0;
+        btnCargarBDs.Click += BtnCargarBDs_Click!;
+        btnCargarBDs.Paint += (s, e) => ThemeRenderer.DrawClassicBorder(e.Graphics, btnCargarBDs.ClientRectangle, true);
+        y += 34;
 
         var l4 = Lbl("Usuario:"); l4.Location = new Point(lx, y + 3);
         txtUsuario = Txt(_ud); txtUsuario.Location = new Point(cx, y); y += 34;
@@ -68,7 +89,7 @@ public class FormConexionBD : Form
         {
             Location = new Point(lx, y),
             Size = new Size(445, 1),
-            BackColor = Color.FromArgb(36, 36, 52)
+            BackColor = Color.Lavender
         };
         y += 10;
 
@@ -78,49 +99,47 @@ public class FormConexionBD : Form
             Location = new Point(cx, y + 1),
             Width = 210,
             DropDownStyle = ComboBoxStyle.DropDown,
-            BackColor = Color.FromArgb(26, 26, 36),
-            ForeColor = Color.FromArgb(220, 220, 232),
-            FlatStyle = FlatStyle.Flat,
-            Font = new Font("Segoe UI", 9f)
+            BackColor = Color.White,
+            ForeColor = ThemeRenderer.MainText,
+            FlatStyle = FlatStyle.Flat
         };
+        if (esEscritura) cmbTabla.Text = "datos_migrados";
+
         btnDetectarTablas = new Button
         {
             Text = "Detectar tablas",
             Location = new Point(cx + 218, y),
             Width = 107,
             Height = 28,
-            BackColor = Color.FromArgb(13, 50, 35),
-            ForeColor = Color.FromArgb(52, 211, 153),
-            FlatStyle = FlatStyle.Flat,
-            Font = new Font("Segoe UI", 8.5f)
+            FlatStyle = FlatStyle.Flat
         };
         btnDetectarTablas.FlatAppearance.BorderSize = 0;
         btnDetectarTablas.Click += BtnDetectarTablas_Click!;
+        btnDetectarTablas.Paint += (s, e) => ThemeRenderer.DrawClassicBorder(e.Graphics, btnDetectarTablas.ClientRectangle, true);
         y += 38;
 
         lblEstadoTablas = new Label
         {
-            Text = "Ingresa los datos y pulsa 'Detectar tablas'.",
+            Text = esEscritura
+                ? "Escribe el nombre de la nueva tabla o pulsa 'Detectar tablas'."
+                : "Ingresa los datos y pulsa 'Cargar BDs' o 'Detectar tablas'.",
             Location = new Point(cx, y),
             Size = new Size(cw, 18),
-            ForeColor = Color.FromArgb(80, 130, 100),
-            Font = new Font("Segoe UI", 7.8f)
+            ForeColor = ThemeRenderer.SecondaryText
         };
         y += 30;
 
         var ok = new Button
         {
-            Text = "Conectar",
+            Text = esEscritura ? "Migrar" : "Conectar",
             Location = new Point(270, y),
             Width = 100,
             Height = 28,
             DialogResult = DialogResult.OK,
-            BackColor = Color.FromArgb(13, 61, 40),
-            ForeColor = Color.FromArgb(52, 211, 153),
-            FlatStyle = FlatStyle.Flat,
-            Font = new Font("Segoe UI", 9f)
+            FlatStyle = FlatStyle.Flat
         };
         ok.FlatAppearance.BorderSize = 0;
+        ok.Paint += (s, e) => ThemeRenderer.DrawClassicBorder(e.Graphics, ok.ClientRectangle, true);
 
         var can = new Button
         {
@@ -129,22 +148,28 @@ public class FormConexionBD : Form
             Width = 87,
             Height = 28,
             DialogResult = DialogResult.Cancel,
-            BackColor = Color.FromArgb(40, 18, 18),
-            ForeColor = Color.FromArgb(200, 100, 100),
-            FlatStyle = FlatStyle.Flat,
-            Font = new Font("Segoe UI", 9f)
+            FlatStyle = FlatStyle.Flat
         };
         can.FlatAppearance.BorderSize = 0;
+        can.Paint += (s, e) => ThemeRenderer.DrawClassicBorder(e.Graphics, can.ClientRectangle, true);
 
         ok.Click += (_, _) =>
         {
             string h = string.IsNullOrWhiteSpace(txtHost.Text) ? "localhost" : txtHost.Text.Trim();
             string p = string.IsNullOrWhiteSpace(txtPuerto.Text) ? _pd : txtPuerto.Text.Trim();
             string u = string.IsNullOrWhiteSpace(txtUsuario.Text) ? _ud : txtUsuario.Text.Trim();
+            string db = cmbBD.Text.Trim();
             CadenaConexion = _esPg
-                ? $"Host={h};Port={p};Database={txtBD.Text.Trim()};Username={u};Password={txtContrasena.Text};"
-                : $"Server={h};Port={p};Database={txtBD.Text.Trim()};User={u};Password={txtContrasena.Text};";
+                ? DatabaseWriter.BuildPostgreSqlConnectionString(h, p, db, u, txtContrasena.Text)
+                : DatabaseWriter.BuildMariaDbConnectionString(h, p, db, u, txtContrasena.Text);
             NombreTabla = cmbTabla.Text.Trim();
+            if (string.IsNullOrWhiteSpace(db))
+            {
+                MessageBox.Show("Debes especificar la base de datos.",
+                    "Base de datos requerida", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                DialogResult = DialogResult.None;
+                return;
+            }
             if (string.IsNullOrWhiteSpace(NombreTabla))
             {
                 MessageBox.Show("Debes especificar el nombre de la tabla.",
@@ -156,13 +181,60 @@ public class FormConexionBD : Form
         ClientSize = new Size(475, y + 50);
         Controls.AddRange(new Control[]
         {
-            l1, txtHost, l2, txtPuerto, l3, txtBD,
+            l1, txtHost, l2, txtPuerto, l3, cmbBD, btnCargarBDs,
             l4, txtUsuario, l5, txtContrasena,
             sep, lTabla, cmbTabla, btnDetectarTablas, lblEstadoTablas,
             ok, can
         });
         AcceptButton = ok;
         CancelButton = can;
+        ThemeRenderer.ApplyTheme(this);
+    }
+
+    private async void BtnCargarBDs_Click(object sender, EventArgs e)
+    {
+        string h = string.IsNullOrWhiteSpace(txtHost.Text) ? "localhost" : txtHost.Text.Trim();
+        string p = string.IsNullOrWhiteSpace(txtPuerto.Text) ? _pd : txtPuerto.Text.Trim();
+        string u = string.IsNullOrWhiteSpace(txtUsuario.Text) ? _ud : txtUsuario.Text.Trim();
+        string pass = txtContrasena.Text;
+
+        btnCargarBDs.Enabled = false;
+        lblEstadoTablas.Text = "Conectando al servidor...";
+        lblEstadoTablas.ForeColor = Color.FromArgb(180, 140, 30);
+
+        try
+        {
+            List<string> dbs = await Task.Run(() =>
+                _esPg
+                    ? DatabaseWriter.ObtenerBasesDatosPostgreSQL(h, p, u, pass)
+                    : DatabaseWriter.ObtenerBasesDatosMariaDB(h, p, u, pass));
+
+            string dbActual = cmbBD.Text;
+            cmbBD.Items.Clear();
+            foreach (var db in dbs) cmbBD.Items.Add(db);
+
+            if (dbs.Count > 0)
+            {
+                int idx = cmbBD.FindStringExact(dbActual);
+                cmbBD.SelectedIndex = idx >= 0 ? idx : 0;
+                lblEstadoTablas.Text = $"{dbs.Count} base(s) de datos encontrada(s).";
+                lblEstadoTablas.ForeColor = Color.FromArgb(52, 180, 120);
+            }
+            else
+            {
+                lblEstadoTablas.Text = "Sin bases de datos en el servidor.";
+                lblEstadoTablas.ForeColor = Color.FromArgb(180, 140, 50);
+            }
+        }
+        catch (Exception ex)
+        {
+            lblEstadoTablas.Text = $"Error: {ex.Message}";
+            lblEstadoTablas.ForeColor = Color.FromArgb(200, 80, 80);
+        }
+        finally
+        {
+            btnCargarBDs.Enabled = true;
+        }
     }
 
     private async void BtnDetectarTablas_Click(object sender, EventArgs e)
@@ -170,18 +242,18 @@ public class FormConexionBD : Form
         string h = string.IsNullOrWhiteSpace(txtHost.Text) ? "localhost" : txtHost.Text.Trim();
         string p = string.IsNullOrWhiteSpace(txtPuerto.Text) ? _pd : txtPuerto.Text.Trim();
         string u = string.IsNullOrWhiteSpace(txtUsuario.Text) ? _ud : txtUsuario.Text.Trim();
-        string db = txtBD.Text.Trim();
+        string db = cmbBD.Text.Trim();
 
         if (string.IsNullOrWhiteSpace(db))
         {
-            MessageBox.Show("Escribe el nombre de la base de datos primero.",
+            MessageBox.Show("Selecciona o escribe el nombre de la base de datos primero.",
                 "Base de datos requerida", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             return;
         }
 
         string cadena = _esPg
-            ? $"Host={h};Port={p};Database={db};Username={u};Password={txtContrasena.Text};"
-            : $"Server={h};Port={p};Database={db};User={u};Password={txtContrasena.Text};";
+            ? DatabaseWriter.BuildPostgreSqlConnectionString(h, p, db, u, txtContrasena.Text)
+            : DatabaseWriter.BuildMariaDbConnectionString(h, p, db, u, txtContrasena.Text);
 
         btnDetectarTablas.Enabled = false;
         lblEstadoTablas.Text = "Conectando...";
@@ -226,7 +298,7 @@ public class FormConexionBD : Form
 
 
 // --------------------------------------------------------------
-//  DIÁLOGO – Selección de columnas
+//  DIÃLOGO â€“ SelecciÃ³n de columnas
 // --------------------------------------------------------------
 public class FormSeleccionColumnas : Form
 {
@@ -242,9 +314,6 @@ public class FormSeleccionColumnas : Form
         StartPosition = FormStartPosition.CenterParent;
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MaximizeBox = false;
-        BackColor = Color.FromArgb(18, 18, 26);
-        ForeColor = Color.FromArgb(220, 220, 232);
-        Font = new Font("Segoe UI", 9f);
 
         string sC = mapeoActual.FirstOrDefault(kv => kv.Value == "categoria").Key ?? "";
         string sV = mapeoActual.FirstOrDefault(kv => kv.Value == "valor").Key ?? "";
@@ -261,8 +330,7 @@ public class FormSeleccionColumnas : Form
             Text = "Elige qué columna de tu tabla representa cada concepto:",
             Location = new Point(lx, y),
             Size = new Size(440, 20),
-            ForeColor = Color.FromArgb(100, 100, 130),
-            Font = new Font("Segoe UI", 8.5f)
+            ForeColor = ThemeRenderer.SecondaryText
         };
         y += 30;
 
@@ -271,8 +339,7 @@ public class FormSeleccionColumnas : Form
             Text = s.Length > 0 ? $"{t}  (auto: {s})" : t,
             Location = new Point(lx, y),
             Size = new Size(lw, 20),
-            ForeColor = Color.FromArgb(52, 211, 153),
-            Font = new Font("Segoe UI", 8.5f)
+            ForeColor = ThemeRenderer.SecondaryText
         };
 
         ComboBox Cmb(string s)
@@ -282,10 +349,9 @@ public class FormSeleccionColumnas : Form
                 Location = new Point(cx, y - 2),
                 Width = cw,
                 DropDownStyle = ComboBoxStyle.DropDownList,
-                BackColor = Color.FromArgb(26, 26, 36),
-                ForeColor = Color.FromArgb(220, 220, 232),
-                FlatStyle = FlatStyle.Flat,
-                Font = new Font("Segoe UI", 9f)
+                BackColor = Color.White,
+                ForeColor = ThemeRenderer.MainText,
+                FlatStyle = FlatStyle.Flat
             };
             c.Items.AddRange(arr);
             int idx = s.Length > 0 ? todas.IndexOf(s) : 0;
@@ -303,8 +369,7 @@ public class FormSeleccionColumnas : Form
             Text = "Deja en (ninguna) si la columna no aplica.",
             Location = new Point(lx, y),
             Size = new Size(440, 18),
-            ForeColor = Color.FromArgb(70, 70, 95),
-            Font = new Font("Segoe UI", 8f)
+            ForeColor = ThemeRenderer.SecondaryText
         };
         y += 28;
 
@@ -314,12 +379,10 @@ public class FormSeleccionColumnas : Form
             Location = new Point(248, y),
             Width = 105,
             DialogResult = DialogResult.OK,
-            BackColor = Color.FromArgb(13, 61, 40),
-            ForeColor = Color.FromArgb(52, 211, 153),
-            FlatStyle = FlatStyle.Flat,
-            Font = new Font("Segoe UI", 9f)
+            FlatStyle = FlatStyle.Flat
         };
         btnOk.FlatAppearance.BorderSize = 0;
+        btnOk.Paint += (s, e) => ThemeRenderer.DrawClassicBorder(e.Graphics, btnOk.ClientRectangle, true);
 
         var btnCan = new Button
         {
@@ -327,12 +390,10 @@ public class FormSeleccionColumnas : Form
             Location = new Point(362, y),
             Width = 85,
             DialogResult = DialogResult.Cancel,
-            BackColor = Color.FromArgb(40, 18, 18),
-            ForeColor = Color.FromArgb(200, 100, 100),
-            FlatStyle = FlatStyle.Flat,
-            Font = new Font("Segoe UI", 9f)
+            FlatStyle = FlatStyle.Flat
         };
         btnCan.FlatAppearance.BorderSize = 0;
+        btnCan.Paint += (s, e) => ThemeRenderer.DrawClassicBorder(e.Graphics, btnCan.ClientRectangle, true);
 
         btnOk.Click += (_, _) =>
         {
@@ -357,6 +418,7 @@ public class FormSeleccionColumnas : Form
             { intro, lC, cC, lV, cV, lN, cN, lF, cF, nota, btnOk, btnCan });
         AcceptButton = btnOk;
         CancelButton = btnCan;
+        ThemeRenderer.ApplyTheme(this);
     }
 }
 

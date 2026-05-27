@@ -109,15 +109,15 @@ public partial class Form1 : Form
     private void ConfigurarContextoMenu()
     {
         ContextMenuStrip menu = new ContextMenuStrip();
-        menu.Renderer = new CustomMenuRenderer(); // Estilo retro/limpio
+        menu.Renderer = new CustomMenuRenderer(); // Estilo clásico/limpio
         
         ToolStripMenuItem itemAbrir = new ToolStripMenuItem("📄  Abrir");
         ToolStripMenuItem itemAbrirCon = new ToolStripMenuItem("📁  Abrir con...");
         
-        ToolStripMenuItem itemCortar = new ToolStripMenuItem("✂️  Cortar");
         ToolStripMenuItem itemCopiar = new ToolStripMenuItem("📋  Copiar");
         ToolStripMenuItem itemRenombrar = new ToolStripMenuItem("✏️  Cambiar nombre");
         ToolStripMenuItem itemEliminar = new ToolStripMenuItem("🗑️  Eliminar");
+        ToolStripMenuItem itemEnviarCorreo = new ToolStripMenuItem("✉️  Enviar por correo");
         ToolStripMenuItem itemPropiedades = new ToolStripMenuItem("🛠️  Propiedades");
 
         // Submenú Abrir con...
@@ -126,6 +126,7 @@ public partial class Form1 : Form
         ToolStripMenuItem itemAppData = new ToolStripMenuItem("📊  App Data");
         ToolStripMenuItem itemMusic = new ToolStripMenuItem("🎵  App Music");
         ToolStripMenuItem itemTexto = new ToolStripMenuItem("📝  Visor de Texto");
+        ToolStripMenuItem itemOffice = new ToolStripMenuItem("🏢  Microsoft Office");
         ToolStripMenuItem itemPredeterminada = new ToolStripMenuItem("💻  Sistema (App Predeterminada)");
 
         // Eventos de apertura
@@ -136,6 +137,7 @@ public partial class Form1 : Form
         itemAppData.Click += (s, e) => AbrirCon(new ExploradorArchivos.AppDataFusion.MainForm(GetSelectedPath()));
         itemMusic.Click += (s, e) => AbrirReproductor(new List<string> { GetSelectedPath() }, GetSelectedPath());
         itemTexto.Click += (s, e) => AbrirCon(new FileViewerForm(GetSelectedPath()));
+        itemOffice.Click += (s, e) => AbrirConOffice(GetSelectedPath());
         itemPredeterminada.Click += (s, e) => AbrirConSistema(GetSelectedPath());
 
         ToolStripMenuItem itemFijar = new ToolStripMenuItem("📌  Fijar a acceso directo");
@@ -212,14 +214,21 @@ public partial class Form1 : Form
         itemActualizar.Click += (s, e) => CargarDirectorio(_rutaActual, false);
 
         // Eventos de archivo
-        itemCortar.Click += (s, e) => CortarSeleccionados();
         itemCopiar.Click += (s, e) => CopiarSeleccionados();
         itemRenombrar.Click += (s, e) => listViewPrincipal.SelectedItems[0].BeginEdit();
         itemEliminar.Click += (s, e) => EliminarArchivo(GetSelectedPath());
+        itemEnviarCorreo.Click += (s, e) => {
+            string ruta = GetSelectedPath();
+            if (!string.IsNullOrEmpty(ruta) && File.Exists(ruta))
+            {
+                using var frm = new SendMailForm(ruta);
+                frm.ShowDialog(this);
+            }
+        };
         itemPropiedades.Click += (s, e) => MostrarPropiedades(GetSelectedPath());
 
         itemAbrirCon.DropDownItems.AddRange(new ToolStripItem[] {
-            itemAppVideo, itemAppFoto, itemAppData, itemMusic, itemTexto, new ToolStripSeparator(), itemPredeterminada
+            itemAppVideo, itemAppFoto, itemAppData, itemMusic, itemTexto, itemOffice, new ToolStripSeparator(), itemPredeterminada
         });
 
         // Crear separadores explícitos
@@ -230,8 +239,8 @@ public partial class Form1 : Form
 
         menu.Items.AddRange(new ToolStripItem[] {
             itemAbrir, itemAbrirCon, sep1,
-            itemCortar, itemCopiar, itemPegar, itemRenombrar, itemEliminar, sep2,
-            itemFijar, itemFavorito, itemVaciarFavoritos, sep3,
+            itemCopiar, itemPegar, itemRenombrar, itemEliminar, sep2,
+            itemEnviarCorreo, itemFijar, itemFavorito, itemVaciarFavoritos, sep3,
             itemNuevaCarpeta, itemActualizar, sep4,
             itemPropiedades
         });
@@ -250,12 +259,12 @@ public partial class Form1 : Form
             // Mostrar/ocultar según selección
             itemAbrir.Visible = algunItemSeleccionado;
             itemAbrirCon.Visible = algunItemSeleccionado;
-            itemCortar.Visible = algunItemSeleccionado;
             itemCopiar.Visible = algunItemSeleccionado;
             itemRenombrar.Visible = algunItemSeleccionado;
             itemEliminar.Visible = algunItemSeleccionado;
             itemFijar.Visible = algunItemSeleccionado;
             itemFavorito.Visible = algunItemSeleccionado;
+            itemEnviarCorreo.Visible = algunItemSeleccionado && File.Exists(GetSelectedPath());
             itemPropiedades.Visible = algunItemSeleccionado;
 
             // Mostrar "Vaciar Favoritos" si estamos dentro de la vista Favoritos, o si el elemento seleccionado es la carpeta Favoritos
@@ -310,6 +319,9 @@ public partial class Form1 : Form
                 itemAppData.Visible = dataExt.Contains(ext);
                 itemMusic.Visible = mediaExt.Contains(ext);
                 itemTexto.Visible = dataExt.Contains(ext) || new[] { ".cs", ".html", ".css", ".js", ".md", ".py" }.Contains(ext);
+                
+                string[] officeExt = { ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx" };
+                itemOffice.Visible = officeExt.Contains(ext);
             }
         };
     }
@@ -347,6 +359,37 @@ public partial class Form1 : Form
      * para delegar la ejecucion al visor predeterminado
      * del sistema operativo, lo que permite abrir cualquier tipo de archivo*/
     private void AbrirConSistema(string ruta) => Process.Start(new ProcessStartInfo { FileName = ruta, UseShellExecute = true });
+
+    /* AbrirConOffice determina la aplicación de Office correspondiente (Word, Excel o PowerPoint)
+     * basándose en la extensión de archivo y la inicia pasándole la ruta del archivo */
+    private void AbrirConOffice(string ruta)
+    {
+        try
+        {
+            string ext = Path.GetExtension(ruta).ToLower();
+            string? exeName = ext switch
+            {
+                ".doc" or ".docx" => "winword.exe",
+                ".xls" or ".xlsx" or ".csv" => "excel.exe",
+                ".ppt" or ".pptx" => "powerpnt.exe",
+                _ => null
+            };
+
+            if (exeName != null)
+            {
+                Process.Start(new ProcessStartInfo { FileName = exeName, Arguments = $"\"{ruta}\"", UseShellExecute = true });
+            }
+            else
+            {
+                // Fallback al comportamiento del sistema
+                Process.Start(new ProcessStartInfo { FileName = ruta, UseShellExecute = true });
+            }
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Error al intentar abrir el archivo en Microsoft Office: {ex.Message}", "Error de Apertura", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+    }
 
     //Almacenan la referencia del archivo en el portapapeles del sistema operativo para transacciones I/O futuras
     private void CortarArchivo(string ruta)
@@ -653,7 +696,7 @@ public partial class Form1 : Form
 
         listViewPrincipal.ShowGroups = true;
 
-        // OwnerDraw para diseño Retro 95
+        // OwnerDraw para diseño clásico 95
         listViewPrincipal.OwnerDraw = true;
         listViewPrincipal.DrawColumnHeader += ThemeRenderer.DrawListViewColumnHeader;
         listViewPrincipal.DrawItem += ThemeRenderer.DrawListViewItem;
@@ -666,7 +709,7 @@ public partial class Form1 : Form
         pnlTop.BackColor = ThemeRenderer.SecondaryBg;
         pnlTop.Height = 80;
         pnlTop.Controls.Clear();
-        pnlTop.Paint += (s, e) => ThemeRenderer.DrawRetroBorder(e.Graphics, pnlTop.ClientRectangle, true);
+        pnlTop.Paint += (s, e) => ThemeRenderer.DrawClassicBorder(e.Graphics, pnlTop.ClientRectangle, true);
 
         // Arrastrar Ventana
         bool isDragging = false;
@@ -691,7 +734,7 @@ public partial class Form1 : Form
         Button btnCopiarRuta = new Button();
         btnCopiarRuta.Size = new Size(35, 36);
         btnCopiarRuta.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-        ConfigurarBotonRetro(btnCopiarRuta, "📋");
+        ConfigurarBotonClasico(btnCopiarRuta, "📋");
         btnCopiarRuta.Click += (s, e) => {
             if (!string.IsNullOrEmpty(_rutaActual))
             {
@@ -727,7 +770,7 @@ public partial class Form1 : Form
         pnlSearch.BackColor = ThemeRenderer.SecondaryBg;
         pnlSearch.Height = 65;
         pnlSearch.Controls.Clear();
-        pnlSearch.Paint += (s, e) => ThemeRenderer.DrawRetroBorder(e.Graphics, pnlSearch.ClientRectangle, true);
+        pnlSearch.Paint += (s, e) => ThemeRenderer.DrawClassicBorder(e.Graphics, pnlSearch.ClientRectangle, true);
 
         pnlSearch.MouseDown += (s, e) => { if (e.Button == MouseButtons.Left) { isDragging = true; lastCursor = e.Location; } };
         pnlSearch.MouseMove += (s, e) => { if (isDragging) { this.Location = new Point(this.Location.X + (e.X - lastCursor.X), this.Location.Y + (e.Y - lastCursor.Y)); } };
@@ -740,7 +783,7 @@ public partial class Form1 : Form
         pnlSearchBorder.BackColor = Color.White;
         
         pnlSearchBorder.Paint += (s, e) => {
-            ThemeRenderer.DrawRetroBorder(e.Graphics, pnlSearchBorder.ClientRectangle, false); // Sunken
+            ThemeRenderer.DrawClassicBorder(e.Graphics, pnlSearchBorder.ClientRectangle, false); // Sunken
         };
         
         txtBuscar.BackColor = Color.White;
@@ -763,22 +806,22 @@ public partial class Form1 : Form
         _pnlFiltros.BackColor = ThemeRenderer.MainBg;
         _pnlFiltros.Height = 55;
         _pnlFiltros.Padding = new Padding(15, 12, 0, 0);
-        _pnlFiltros.Paint += (s, e) => ThemeRenderer.DrawRetroBorder(e.Graphics, _pnlFiltros.ClientRectangle, true);
+        _pnlFiltros.Paint += (s, e) => ThemeRenderer.DrawClassicBorder(e.Graphics, _pnlFiltros.ClientRectangle, true);
 
         // --- Configurar Botones (Estilo Clásico 3D) ---
-        ConfigurarBotonRetro(btnAtras, "◀️");
-        ConfigurarBotonRetro(btnSubir, "🔼");
-        ConfigurarBotonRetro(btnActualizar, "🔄");
-        ConfigurarBotonRetro(btnNuevaCarpeta, "📁");
-        ConfigurarBotonRetro(btnExportarCSV, "📤");
-        ConfigurarBotonRetro(_btnToggleVista, "🖼️");
-        ConfigurarBotonRetro(_btnAppData, "📊");
-        ConfigurarBotonRetro(btnCamara, "📷");
+        ConfigurarBotonClasico(btnAtras, "◀️");
+        ConfigurarBotonClasico(btnSubir, "🔼");
+        ConfigurarBotonClasico(btnActualizar, "🔄");
+        ConfigurarBotonClasico(btnNuevaCarpeta, "📁");
+        ConfigurarBotonClasico(btnExportarCSV, "📤");
+        ConfigurarBotonClasico(_btnToggleVista, "🖼️");
+        ConfigurarBotonClasico(_btnAppData, "📊");
+        ConfigurarBotonClasico(btnCamara, "📷");
 
         // --- Barra de Direcciones ---
         pnlAddressBorder.BackColor = Color.White;
         pnlAddressBorder.Paint += (s, e) => {
-            ThemeRenderer.DrawRetroBorder(e.Graphics, pnlAddressBorder.ClientRectangle, false); // Sunken
+            ThemeRenderer.DrawClassicBorder(e.Graphics, pnlAddressBorder.ClientRectangle, false); // Sunken
         };
         
         _flpBreadcrumbs = new FlowLayoutPanel
@@ -800,7 +843,7 @@ public partial class Form1 : Form
 
         // --- Elementos Decorativos y Barra de Estado ---
         pnlBottom.BackColor = ThemeRenderer.MainBg;
-        pnlBottom.Paint += (s, e) => ThemeRenderer.DrawRetroBorder(e.Graphics, pnlBottom.ClientRectangle, true);
+        pnlBottom.Paint += (s, e) => ThemeRenderer.DrawClassicBorder(e.Graphics, pnlBottom.ClientRectangle, true);
 
         // --- Barra de Estado y Papelera ---
         lblStatus.ForeColor = ThemeRenderer.MainText;
@@ -812,7 +855,7 @@ public partial class Form1 : Form
         
         pnlTrash.BackColor = ThemeRenderer.MainBg;
         pnlTrash.Paint += (s, e) => {
-            ThemeRenderer.DrawRetroBorder(e.Graphics, pnlTrash.ClientRectangle, false); // Sunken
+            ThemeRenderer.DrawClassicBorder(e.Graphics, pnlTrash.ClientRectangle, false); // Sunken
         };
         lblTrash.ForeColor = ThemeRenderer.MainText;
         lblTrash.Text = "🗑️ Papelera";
@@ -838,7 +881,7 @@ public partial class Form1 : Form
         Panel pnl = new Panel { Location = new Point(x, y), Size = new Size(ancho, 55), BackColor = Color.Transparent };
         Label lbl = new Label { Text = titulo, Location = new Point(5, 0), AutoSize = true, Font = new Font("Segoe UI", 8.5f, FontStyle.Bold), ForeColor = ThemeRenderer.SecondaryText };
         pnl.Controls.Add(lbl);
-        pnl.Paint += (s, e) => ThemeRenderer.DrawRetroBorder(e.Graphics, new Rectangle(0, 15, pnl.Width - 1, pnl.Height - 16), false);
+        pnl.Paint += (s, e) => ThemeRenderer.DrawClassicBorder(e.Graphics, new Rectangle(0, 15, pnl.Width - 1, pnl.Height - 16), false);
         return pnl;
     }
 
@@ -874,7 +917,7 @@ public partial class Form1 : Form
         return b;
     }
 
-    private void ConfigurarBotonRetro(Button btn, string text)
+    private void ConfigurarBotonClasico(Button btn, string text)
     {
         btn.FlatStyle = FlatStyle.Flat;
         btn.FlatAppearance.BorderSize = 0;
@@ -889,7 +932,7 @@ public partial class Form1 : Form
         btn.MouseUp += (s, e) => { isPressed = false; btn.Invalidate(); };
 
         btn.Paint += (s, e) => {
-            ThemeRenderer.DrawRetroBorder(e.Graphics, btn.ClientRectangle, !isPressed);
+            ThemeRenderer.DrawClassicBorder(e.Graphics, btn.ClientRectangle, !isPressed);
             if (isPressed)
             {
                 TextRenderer.DrawText(e.Graphics, btn.Text, btn.Font, 

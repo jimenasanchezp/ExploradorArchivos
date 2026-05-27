@@ -84,7 +84,7 @@ namespace ExploradorArchivos.Mp3
             this.Size = new Size(850, 550);
             this.StartPosition = FormStartPosition.CenterScreen;
 
-            this.Paint += (s, e) => DrawRetroBorder(e.Graphics, new Rectangle(0, 0, this.Width - 1, this.Height - 1), true);
+            this.Paint += (s, e) => DrawClassicBorder(e.Graphics, new Rectangle(0, 0, this.Width - 1, this.Height - 1), true);
 
             // === TITLE BAR ===
             Panel pnlTitleBar = new Panel { Dock = DockStyle.Top, Height = 32, BackColor = ThemeRenderer.SecondaryBg };
@@ -176,7 +176,7 @@ namespace ExploradorArchivos.Mp3
             Panel pnlCoverContainer = new Panel { Location = new Point(10, 10), Size = new Size(240, 240) };
             pnlCoverContainer.Paint += (s, e) => {
                 e.Graphics.FillRectangle(new SolidBrush(Color.White), pnlCoverContainer.ClientRectangle);
-                DrawRetroBorder(e.Graphics, new Rectangle(0,0, 239, 239), false);
+                DrawClassicBorder(e.Graphics, new Rectangle(0,0, 239, 239), false);
             };
             _picPortada = new PictureBox { Location = new Point(4, 4), Size = new Size(232, 232), SizeMode = PictureBoxSizeMode.Zoom, BackColor = Color.White };
             pnlCoverContainer.Controls.Add(_picPortada);
@@ -206,7 +206,7 @@ namespace ExploradorArchivos.Mp3
             _lstCola = new ListBox { Dock = DockStyle.Fill, BackColor = Color.White, Font = new Font(this.Font.FontFamily, 10), DrawMode = DrawMode.OwnerDrawFixed, ItemHeight = 35 };
             _lstCola.DrawItem += LstCola_DrawItem;
             Panel pnlListBorder = new Panel { Dock = DockStyle.Fill, Padding = new Padding(2) };
-            pnlListBorder.Paint += (s, e) => DrawRetroBorder(e.Graphics, pnlListBorder.ClientRectangle, false);
+            pnlListBorder.Paint += (s, e) => DrawClassicBorder(e.Graphics, pnlListBorder.ClientRectangle, false);
             pnlListBorder.Controls.Add(_lstCola);
             _pnlBiblioteca.Controls.AddRange(new Control[] { pnlListBorder, lblBib });
 
@@ -215,7 +215,7 @@ namespace ExploradorArchivos.Mp3
             Label lblCarp = new Label { Text = "🍧 Carpetas Locales", Dock = DockStyle.Top, Font = new Font(this.Font.FontFamily, 12, FontStyle.Bold), Height = 30 };
             _flowCarpetas = new FlowLayoutPanel { Dock = DockStyle.Fill, AutoScroll = true, BackColor = Color.White };
             Panel pnlFlowBorder = new Panel { Dock = DockStyle.Fill, Padding = new Padding(2) };
-            pnlFlowBorder.Paint += (s, e) => DrawRetroBorder(e.Graphics, pnlFlowBorder.ClientRectangle, false);
+            pnlFlowBorder.Paint += (s, e) => DrawClassicBorder(e.Graphics, pnlFlowBorder.ClientRectangle, false);
             pnlFlowBorder.Controls.Add(_flowCarpetas);
             _pnlCarpetas.Controls.AddRange(new Control[] { pnlFlowBorder, lblCarp });
 
@@ -225,7 +225,7 @@ namespace ExploradorArchivos.Mp3
             _rtbLetras = new RichTextBox { Dock = DockStyle.Fill, BackColor = VerdeMenta, BorderStyle = BorderStyle.None, ReadOnly = true, Font = new Font(this.Font.FontFamily, 11) };
             _rtbLetras.SelectionAlignment = HorizontalAlignment.Center;
             Panel pnlLetrasBorder = new Panel { Dock = DockStyle.Fill, Padding = new Padding(2) };
-            pnlLetrasBorder.Paint += (s, e) => DrawRetroBorder(e.Graphics, pnlLetrasBorder.ClientRectangle, false);
+            pnlLetrasBorder.Paint += (s, e) => DrawClassicBorder(e.Graphics, pnlLetrasBorder.ClientRectangle, false);
             pnlLetrasBorder.Controls.Add(_rtbLetras);
             _pnlLetras.Controls.AddRange(new Control[] { pnlLetrasBorder, lblLetras });
 
@@ -233,7 +233,7 @@ namespace ExploradorArchivos.Mp3
             _pnlGrabacion = new Panel { Dock = DockStyle.Fill, Visible = false, Padding = new Padding(10) };
             Label lblGrab = new Label { Text = "🎙️ Grabadora de Voz", Dock = DockStyle.Top, Font = new Font(this.Font.FontFamily, 12, FontStyle.Bold), Height = 30 };
             Panel pnlGrabBorder = new Panel { Dock = DockStyle.Fill, Padding = new Padding(2) };
-            pnlGrabBorder.Paint += (s, e) => DrawRetroBorder(e.Graphics, pnlGrabBorder.ClientRectangle, false);
+            pnlGrabBorder.Paint += (s, e) => DrawClassicBorder(e.Graphics, pnlGrabBorder.ClientRectangle, false);
             
             _btnGrabar = new Button {
                 Text = "🎙️ Grabar", Size = new Size(180, 60), FlatStyle = FlatStyle.Flat,
@@ -242,7 +242,7 @@ namespace ExploradorArchivos.Mp3
             };
             _btnGrabar.FlatAppearance.BorderSize = 0;
             _btnGrabar.Location = new Point(250, 150);
-            _btnGrabar.Paint += (s, e) => DrawRetroBorder(e.Graphics, new Rectangle(0,0, _btnGrabar.Width - 1, _btnGrabar.Height - 1), true);
+            _btnGrabar.Paint += (s, e) => DrawClassicBorder(e.Graphics, new Rectangle(0,0, _btnGrabar.Width - 1, _btnGrabar.Height - 1), true);
             pnlGrabBorder.Controls.Add(_btnGrabar);
 
             _pnlGrabacion.Controls.AddRange(new Control[] { pnlGrabBorder, lblGrab });
@@ -272,7 +272,7 @@ namespace ExploradorArchivos.Mp3
             _pnlGrabacion.Visible = (p == _pnlGrabacion);
         }
 
-        private void DrawRetroBorder(Graphics g, Rectangle bounds, bool raised)
+        private void DrawClassicBorder(Graphics g, Rectangle bounds, bool raised)
         {
             using Pen borderPen = new Pen(ColorTranslator.FromHtml("#DCDCDC"), 1);
             g.DrawRectangle(borderPen, bounds.X, bounds.Y, bounds.Width - 1, bounds.Height - 1);
@@ -287,7 +287,7 @@ namespace ExploradorArchivos.Mp3
             pnl.Paint += (s, e) => {
                 var rect = new Rectangle(2, 18, 330, 30);
                 e.Graphics.FillRectangle(new SolidBrush(Color.White), rect);
-                DrawRetroBorder(e.Graphics, rect, false);
+                DrawClassicBorder(e.Graphics, rect, false);
             };
             pnl.Controls.AddRange(new Control[] { lblDesc, lblValue });
             return pnl;
@@ -325,7 +325,7 @@ namespace ExploradorArchivos.Mp3
                 Cursor = Cursors.Hand
             };
             btn.FlatAppearance.BorderSize = 0;
-            btn.Paint += (s, e) => DrawRetroBorder(e.Graphics, new Rectangle(0,0, btn.Width - 1, btn.Height - 1), true);
+            btn.Paint += (s, e) => DrawClassicBorder(e.Graphics, new Rectangle(0,0, btn.Width - 1, btn.Height - 1), true);
             return btn;
         }
 
@@ -512,7 +512,7 @@ namespace ExploradorArchivos.Mp3
                     Margin = new Padding(10)
                 };
                 btn.FlatAppearance.BorderSize = 0;
-                btn.Paint += (s, e) => DrawRetroBorder(e.Graphics, new Rectangle(0,0, btn.Width - 1, btn.Height - 1), true);
+                btn.Paint += (s, e) => DrawClassicBorder(e.Graphics, new Rectangle(0,0, btn.Width - 1, btn.Height - 1), true);
                 
                 btn.Click += (s, e) => {
                     var archivos = Directory.GetFiles(r, "*.*", SearchOption.TopDirectoryOnly)

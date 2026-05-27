@@ -7,7 +7,7 @@ namespace ExploradorArchivos.UI;
 
 public static class ThemeRenderer
 {
-    // === Total Pink Y2K Palette ===
+    // === Total Pink Classic Palette ===
     public static readonly Color MainBg = ColorTranslator.FromHtml("#FFF5F9");      // Rosa Crema muy claro
     public static readonly Color SecondaryBg = ColorTranslator.FromHtml("#FFD1EA"); // Rosa Pastel (Sidebar)
     public static readonly Color Accent = ColorTranslator.FromHtml("#FF80BF");      // Rosa Intenso (Botones/Tabs)
@@ -32,9 +32,9 @@ public static class ThemeRenderer
     public static int GetHoverIndex() => _hoverIndex;
 
     /// <summary>
-    /// Dibuja un borde retro 3D suave estilo Y2K.
+    /// Dibuja un borde clásico 3D suave.
     /// </summary>
-    public static void DrawRetroBorder(Graphics g, Rectangle bounds, bool raised)
+    public static void DrawClassicBorder(Graphics g, Rectangle bounds, bool raised)
     {
         Color light = Color.White;
         Color dark = Color.Gray;
@@ -91,7 +91,7 @@ public static class ThemeRenderer
 
         e.Graphics.FillRectangle(new SolidBrush(backColor), e.Bounds);
 
-        // Gridlines retro suaves
+        // Gridlines clásicos suaves
         e.Graphics.DrawLine(Pens.Lavender, e.Bounds.Left, e.Bounds.Bottom - 1, e.Bounds.Right, e.Bounds.Bottom - 1);
 
         StringFormat format = new StringFormat { LineAlignment = StringAlignment.Center, Trimming = StringTrimming.EllipsisCharacter };

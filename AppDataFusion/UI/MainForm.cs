@@ -13,7 +13,7 @@ namespace ExploradorArchivos.AppDataFusion;
 
 public partial class MainForm : Form
 {
-    // ── Data state ───────────────────────────────────────────────
+    // â”€â”€ Data state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     private readonly List<DataItem> _datos = new();
     private List<DataItem> _datosBase = new();
     private List<DataItem> _datosVista = new();
@@ -34,7 +34,7 @@ public partial class MainForm : Form
 
     private List<(string Display, string Clave)> _infoColumnas = new()
     {
-        ("ID","id"),("Nombre","nombre"),("Categoría","categoria"),
+        ("ID","id"),("Nombre","nombre"),("CategorÃ­a","categoria"),
         ("Valor","valor"),("Fecha","fecha"),("Fuente","fuente")
     };
 
@@ -42,7 +42,7 @@ public partial class MainForm : Form
 
     private static readonly List<(string Display, string Clave)> _colsDefault = new()
     {
-        ("ID","id"),("Nombre","nombre"),("Categoría","categoria"),
+        ("ID","id"),("Nombre","nombre"),("CategorÃ­a","categoria"),
         ("Valor","valor"),("Fecha","fecha"),("Fuente","fuente"),
         ("Latitud","latitude"),("Longitud","longitude")
     };
@@ -58,9 +58,9 @@ public partial class MainForm : Form
     private static bool EsMonedaDisplay(string display) =>
         _kwMoneda.Any(k => display.ToLower().Contains(k));
 
-    // ══════════════════════════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     //  CONSTRUCTOR
-    // ══════════════════════════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     public MainForm(string? rutaInicial = null)
     {
         _rutaInicial = rutaInicial;
@@ -73,7 +73,7 @@ public partial class MainForm : Form
         dgvTodos.CellPainting += DgvTodos_CellPainting!;
         ThemeRenderer.ApplyTheme(this);
 
-        Text = "DATA FUSION ARENA · DATA ENGINE";
+        Text = "DATA FUSION ARENA Â· DATA ENGINE";
         
         Load += async (s, e) =>
         {
@@ -104,7 +104,7 @@ public partial class MainForm : Form
             ActualizarEstadoBarra("Llamando a la API de Geocoding...");
             await GeocodingService.IdentificarCoordenadasAsync(_datos);
             await ActualizarTodoAsync();
-            ActualizarEstadoBarra("Geocodificación completada.");
+            ActualizarEstadoBarra("GeocodificaciÃ³n completada.");
         };
     }
 
@@ -160,12 +160,12 @@ public partial class MainForm : Form
         tabControl1.ItemSize = new Size(160, 42);
         tabControl1.SizeMode = TabSizeMode.Fixed;
 
-        ActualizarEstadoBarra("Listo — carga datos para comenzar.");
+        ActualizarEstadoBarra("Listo â€” carga datos para comenzar.");
     }
 
-    // ══════════════════════════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     //  COLUMN / COMBOBOX MANAGEMENT
-    // ══════════════════════════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
     private string TraducirClave(string display)
     {
@@ -262,9 +262,9 @@ public partial class MainForm : Form
         }
     }
 
-    // ══════════════════════════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     //  NUMERIC / CURRENCY DETECTION
-    // ══════════════════════════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
     private void DetectarNumericosYMoneda()
     {
@@ -297,9 +297,9 @@ public partial class MainForm : Form
         }
     }
 
-    // ══════════════════════════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     //  CHART
-    // ══════════════════════════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
     private void RefrescarCombosGrafica()
     {
@@ -319,7 +319,7 @@ public partial class MainForm : Form
         }
 
         int gi = cmbGrupoGrafica.FindStringExact(prevGrupo);
-        if (gi < 0) { gi = cmbGrupoGrafica.FindStringExact("Categoría"); if (gi < 0 && cmbGrupoGrafica.Items.Count > 0) gi = 0; }
+        if (gi < 0) { gi = cmbGrupoGrafica.FindStringExact("CategorÃ­a"); if (gi < 0 && cmbGrupoGrafica.Items.Count > 0) gi = 0; }
         if (gi >= 0 && gi < cmbGrupoGrafica.Items.Count) cmbGrupoGrafica.SelectedIndex = gi;
 
         int mi = cmbMetricaGrafica.FindStringExact(prevMetrica);
@@ -353,14 +353,14 @@ public partial class MainForm : Form
             {
                 if (grupoClv == "fecha") return item.Fecha.ToString("yyyy-MM");
                 if (grupoClv == "nombre") return item.Nombre;
-                if (grupoClv == "categoria") return string.IsNullOrWhiteSpace(item.Categoria) ? "(sin categoría)" : item.Categoria;
+                if (grupoClv == "categoria") return string.IsNullOrWhiteSpace(item.Categoria) ? "(sin categorÃ­a)" : item.Categoria;
                 if (grupoClv == "fuente") return item.Fuente;
                 if (grupoClv == "valor") return item.Valor.ToString("F2");
                 if (grupoClv == "id") return item.Id.ToString();
-                if (grupoClv == "latitude") return item.Latitude?.ToString("F4") ?? "(vacío)";
-                if (grupoClv == "longitude") return item.Longitude?.ToString("F4") ?? "(vacío)";
+                if (grupoClv == "latitude") return item.Latitude?.ToString("F4") ?? "(vacÃ­o)";
+                if (grupoClv == "longitude") return item.Longitude?.ToString("F4") ?? "(vacÃ­o)";
                 
-                return BuscarExtra(item, grupoClv) is { Length: > 0 } ev ? ev : "(vacío)";
+                return BuscarExtra(item, grupoClv) is { Length: > 0 } ev ? ev : "(vacÃ­o)";
             }
 
             double GetValor(DataItem item)
@@ -390,7 +390,7 @@ public partial class MainForm : Form
                 conteoGrupo[grupo] += 1;
             }
 
-            // Calcular valor final: promedio o suma según el tipo de métrica
+            // Calcular valor final: promedio o suma segÃºn el tipo de mÃ©trica
             var agrupado = sumaGrupo.ToDictionary(
                 kv => kv.Key,
                 kv => esSuma
@@ -408,15 +408,15 @@ public partial class MainForm : Form
 
             if (!contar && data.All(d => d.Value == 0))
             {
-                ActualizarEstadoBarra($"Aviso: La métrica '{metricaDisplay}' no contiene valores numéricos válidos.");
+                ActualizarEstadoBarra($"Aviso: La mÃ©trica '{metricaDisplay}' no contiene valores numÃ©ricos vÃ¡lidos.");
             }
 
-            // Título descriptivo: "Conteo", "Suma de X", "Promedio de X"
+            // TÃ­tulo descriptivo: "Conteo", "Suma de X", "Promedio de X"
             string metricaLabel = contar ? "Conteo"
                 : esSuma ? $"Suma de {metricaDisplay}"
                 : $"Promedio de {metricaDisplay}";
 
-            string grupoLabel = string.IsNullOrEmpty(grupoDisplay) ? "Categoría" : grupoDisplay;
+            string grupoLabel = string.IsNullOrEmpty(grupoDisplay) ? "CategorÃ­a" : grupoDisplay;
 
             var tipo = cmbTipoGrafica.Text switch
             {
@@ -428,7 +428,7 @@ public partial class MainForm : Form
             chartMain.SetData(data, tipo, $"{metricaLabel}  por  {grupoLabel}");
         }
         catch (Exception ex)
-        { chartMain.Limpiar(); ActualizarEstadoBarra($"Error en gráfica: {ex.Message}"); }
+        { chartMain.Limpiar(); ActualizarEstadoBarra($"Error en grÃ¡fica: {ex.Message}"); }
     }
 
     private void BtnActualizarGrafica_Click(object sender, EventArgs e) => ActualizarChart();
@@ -436,9 +436,9 @@ public partial class MainForm : Form
     private void CmbGrupoGrafica_SelectedIndexChanged(object sender, EventArgs e) => ActualizarChart();
     private void CmbMetricaGrafica_SelectedIndexChanged(object sender, EventArgs e) => ActualizarChart();
 
-    // ══════════════════════════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     //  FILE LOADING
-    // ══════════════════════════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
     private async void BtnCargarJson_Click(object? sender, EventArgs e) => await CargarConDialogoAsync("json");
     private async void BtnCargarCsv_Click(object? sender, EventArgs e) => await CargarConDialogoAsync("csv");
@@ -464,7 +464,7 @@ public partial class MainForm : Form
         await CargarArchivoAsync(Path.Combine(_dirDatos, "records.txt"), "txt", true);
         _ultimoTipoCargado = "";
         await ActualizarTodoAsync();
-        ActualizarEstadoBarra($"Todos los archivos cargados — {_datos.Count} registros.");
+        ActualizarEstadoBarra($"Todos los archivos cargados â€” {_datos.Count} registros.");
         MessageBox.Show($"Archivos cargados correctamente.\n\nTotal: {_datos.Count} registros.",
             "Data Fusion Arena", MessageBoxButtons.OK, MessageBoxIcon.Information);
     }
@@ -519,14 +519,14 @@ public partial class MainForm : Form
         await ActualizarTodoAsync();
         if (!silencioso)
             ActualizarEstadoBarra(
-                $"{nuevos.Count} registros cargados desde {Path.GetFileName(ruta)} — Total: {_datos.Count}");
+                $"{nuevos.Count} registros cargados desde {Path.GetFileName(ruta)} â€” Total: {_datos.Count}");
     }
 
 
 
-    // ══════════════════════════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     //  EXPORT FILES
-    // ══════════════════════════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
     private void BtnExportarCsv_Click(object? sender, EventArgs e) => _ = ExportarAsync("csv");
     private void BtnExportarJson_Click(object? sender, EventArgs e) => _ = ExportarAsync("json");
@@ -592,7 +592,7 @@ public partial class MainForm : Form
                 $"Exportado correctamente\n\n" +
                 $"Formato:   {formato.ToUpper()}\n" +
                 $"Registros: {snapshot.Count:N0}\n" +
-                $"Tamaño:    {size}\n\n" +
+                $"TamaÃ±o:    {size}\n\n" +
                 $"{dlg.FileName}",
                 "Exportar", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
@@ -604,76 +604,170 @@ public partial class MainForm : Form
         }
     }
 
-    // ══════════════════════════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     //  DATABASE CONNECTION (READ)
-    // ══════════════════════════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
     private async void BtnConectarPostgres_Click(object sender, EventArgs e)
     {
-        using var dlg = new FormConexionBD("PostgreSQL");
-        if (dlg.ShowDialog() != DialogResult.OK) return;
-
-        var pg = new PostgreSqlConnector(dlg.CadenaConexion, dlg.NombreTabla);
-        ActualizarEstadoBarra("Conectando a PostgreSQL...");
-
-        bool ok = await Task.Run(() => pg.ProbarConexion(out _));
-        if (!ok)
+        bool esEscritura = false;
+        if (_datosBase.Count > 0)
         {
-            pg.ProbarConexion(out string err);
-            MessageBox.Show($"Error:\n{err}", "PostgreSQL", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            ActualizarEstadoBarra("Error al conectar con PostgreSQL."); return;
+            var res = MessageBox.Show(
+                $"Se detectaron {_datosBase.Count} registros en memoria.\n\n" +
+                "¿Deseas MIGRAR (guardar) estos registros en una tabla de PostgreSQL?\n\n" +
+                "- Presiona SÍ para migrar los datos locales a la base de datos.\n" +
+                "- Presiona NO para conectar e importar (leer) datos desde la base de datos.",
+                "Seleccionar Acción - PostgreSQL",
+                MessageBoxButtons.YesNoCancel,
+                MessageBoxIcon.Question);
+
+            if (res == DialogResult.Cancel) return;
+            if (res == DialogResult.Yes) esEscritura = true;
         }
 
-        var cols = await Task.Run(() => pg.ObtenerNombresColumnas());
-        using var dlgCols = new FormSeleccionColumnas(cols, pg.MapeoColumnas);
-        if (dlgCols.ShowDialog() != DialogResult.OK) return;
+        using var dlg = new FormConexionBD("PostgreSQL", esEscritura);
+        if (dlg.ShowDialog() != DialogResult.OK) return;
 
-        pg.SobreescribirMapeo(dlgCols.ColCategoria, dlgCols.ColValor,
-                              dlgCols.ColNombre, dlgCols.ColFecha);
+        if (esEscritura)
+        {
+            ActualizarEstadoBarra($"Migrando {_datosBase.Count} registros a PostgreSQL (tabla: {dlg.NombreTabla})...");
+            try
+            {
+                var snapshot = new List<DataItem>(_datosVista.Count > 0 ? _datosVista : _datosBase);
+                var progreso = new Progress<int>(pct => ActualizarEstadoBarra($"Migrando a PostgreSQL: {pct}%"));
 
-        ActualizarEstadoBarra("Cargando datos PostgreSQL...");
-        var datos = await Task.Run(() => pg.LeerDatos());
+                var result = await DatabaseWriter.EscribirEnPostgreSQLAsync(
+                    dlg.CadenaConexion, dlg.NombreTabla, snapshot, _infoColumnas, progreso);
 
-        _lastPgConnector = pg;
-        _ultimoTipoCargado = "postgresql";
-        _datos.RemoveAll(d => d.Fuente == "postgresql");
-        DataProcessor.AgregarDatos(_datos, datos);
-        await ActualizarTodoAsync();
-        ActualizarEstadoBarra($"PostgreSQL: {datos.Count} registros cargados.");
+                if (result.Exito)
+                {
+                    ActualizarEstadoBarra($"Migrado a PostgreSQL: {result.Mensaje}");
+                    MessageBox.Show(result.Mensaje, "Migración Completada", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
+                else
+                {
+                    ActualizarEstadoBarra($"Error PostgreSQL: {result.Mensaje}");
+                    MessageBox.Show(result.Mensaje, "Error en la Migración", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+            }
+            catch (Exception ex)
+            {
+                ActualizarEstadoBarra($"Error: {ex.Message}");
+                MessageBox.Show($"Error al migrar a PostgreSQL:\n{ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+        else
+        {
+            var pg = new PostgreSqlConnector(dlg.CadenaConexion, dlg.NombreTabla);
+            ActualizarEstadoBarra("Conectando a PostgreSQL...");
+
+            bool ok = await Task.Run(() => pg.ProbarConexion(out _));
+            if (!ok)
+            {
+                pg.ProbarConexion(out string err);
+                MessageBox.Show($"Error:\n{err}", "PostgreSQL", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                ActualizarEstadoBarra("Error al conectar con PostgreSQL."); return;
+            }
+
+            var cols = await Task.Run(() => pg.ObtenerNombresColumnas());
+            using var dlgCols = new FormSeleccionColumnas(cols, pg.MapeoColumnas);
+            if (dlgCols.ShowDialog() != DialogResult.OK) return;
+
+            pg.SobreescribirMapeo(dlgCols.ColCategoria, dlgCols.ColValor,
+                                  dlgCols.ColNombre, dlgCols.ColFecha);
+
+            ActualizarEstadoBarra("Cargando datos PostgreSQL...");
+            var datos = await Task.Run(() => pg.LeerDatos());
+
+            _lastPgConnector = pg;
+            _ultimoTipoCargado = "postgresql";
+            _datos.RemoveAll(d => d.Fuente == "postgresql");
+            DataProcessor.AgregarDatos(_datos, datos);
+            await ActualizarTodoAsync();
+            ActualizarEstadoBarra($"PostgreSQL: {datos.Count} registros cargados.");
+        }
     }
 
     private async void BtnConectarMariaDB_Click(object sender, EventArgs e)
     {
-        using var dlg = new FormConexionBD("MariaDB");
-        if (dlg.ShowDialog() != DialogResult.OK) return;
-
-        var md = new MariaDbConnector(dlg.CadenaConexion, dlg.NombreTabla);
-        ActualizarEstadoBarra("Conectando a MariaDB...");
-
-        bool ok = await Task.Run(() => md.ProbarConexion(out _));
-        if (!ok)
+        bool esEscritura = false;
+        if (_datosBase.Count > 0)
         {
-            md.ProbarConexion(out string err);
-            MessageBox.Show($"Error:\n{err}", "MariaDB", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            ActualizarEstadoBarra("Error al conectar con MariaDB."); return;
+            var res = MessageBox.Show(
+                $"Se detectaron {_datosBase.Count} registros en memoria.\n\n" +
+                "¿Deseas MIGRAR (guardar) estos registros en una tabla de MariaDB?\n\n" +
+                "- Presiona SÍ para migrar los datos locales a la base de datos.\n" +
+                "- Presiona NO para conectar e importar (leer) datos desde la base de datos.",
+                "Seleccionar Acción - MariaDB",
+                MessageBoxButtons.YesNoCancel,
+                MessageBoxIcon.Question);
+
+            if (res == DialogResult.Cancel) return;
+            if (res == DialogResult.Yes) esEscritura = true;
         }
 
-        var cols = await Task.Run(() => md.ObtenerNombresColumnas());
-        using var dlgCols = new FormSeleccionColumnas(cols, md.MapeoColumnas);
-        if (dlgCols.ShowDialog() != DialogResult.OK) return;
+        using var dlg = new FormConexionBD("MariaDB", esEscritura);
+        if (dlg.ShowDialog() != DialogResult.OK) return;
 
-        md.SobreescribirMapeo(dlgCols.ColCategoria, dlgCols.ColValor,
-                              dlgCols.ColNombre, dlgCols.ColFecha);
+        if (esEscritura)
+        {
+            ActualizarEstadoBarra($"Migrando {_datosBase.Count} registros a MariaDB (tabla: {dlg.NombreTabla})...");
+            try
+            {
+                var snapshot = new List<DataItem>(_datosVista.Count > 0 ? _datosVista : _datosBase);
+                var progreso = new Progress<int>(pct => ActualizarEstadoBarra($"Migrando a MariaDB: {pct}%"));
 
-        ActualizarEstadoBarra("Cargando datos MariaDB...");
-        var datos = await Task.Run(() => md.LeerDatos());
+                var result = await DatabaseWriter.EscribirEnMariaDBAsync(
+                    dlg.CadenaConexion, dlg.NombreTabla, snapshot, _infoColumnas, progreso);
 
-        _lastMdConnector = md;
-        _ultimoTipoCargado = "mariadb";
-        _datos.RemoveAll(d => d.Fuente == "mariadb");
-        DataProcessor.AgregarDatos(_datos, datos);
-        await ActualizarTodoAsync();
-        ActualizarEstadoBarra($"MariaDB: {datos.Count} registros cargados.");
+                if (result.Exito)
+                {
+                    ActualizarEstadoBarra($"Migrado a MariaDB: {result.Mensaje}");
+                    MessageBox.Show(result.Mensaje, "Migración Completada", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
+                else
+                {
+                    ActualizarEstadoBarra($"Error MariaDB: {result.Mensaje}");
+                    MessageBox.Show(result.Mensaje, "Error en la Migración", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+            }
+            catch (Exception ex)
+            {
+                ActualizarEstadoBarra($"Error: {ex.Message}");
+                MessageBox.Show($"Error al migrar a MariaDB:\n{ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+        else
+        {
+            var md = new MariaDbConnector(dlg.CadenaConexion, dlg.NombreTabla);
+            ActualizarEstadoBarra("Conectando a MariaDB...");
+
+            bool ok = await Task.Run(() => md.ProbarConexion(out _));
+            if (!ok)
+            {
+                md.ProbarConexion(out string err);
+                MessageBox.Show($"Error:\n{err}", "MariaDB", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                ActualizarEstadoBarra("Error al conectar con MariaDB."); return;
+            }
+
+            var cols = await Task.Run(() => md.ObtenerNombresColumnas());
+            using var dlgCols = new FormSeleccionColumnas(cols, md.MapeoColumnas);
+            if (dlgCols.ShowDialog() != DialogResult.OK) return;
+
+            md.SobreescribirMapeo(dlgCols.ColCategoria, dlgCols.ColValor,
+                                  dlgCols.ColNombre, dlgCols.ColFecha);
+
+            ActualizarEstadoBarra("Cargando datos MariaDB...");
+            var datos = await Task.Run(() => md.LeerDatos());
+
+            _lastMdConnector = md;
+            _ultimoTipoCargado = "mariadb";
+            _datos.RemoveAll(d => d.Fuente == "mariadb");
+            DataProcessor.AgregarDatos(_datos, datos);
+            await ActualizarTodoAsync();
+            ActualizarEstadoBarra($"MariaDB: {datos.Count} registros cargados.");
+        }
     }
 
     private async void BtnRefresh_Click(object sender, EventArgs e)
@@ -681,7 +775,7 @@ public partial class MainForm : Form
         if (_lastPgConnector == null && _lastMdConnector == null)
         {
             MessageBox.Show("No hay bases de datos conectadas.",
-                "Sin conexión", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                "Sin conexiÃ³n", MessageBoxButtons.OK, MessageBoxIcon.Information);
             return;
         }
         _datos.RemoveAll(d => d.Fuente is "postgresql" or "mariadb");
@@ -699,12 +793,12 @@ public partial class MainForm : Form
             (_lastPgConnector != null && _lastMdConnector == null) ? "postgresql" :
             (_lastMdConnector != null && _lastPgConnector == null) ? "mariadb" : "";
         await ActualizarTodoAsync();
-        ActualizarEstadoBarra($"Datos actualizados — Total: {_datos.Count}");
+        ActualizarEstadoBarra($"Datos actualizados â€” Total: {_datos.Count}");
     }
 
-    // ══════════════════════════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     //  FILTER / SORT
-    // ══════════════════════════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
     private async void BtnFiltrar_Click(object? sender, EventArgs e)
     {
@@ -715,7 +809,7 @@ public partial class MainForm : Form
             ? new List<DataItem>(_datosBase)
             : await Task.Run(() => DataProcessor.Filtrar(_datosBase, clave, valor));
         await BindGridAsync(dgvTodos, _datosVista, lblContadorTodos);
-        ActualizarEstadoBarra($"Filtro '{display}' = '{valor}' → {_datosVista.Count} resultados.");
+        ActualizarEstadoBarra($"Filtro '{display}' = '{valor}' â†’ {_datosVista.Count} resultados.");
     }
 
     private async void BtnLimpiarFiltro_Click(object? sender, EventArgs e)
@@ -723,7 +817,7 @@ public partial class MainForm : Form
         txtBusqueda.Text = "";
         _datosVista = new List<DataItem>(_datosBase);
         await BindGridAsync(dgvTodos, _datosVista, lblContadorTodos);
-        ActualizarEstadoBarra($"Filtro limpiado — {_datosVista.Count} registros.");
+        ActualizarEstadoBarra($"Filtro limpiado â€” {_datosVista.Count} registros.");
     }
 
     private async void BtnOrdenar_Click(object? sender, EventArgs e)
@@ -733,12 +827,12 @@ public partial class MainForm : Form
         ActualizarEstadoBarra("Ordenando con LINQ...");
         _datosVista = await Task.Run(() => DataProcessor.OrdenarLinq(_datosVista, clave, asc));
         await BindGridAsync(dgvTodos, _datosVista, lblContadorTodos);
-        ActualizarEstadoBarra($"LINQ: Ordenado por '{display}' {(asc ? "↑ Asc" : "↓ Desc")} — {_datosVista.Count} registros.");
+        ActualizarEstadoBarra($"LINQ: Ordenado por '{display}' {(asc ? "â†‘ Asc" : "â†“ Desc")} â€” {_datosVista.Count} registros.");
     }
 
-    // ══════════════════════════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     //  CATEGORIES
-    // ══════════════════════════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
     private async void LstCategorias_SelectedIndexChanged(object? sender, EventArgs e)
     {
@@ -751,15 +845,15 @@ public partial class MainForm : Form
 
 
 
-    // ══════════════════════════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     //  STATISTICS TAB
-    // ══════════════════════════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 
 
-    // ══════════════════════════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     //  PROCESSING / LINQ
-    // ══════════════════════════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
     private async void BtnDetectarDuplicados_Click(object? sender, EventArgs e)
     {
@@ -775,8 +869,8 @@ public partial class MainForm : Form
 
     private async void BtnEliminarDuplicados_Click(object? sender, EventArgs e)
     {
-        if (MessageBox.Show("¿Eliminar duplicados? Esta acción no se puede deshacer.",
-            "Confirmar eliminación", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes) return;
+        if (MessageBox.Show("Â¿Eliminar duplicados? Esta acciÃ³n no se puede deshacer.",
+            "Confirmar eliminaciÃ³n", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes) return;
         int antes = _datos.Count;
         var limpia = await Task.Run(() => DataProcessor.EliminarDuplicados(_datos));
         _datos.Clear(); _datos.AddRange(limpia);
@@ -808,7 +902,7 @@ public partial class MainForm : Form
 
     private async void BtnLinqGroupBy_Click(object? sender, EventArgs e)
     {
-        ActualizarEstadoBarra("LINQ GroupBy (Categoría)...");
+        ActualizarEstadoBarra("LINQ GroupBy (CategorÃ­a)...");
         var res = await Task.Run(() => _datosBase.GroupBy(d => d.Categoria)
             .Select(g => new DataItem { 
                 Id = 0, 
@@ -820,7 +914,7 @@ public partial class MainForm : Form
             }).ToList());
             
         await BindGridAsync(dgvProcesamiento, res, null);
-        lblProcInfo.Text = $"LINQ .GroupBy(): {res.Count} grupos creados por Categoría.";
+        lblProcInfo.Text = $"LINQ .GroupBy(): {res.Count} grupos creados por CategorÃ­a.";
     }
 
     private async void BtnLinqOrderBy_Click(object? sender, EventArgs e)
@@ -842,13 +936,13 @@ public partial class MainForm : Form
 
 
 
-    // ══════════════════════════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     //  UPDATE ALL
-    // ══════════════════════════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
     private async Task ActualizarTodoAsync()
     {
-        // El geocoding ahora solo se activa manualmente con el botón de la API para mayor velocidad de carga.
+        // El geocoding ahora solo se activa manualmente con el botÃ³n de la API para mayor velocidad de carga.
         // await GeocodingService.IdentificarCoordenadasAsync(_datos);
 
         _porCategoria = DataProcessor.AgruparPorCategoria(_datos);
@@ -879,7 +973,7 @@ public partial class MainForm : Form
     {
         int count = _datos.Count;
         int sources = _datos.Select(d => d.Fuente).Distinct().Count();
-        lblSubtext.Text = $"{count:N0} registros fusionados · {sources} fuente{(sources != 1 ? "s" : "")} activa{(sources != 1 ? "s" : "")}";
+        lblSubtext.Text = $"{count:N0} registros fusionados Â· {sources} fuente{(sources != 1 ? "s" : "")} activa{(sources != 1 ? "s" : "")}";
     }
 
     private List<DataItem> GetDatosBase()
@@ -926,9 +1020,9 @@ public partial class MainForm : Form
         });
     }
 
-    // ══════════════════════════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     //  BIND GRID
-    // ══════════════════════════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
     private async Task BindGridAsync(DataGridView dgv, List<DataItem> items,
         Label? contadorLabel, bool usarColsDefault = false)
@@ -997,7 +1091,7 @@ public partial class MainForm : Form
         dgv.CellFormatting -= DgvCellFormatting!;
         dgv.CellFormatting += DgvCellFormatting!;
 
-        // Forzar dibujo de líneas si no están por defecto
+        // Forzar dibujo de lÃ­neas si no estÃ¡n por defecto
         dgv.CellBorderStyle = DataGridViewCellBorderStyle.Single;
         dgv.GridColor = Color.LightGray;
 
@@ -1091,9 +1185,9 @@ public partial class MainForm : Form
         }
     }
 
-    // ══════════════════════════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     //  GRID SETUP
-    // ══════════════════════════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
     private void ConfigurarDataGridViews()
     {
@@ -1110,7 +1204,7 @@ public partial class MainForm : Form
             dgv.RowHeadersBorderStyle = DataGridViewHeaderBorderStyle.Single;
             dgv.GridColor = Color.FromArgb(220, 220, 230);
 
-            // Scroll y Columnas (Prevención de Columnas Aplastadas)
+            // Scroll y Columnas (PrevenciÃ³n de Columnas Aplastadas)
             dgv.ScrollBars = ScrollBars.Both;
             dgv.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None; // Permite el scroll horizontal
             dgv.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize;
@@ -1126,9 +1220,9 @@ public partial class MainForm : Form
         }
     }
 
-    // ══════════════════════════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     //  STATUS BAR
-    // ══════════════════════════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
     private void ActualizarEstadoBarra(string mensaje)
     {
@@ -1139,9 +1233,9 @@ public partial class MainForm : Form
         Application.DoEvents();
     }
 
-    // ══════════════════════════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     //  HELPERS
-    // ══════════════════════════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
     private static string BuscarExtra(DataItem item, string clave)
     {
@@ -1154,7 +1248,7 @@ public partial class MainForm : Form
 
     private void MenuLimpiarDatos_Click(object sender, EventArgs e)
     {
-        if (MessageBox.Show("¿Limpiar todos los datos en memoria?", "Confirmar",
+        if (MessageBox.Show("Â¿Limpiar todos los datos en memoria?", "Confirmar",
             MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
 
         _datos.Clear(); _porCategoria.Clear(); _porId.Clear();
@@ -1171,7 +1265,7 @@ public partial class MainForm : Form
         cmbGrupoGrafica?.Items.Clear();
         cmbMetricaGrafica?.Items.Clear();
         txtLinqFiltro.Text = "";
-        lblProcInfo.Text = "Selecciona una operación.";
+        lblProcInfo.Text = "Selecciona una operaciÃ³n.";
         btnEliminarDuplicados.Enabled = false;
         chartMain.Limpiar();
         lblContadorTodos.Text = "0 registros";
@@ -1191,11 +1285,11 @@ public partial class MainForm : Form
     private void MenuAcercaDe_Click(object sender, EventArgs e) =>
         MessageBox.Show(
             "Data Fusion Arena\n" +
-            "Administración y Organización de Datos\n\n" +
-            "Ingeniería · 4.º Semestre · C# .NET 10 · WinForms\n\n" +
-            "Fuentes:  JSON · CSV · XML · TXT · PostgreSQL · MariaDB\n" +
-            "Exportar: CSV · JSON · XML · TXT · BD\n" +
-            "Estructuras: List<T> · Dictionary<TKey,TValue> · LINQ",
+            "AdministraciÃ³n y OrganizaciÃ³n de Datos\n\n" +
+            "IngenierÃ­a Â· 4.Âº Semestre Â· C# .NET 10 Â· WinForms\n\n" +
+            "Fuentes:  JSON Â· CSV Â· XML Â· TXT Â· PostgreSQL Â· MariaDB\n" +
+            "Exportar: CSV Â· JSON Â· XML Â· TXT Â· BD\n" +
+            "Estructuras: List<T> Â· Dictionary<TKey,TValue> Â· LINQ",
             "Acerca de Data Fusion Arena",
             MessageBoxButtons.OK, MessageBoxIcon.Information);
 
@@ -1207,11 +1301,11 @@ public partial class MainForm : Form
         
         var comparison = new[]
         {
-            ("Socket / Zócalo", "LGA 1851 (Arrow Lake)", "AM5"),
+            ("Socket / ZÃ³calo", "LGA 1851 (Arrow Lake)", "AM5"),
             ("Carriles PCIe 4.0", "24 PCIe 4.0", "12 PCIe 4.0"),
             ("Carriles PCIe 5.0", "24 PCIe 5.0", "24 PCIe 5.0"),
-            ("Overclocking RAM", "Sí (CPU y RAM)", "Sí (CPU y todo)"),
-            ("Overclocking CPU", "Sí (en CPU)", "Sí (en todo)"),
+            ("Overclocking RAM", "SÃ­ (CPU y RAM)", "SÃ­ (CPU y todo)"),
+            ("Overclocking CPU", "SÃ­ (en CPU)", "SÃ­ (en todo)"),
             ("Puertos USB", "Hasta 4 puertos", "Hasta 8 puertos")
         };
 
@@ -1222,7 +1316,7 @@ public partial class MainForm : Form
             {
                 Id = id++,
                 Nombre = feat,
-                Categoria = "Característica",
+                Categoria = "CaracterÃ­stica",
                 Valor = 100,
                 Fuente = "csv",
                 Fecha = DateTime.Now

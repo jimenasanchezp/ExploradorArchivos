@@ -16,7 +16,7 @@ public static class LyricsService
     static LyricsService()
     {
         // Configurar User-Agent (buena práctica para APIs)
-        _httpClient.DefaultRequestHeaders.Add("User-Agent", "ExploradorArchivos-Y2K-Player/1.0");
+        _httpClient.DefaultRequestHeaders.Add("User-Agent", "ExploradorArchivos-Classic-Player/1.0");
     }
 
     /// <summary>

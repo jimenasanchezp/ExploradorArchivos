@@ -72,7 +72,7 @@ public partial class AppCamaraForm : Form
             BackColor = ThemeRenderer.SecondaryBg,
             Padding   = new Padding(80, 10, 10, 10)
         };
-        pnlTop.Paint += (s, e) => ThemeRenderer.DrawRetroBorder(e.Graphics, pnlTop.ClientRectangle, true);
+        pnlTop.Paint += (s, e) => ThemeRenderer.DrawClassicBorder(e.Graphics, pnlTop.ClientRectangle, true);
 
         bool isDragging  = false;
         Point lastCursor = Point.Empty;
@@ -108,7 +108,7 @@ public partial class AppCamaraForm : Form
             BackColor = ThemeRenderer.MainBg,
             Padding   = new Padding(15)
         };
-        pnlBottom.Paint += (s, e) => ThemeRenderer.DrawRetroBorder(e.Graphics, pnlBottom.ClientRectangle, true);
+        pnlBottom.Paint += (s, e) => ThemeRenderer.DrawClassicBorder(e.Graphics, pnlBottom.ClientRectangle, true);
 
         // ── Fila 1: Selector de cámara ───────────────────────────────────────
         Label lblSelect = new Label
