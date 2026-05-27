@@ -32,6 +32,21 @@ public static class AppVideoProcessor
         return await EjecutarComando(arguments);
     }
 
+    /// <summary>
+    /// Convierte un archivo AVI (grabado por la cámara) a MP4/H.264.
+    /// Requiere ffmpeg.exe en la carpeta de la aplicación.
+    /// </summary>
+    public static async Task<bool> ConvertirAviAMp4(string inputAvi, string outputMp4)
+    {
+        // -vcodec libx264   → codec H.264
+        // -pix_fmt yuv420p  → compatibilidad máxima con reproductores
+        // -preset ultrafast → velocidad máxima (prioridad sobre tamaño)
+        // -crf 23           → calidad razonable
+        // -an               → sin audio (la cámara no captura audio en este flujo)
+        string arguments = $"-i \"{inputAvi}\" -vcodec libx264 -pix_fmt yuv420p -preset ultrafast -crf 23 -an \"{outputMp4}\" -y";
+        return await EjecutarComando(arguments);
+    }
+
     public static async Task<bool> ExtraerAudio(string input, string output)
     {
         string arguments = $"-i \"{input}\" -vn -ab 192k -ar 44100 -y \"{output}\"";

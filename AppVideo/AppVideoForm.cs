@@ -248,9 +248,12 @@ public partial class AppVideoForm : Form
         _mediaPlayer.Play(media);
         
         _mediaPlayer.LengthChanged += (s, e) => {
-            this.BeginInvoke(new Action(() => {
-                lblTiempoFin.Text = TimeSpan.FromMilliseconds(e.Length).ToString(@"hh\:mm\:ss");
-            }));
+            if (this.IsHandleCreated)
+            {
+                this.BeginInvoke(new Action(() => {
+                    lblTiempoFin.Text = TimeSpan.FromMilliseconds(e.Length).ToString(@"hh\:mm\:ss");
+                }));
+            }
         };
 
         _timerUI.Start();
