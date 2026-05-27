@@ -154,7 +154,7 @@ public partial class AppCamaraForm : Form
         };
         btnCapturar.FlatAppearance.BorderSize = 0;
         btnCapturar.Click += BtnCapturar_Click;
-        btnCapturar.Paint += (s, e) => ThemeRenderer.DrawRetroBorder(e.Graphics, btnCapturar.ClientRectangle, true);
+        btnCapturar.Paint += (s, e) => ThemeRenderer.DrawClassicBorder(e.Graphics, btnCapturar.ClientRectangle, true);
 
         btnGrabar = new Button
         {
@@ -169,7 +169,7 @@ public partial class AppCamaraForm : Form
         };
         btnGrabar.FlatAppearance.BorderSize = 0;
         btnGrabar.Click += BtnGrabar_Click;
-        btnGrabar.Paint += (s, e) => ThemeRenderer.DrawRetroBorder(e.Graphics, btnGrabar.ClientRectangle, true);
+        btnGrabar.Paint += (s, e) => ThemeRenderer.DrawClassicBorder(e.Graphics, btnGrabar.ClientRectangle, true);
 
         Button btnCancelar = new Button
         {
@@ -184,7 +184,7 @@ public partial class AppCamaraForm : Form
         };
         btnCancelar.FlatAppearance.BorderSize = 0;
         btnCancelar.Click += (s, e) => { this.DialogResult = DialogResult.Cancel; this.Close(); };
-        btnCancelar.Paint += (s, e) => ThemeRenderer.DrawRetroBorder(e.Graphics, btnCancelar.ClientRectangle, true);
+        btnCancelar.Paint += (s, e) => ThemeRenderer.DrawClassicBorder(e.Graphics, btnCancelar.ClientRectangle, true);
 
         pnlBottom.Controls.AddRange(new Control[]
         {
