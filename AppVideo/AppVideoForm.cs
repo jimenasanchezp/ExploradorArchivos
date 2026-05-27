@@ -195,7 +195,7 @@ public partial class AppVideoForm : Form
         btn.Paint += (s, e) => ThemeRenderer.DrawClassicBorder(e.Graphics, btn.ClientRectangle, true);
         pnlTop.Controls.Add(btn);
     }
-
+    // Semáforos al estilo macOS
     private void ConfigurarSemaforos()
     {
         Panel pnlSemaforos = new Panel { Location = new Point(10, 25), Size = new Size(60, 20), BackColor = Color.Transparent };
