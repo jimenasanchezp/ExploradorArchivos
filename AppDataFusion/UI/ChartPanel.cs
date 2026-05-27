@@ -17,7 +17,7 @@ public class ChartPanel : Panel
     private TipoGrafica _tipo = TipoGrafica.Columnas;
     private string _titulo = "Sin datos — carga archivos primero";
 
-    // ── Paleta Kawaii 95 ────────────────────────────
+    // ── Paleta Clásica 95 ────────────────────────────
     private static readonly Color[] Palette =
     {
         Color.FromArgb(255, 128, 191), Color.FromArgb(255, 189, 227),

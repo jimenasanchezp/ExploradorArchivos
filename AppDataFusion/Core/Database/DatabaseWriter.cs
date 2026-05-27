@@ -9,8 +9,8 @@ namespace ExploradorArchivos.AppDataFusion.Database;
 /// Escribe registros DataItem en PostgreSQL o MariaDB exportando exactamente
 /// las mismas columnas que aparecen en el dataset cargado (sin columnas fijas).
 /// La lista de columnas y su mapeo se recibe desde MainForm._infoColumnas,
-/// igual que hace FileExportService, para que la tabla en BD sea idéntica
-/// a lo que se ve en pantalla y a lo que se exportaría a CSV/JSON/XML/TXT.
+/// igual que hace FileExportService, para que la tabla en BD sea idÃ©ntica
+/// a lo que se ve en pantalla y a lo que se exportarÃ­a a CSV/JSON/XML/TXT.
 /// </summary>
 public static class DatabaseWriter
 {
@@ -96,7 +96,7 @@ public static class DatabaseWriter
         string tabla,
         List<(string NombreDB, string Clave, string Display)> columnas)
     {
-        // Determinar tipo SQL por clave semántica
+        // Determinar tipo SQL por clave semÃ¡ntica
         string TipoSQL(string clave) => clave switch
         {
             "id" => "INTEGER",
@@ -133,15 +133,25 @@ public static class DatabaseWriter
             var (_, clave, display) = columnas[i];
             string rawVal = ObtenerValorExport(item, display, clave);
 
-            // Intentar parsear numérico/fecha para los tipos correctos
             object dbVal;
-            if (clave == "id" && int.TryParse(rawVal, out int idV))
-                dbVal = idV;
-            else if (clave == "valor" && double.TryParse(rawVal,
-                NumberStyles.Any, CultureInfo.InvariantCulture, out double dblV))
-                dbVal = dblV;
+            if (clave == "id")
+            {
+                if (int.TryParse(rawVal, out int idV))
+                    dbVal = idV;
+                else
+                    dbVal = DBNull.Value;
+            }
+            else if (clave == "valor")
+            {
+                if (double.TryParse(rawVal, NumberStyles.Any, CultureInfo.InvariantCulture, out double dblV))
+                    dbVal = dblV;
+                else
+                    dbVal = DBNull.Value;
+            }
             else
-                dbVal = rawVal;
+            {
+                dbVal = string.IsNullOrEmpty(rawVal) ? DBNull.Value : (object)rawVal;
+            }
 
             cmd.Parameters.AddWithValue($"@p{i}", dbVal);
         }
@@ -266,18 +276,103 @@ public static class DatabaseWriter
             string rawVal = ObtenerValorExport(item, display, clave);
 
             object dbVal;
-            if (clave == "id" && int.TryParse(rawVal, out int idV))
-                dbVal = idV;
-            else if (clave == "valor" && double.TryParse(rawVal,
-                NumberStyles.Any, CultureInfo.InvariantCulture, out double dblV))
-                dbVal = dblV;
+            if (clave == "id")
+            {
+                if (int.TryParse(rawVal, out int idV))
+                    dbVal = idV;
+                else
+                    dbVal = DBNull.Value;
+            }
+            else if (clave == "valor")
+            {
+                if (double.TryParse(rawVal, NumberStyles.Any, CultureInfo.InvariantCulture, out double dblV))
+                    dbVal = dblV;
+                else
+                    dbVal = DBNull.Value;
+            }
             else
-                dbVal = rawVal;
+            {
+                dbVal = string.IsNullOrEmpty(rawVal) ? DBNull.Value : (object)rawVal;
+            }
 
             cmd.Parameters.AddWithValue($"@p{i}", dbVal);
         }
 
         cmd.ExecuteNonQuery();
+    }
+
+    public static string BuildPostgreSqlConnectionString(string host, string puerto, string database, string usuario, string contrasena)
+    {
+        var builder = new NpgsqlConnectionStringBuilder
+        {
+            Host = host,
+            Port = int.TryParse(puerto, out int p) ? p : 5432,
+            Database = string.IsNullOrWhiteSpace(database) ? "postgres" : database,
+            Username = usuario,
+            Password = contrasena
+        };
+        return builder.ConnectionString;
+    }
+
+    public static string BuildMariaDbConnectionString(string host, string puerto, string database, string usuario, string contrasena)
+    {
+        var builder = new MySqlConnectionStringBuilder
+        {
+            Server = host,
+            Port = uint.TryParse(puerto, out uint p) ? p : 3306,
+            UserID = usuario,
+            Password = contrasena
+        };
+        if (!string.IsNullOrWhiteSpace(database))
+        {
+            builder.Database = database;
+        }
+        return builder.ConnectionString;
+    }
+
+    // --------------------------------------------------------------
+    //  OBTENER BASES DE DATOS DISPONIBLES
+    // --------------------------------------------------------------
+
+    public static List<string> ObtenerBasesDatosPostgreSQL(string host, string puerto, string usuario, string contrasena)
+    {
+        var dbs = new List<string>();
+        try
+        {
+            string connStr = BuildPostgreSqlConnectionString(host, puerto, "postgres", usuario, contrasena);
+            using var conn = new NpgsqlConnection(connStr);
+            conn.Open();
+            using var cmd = new NpgsqlCommand(
+                "SELECT datname FROM pg_database WHERE datistemplate = false AND datallowconn = true ORDER BY datname;", conn);
+            using var r = cmd.ExecuteReader();
+            while (r.Read()) dbs.Add(r.GetString(0));
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[PostgreSQL] ObtenerBasesDatos: {ex.Message}");
+            throw;
+        }
+        return dbs;
+    }
+
+    public static List<string> ObtenerBasesDatosMariaDB(string host, string puerto, string usuario, string contrasena)
+    {
+        var dbs = new List<string>();
+        try
+        {
+            string connStr = BuildMariaDbConnectionString(host, puerto, "", usuario, contrasena);
+            using var conn = new MySqlConnection(connStr);
+            conn.Open();
+            using var cmd = new MySqlCommand("SHOW DATABASES;", conn);
+            using var r = cmd.ExecuteReader();
+            while (r.Read()) dbs.Add(r.GetString(0));
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[MariaDB] ObtenerBasesDatos: {ex.Message}");
+            throw;
+        }
+        return dbs;
     }
 
     // --------------------------------------------------------------
@@ -335,7 +430,7 @@ public static class DatabaseWriter
     /// - Usa el Display como nombre de columna en BD (sanitizado).
     /// - Elimina duplicados por nombre sanitizado (el primero gana).
     /// Esto garantiza que la tabla en BD tenga exactamente las mismas columnas
-    /// que se ven en el DataGridView y que se exportarían a CSV/JSON/etc.
+    /// que se ven en el DataGridView y que se exportarÃ­an a CSV/JSON/etc.
     /// </summary>
     private static List<(string NombreDB, string Clave, string Display)> BuildColumnasSanitizadas(
         List<(string Display, string Clave)> infoColumnas)
@@ -357,9 +452,9 @@ public static class DatabaseWriter
 
     /// <summary>
     /// Obtiene el valor de una columna para un DataItem dado su Display y Clave.
-    /// Usa exactamente la misma lógica que FileExportService.GetValorExport,
+    /// Usa exactamente la misma lÃ³gica que FileExportService.GetValorExport,
     /// buscando primero en CamposExtra (valor RAW original del archivo)
-    /// y haciendo fallback a las propiedades estándar de DataItem.
+    /// y haciendo fallback a las propiedades estÃ¡ndar de DataItem.
     /// </summary>
     private static string ObtenerValorExport(DataItem item, string display, string clave)
     {
@@ -367,7 +462,7 @@ public static class DatabaseWriter
         if (item.CamposExtra.TryGetValue(display, out var v1) && v1 != null)
             return v1;
 
-        // 2. Buscar en CamposExtra por Display en minúsculas
+        // 2. Buscar en CamposExtra por Display en minÃºsculas
         if (item.CamposExtra.TryGetValue(display.ToLowerInvariant(), out var v2) && v2 != null)
             return v2;
 
@@ -375,7 +470,7 @@ public static class DatabaseWriter
         if (item.CamposExtra.TryGetValue(clave, out var v3) && v3 != null)
             return v3;
 
-        // 4. Fallback a propiedades estándar de DataItem
+        // 4. Fallback a propiedades estÃ¡ndar de DataItem
         return clave switch
         {
             "id" => item.Id.ToString(),

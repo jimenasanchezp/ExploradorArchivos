@@ -48,7 +48,7 @@ public partial class AppCamaraForm : Form
             BackColor = ThemeRenderer.SecondaryBg, 
             Padding = new Padding(80, 10, 10, 10) 
         };
-        pnlTop.Paint += (s, e) => ThemeRenderer.DrawRetroBorder(e.Graphics, pnlTop.ClientRectangle, true);
+        pnlTop.Paint += (s, e) => ThemeRenderer.DrawClassicBorder(e.Graphics, pnlTop.ClientRectangle, true);
 
         // Arrastrar Ventana
         bool isDragging = false;
@@ -85,7 +85,7 @@ public partial class AppCamaraForm : Form
             BackColor = ThemeRenderer.MainBg, 
             Padding = new Padding(15) 
         };
-        pnlBottom.Paint += (s, e) => ThemeRenderer.DrawRetroBorder(e.Graphics, pnlBottom.ClientRectangle, true);
+        pnlBottom.Paint += (s, e) => ThemeRenderer.DrawClassicBorder(e.Graphics, pnlBottom.ClientRectangle, true);
 
         // Selector de Cámara
         cbCamaras = new ComboBox
@@ -123,7 +123,7 @@ public partial class AppCamaraForm : Form
         };
         btnCapturar.FlatAppearance.BorderSize = 0;
         btnCapturar.Click += BtnCapturar_Click;
-        btnCapturar.Paint += (s, e) => ThemeRenderer.DrawRetroBorder(e.Graphics, btnCapturar.ClientRectangle, true);
+        btnCapturar.Paint += (s, e) => ThemeRenderer.DrawClassicBorder(e.Graphics, btnCapturar.ClientRectangle, true);
         pnlBottom.Controls.Add(btnCapturar);
 
         // Botón Cancelar
@@ -140,7 +140,7 @@ public partial class AppCamaraForm : Form
         };
         btnCancelar.FlatAppearance.BorderSize = 0;
         btnCancelar.Click += (s, e) => { this.DialogResult = DialogResult.Cancel; this.Close(); };
-        btnCancelar.Paint += (s, e) => ThemeRenderer.DrawRetroBorder(e.Graphics, btnCancelar.ClientRectangle, true);
+        btnCancelar.Paint += (s, e) => ThemeRenderer.DrawClassicBorder(e.Graphics, btnCancelar.ClientRectangle, true);
         pnlBottom.Controls.Add(btnCancelar);
 
         this.Controls.Add(picPreview);

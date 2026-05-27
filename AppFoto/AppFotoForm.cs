@@ -65,7 +65,7 @@ public partial class AppFotoForm : Form
 
         // Barra Superior Responsiva (80px de padding izquierdo para los semáforos)
         pnlTop = new Panel { Dock = DockStyle.Top, Height = 70, BackColor = ThemeRenderer.SecondaryBg, Padding = new Padding(80, 10, 10, 10) };
-        pnlTop.Paint += (s, e) => ThemeRenderer.DrawRetroBorder(e.Graphics, pnlTop.ClientRectangle, true);
+        pnlTop.Paint += (s, e) => ThemeRenderer.DrawClassicBorder(e.Graphics, pnlTop.ClientRectangle, true);
         
         // Arrastrar Ventana
         bool isDragging = false;
@@ -217,7 +217,7 @@ public partial class AppFotoForm : Form
         };
         btn.FlatAppearance.BorderSize = 0;
         btn.Click += (s, e) => accion();
-        btn.Paint += (s, e) => ThemeRenderer.DrawRetroBorder(e.Graphics, btn.ClientRectangle, true);
+        btn.Paint += (s, e) => ThemeRenderer.DrawClassicBorder(e.Graphics, btn.ClientRectangle, true);
         flowButtons.Controls.Add(btn);
     }
 

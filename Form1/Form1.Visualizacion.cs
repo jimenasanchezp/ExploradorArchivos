@@ -63,7 +63,7 @@ public partial class Form1
         };
 
         _pnlFiltros.Paint += (s, e) => {
-            ThemeRenderer.DrawRetroBorder(e.Graphics, _pnlFiltros.ClientRectangle, true);
+            ThemeRenderer.DrawClassicBorder(e.Graphics, _pnlFiltros.ClientRectangle, true);
         };
 
         splitContainerMain.Panel2.Controls.Add(_pnlFiltros);
@@ -94,7 +94,7 @@ public partial class Form1
                 Rectangle rect = btnTab.ClientRectangle;
                 if (!activo) { rect.Y += 2; rect.Height -= 2; }
 
-                ThemeRenderer.DrawRetroBorder(e.Graphics, rect, true);
+                ThemeRenderer.DrawClassicBorder(e.Graphics, rect, true);
                 
                 TextFormatFlags flags = TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter;
                 TextRenderer.DrawText(e.Graphics, btnTab.Text, btnTab.Font, rect, btnTab.ForeColor, flags);
@@ -154,7 +154,7 @@ public partial class Form1
             {
                 listViewPrincipal.View = View.Details;
             }
-            listViewPrincipal.OwnerDraw = true; // Siempre activo para diseño Retro
+            listViewPrincipal.OwnerDraw = true; // Siempre activo para diseño clásico
             listViewPrincipal.Invalidate();
         };
 

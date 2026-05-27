@@ -1,6 +1,6 @@
-# 📘 Documentación Arquitectónica Exhaustiva: Explorador de Archivos (Kawaii 95 / Soft Retro)
+# 📘 Documentación Arquitectónica Exhaustiva: Explorador de Archivos (Estilo Clásico / Soft Pastel)
 
-Este documento detalla a profundidad la arquitectura técnica completa del sistema de Explorador de Archivos, incluyendo su diseño estético retro *Kawaii 95*, el motor modular de sub-aplicaciones y la suite de ciencia de datos *AppData Fusion*.
+Este documento detalla a profundidad la arquitectura técnica completa del sistema de Explorador de Archivos, incluyendo su diseño estético clásico *Estilo 95*, el motor modular de sub-aplicaciones y la suite de ciencia de datos *AppData Fusion*.
 
 ---
 
@@ -57,7 +57,7 @@ Contiene la inicialización del formulario raíz, declaración de variables glob
     *   `EliminarArchivo(string)`: Invoca a `FileService.EnviarAPapelera(ruta)` y recarga la grilla.
     *   `RenombrarArchivo(string, string)`: Maneja el renombrado físico de archivos en disco.
     *   `MostrarPropiedades(string)`: Lanza un diálogo informativo con el peso exacto, fecha de creación y atributos del archivo.
-    *   `ConfigurarUI()`, `CrearGrupoHerramientas()`, `ConfigurarSemaforos()`, `ConfigurarBotonRetro()`, `ConectarEventos()`: Métodos de configuración inicial para aplicar la apariencia *Kawaii 95* con colores pastel, bordes biselados y botones redondeados.
+    *   `ConfigurarUI()`, `CrearGrupoHerramientas()`, `ConfigurarSemaforos()`, `ConfigurarBotonClasico()`, `ConectarEventos()`: Métodos de configuración inicial para aplicar la apariencia clásica con colores pastel, bordes biselados y botones redondeados.
 *   **Clases Anidadas:**
     *   `CustomMenuRenderer` (`ToolStripProfessionalRenderer`): Personaliza con GDI+ el pintado de menús contextuales para integrarlos a la estética pastel.
 
@@ -121,33 +121,29 @@ Motor asíncrono recursivo para exportar árboles completos de directorios.
 
 ---
 
-## 📂 4. Capa de Apariencia y Pintura GDI+ (`UI/` - Retro Theme Engine)
+## 📂 4. Capa de Apariencia y Pintura GDI+ (`UI/` - Classic Theme Engine)
 
 ### 📄 [ThemeRenderer.cs](file:///c:/Users/jimes/source/repos/ExploradorArchivos/UI/ThemeRenderer.cs)
 Establece la paleta de colores temáticos y las rutinas GDI+ para pintar de forma manual los controles.
-*   **Paleta Pastel Kawaii:**
+*   **Paleta Pastel Clásica:**
     *   `MainBg` ($#FFF5F9$): Rosa Crema ultra claro.
     *   `SecondaryBg` ($#FFD1EA$): Rosa Pastel para barras de menús.
     *   `Accent` ($#FF80BF$): Rosa Intenso de resalto.
     *   `FolderMusicBg` ($#E6D4F8$): Púrpura pastel.
     *   `VerdeMenta` ($#CFF5E7$): Verde menta pastel de contraste.
 *   **Métodos Clave:**
-    *   `static void DrawRetroBorder(Graphics g, Rectangle bounds, bool raised)`: Simula relieves 3D beveled clásicos mediante pinceles oscuros, grises y blancos de forma manual.
-    *   `static void DrawListViewColumnHeader(...)`: Dibuja cabeceras de columnas como botones retro 3D elevados.
+    *   `static void DrawClassicBorder(Graphics g, Rectangle bounds, bool raised)`: Simula relieves 3D beveled clásicos mediante pinceles oscuros, grises y blancos de forma manual.
+    *   `static void DrawListViewColumnHeader(...)`: Dibuja cabeceras de columnas como botones clásicos 3D elevados.
     *   `static void DrawListViewItem(...)`, `DrawListViewSubItem(...)`: Pinta celdas y filas de la grilla pintando colores pastel según la categoría y fuentes personalizadas.
     *   `static void DrawTreeNode(...)`: Pinta nodos del panel lateral con iconos personalizados.
-    *   `static void ApplyTheme(Control parent)`: Aplica de manera recursiva la tipografía y paleta rosa pastel retro a todos los sub-controles de la ventana.
+    *   `static void ApplyTheme(Control parent)`: Aplica de manera recursiva la tipografía y paleta rosa pastel clásica a todos los sub-controles de la ventana.
 
 ---
 
-### 📄 [RetroDesignHelper.cs](file:///c:/Users/jimes/source/repos/ExploradorArchivos/UI/RetroDesignHelper.cs)
+### 📄 [ClassicDesignHelper.cs](file:///c:/Users/jimes/source/repos/ExploradorArchivos/UI/ClassicDesignHelper.cs)
 Provee asistentes gráficos y de comportamiento estético para el explorador.
 *   **Métodos Clave:**
-    *   `static void AplicarBordeRetro(Control, Color)`: Vincula bordes biselados 3D a paneles y cajas de texto.
-    *   `static void AplicarBordeRedondeado(Button, int, Color?)`: Modifica la región de botones para esquinas curvas.
-    *   `static void AplicarHoverPastel(Control, Color, Color)`: Vincula dinámicamente eventos `MouseEnter` y `MouseLeave` para alternar colores de acento retro de forma interactiva.
-    *   `static void AplicarGradientePastel(Panel, Color, Color)`: Rellena contenedores con suaves gradientes de color.
-    *   `static Color ObtenerColorCarpeta(string)`, `static string AgregaEmojiCarpeta(string)`: Lógica inteligente que colorea de morado carpetas de música, verde carpetas de descargas y asigna emojis representativos automáticos (🎵, ⬇️).
+    *   `static void AplicarBordeClasico(Control, Color)`: Vincula bordes biselados 3D a paneles y cajas de texto.
 
 ---
 

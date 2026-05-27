@@ -102,7 +102,7 @@ partial class MainForm
     {
         components = new System.ComponentModel.Container();
 
-    // ── Design tokens (Kawaii 95 / ThemeRenderer spec) ──────────────────────────────────────────────────────────
+    // ── Design tokens (Estilo Clásico / ThemeRenderer spec) ──────────────────────────────────────────────────────────
         var clrBg = ColorTranslator.FromHtml("#FFF5F9");      // MainBg
         var clrSurface = Color.White;                         // white surface
         var clrSurface2 = ColorTranslator.FromHtml("#FFE4F2"); // Hover (light pink)
@@ -319,9 +319,10 @@ partial class MainForm
         var lblDBTitle = SbSection("Bases de datos");
         btnSbPostgres = SbBtn("🐘  Conectar PostgreSQL", clrAcento, BtnConectarPostgres_Click!);
         btnSbMariaDB = SbBtn("🐬  Conectar MariaDB", clrAcento, BtnConectarMariaDB_Click!);
+        var btnSbRefresh = SbBtn("🔄  Actualizar BD", clrAcento, BtnRefresh_Click!);
 
         pnlSidebarDB.Controls.AddRange(new Control[]
-            { btnSbPostgres, btnSbMariaDB, lblDBTitle, sbDivDB });
+            { btnSbRefresh, btnSbMariaDB, btnSbPostgres, lblDBTitle, sbDivDB });
 
     // ── INTEGRATION SECTION ──────────────────────────────────────────────────────────
         pnlSidebarApi = new Panel { Dock = DockStyle.Top, AutoSize = true, BackColor = clrSidebar, Visible = true };
