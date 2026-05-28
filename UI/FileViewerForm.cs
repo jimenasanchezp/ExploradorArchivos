@@ -8,6 +8,10 @@ using System.Windows.Forms;
 
 namespace ExploradorArchivos.UI;
 
+/// <summary>
+/// Visor y editor ligero de texto integrado. Soporta auto-formateo para JSON, XML y CSV.
+/// Incluye interfaz en modo lectura por defecto con opción a edición y guardado.
+/// </summary>
 public class FileViewerForm : Form
 {
     private RichTextBox _richTextBox = default!;

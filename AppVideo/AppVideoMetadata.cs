@@ -2,6 +2,9 @@ using System;
 
 namespace ExploradorArchivos.AppVideo;
 
+/// <summary>
+/// Representa los metadatos técnicos y geográficos de un archivo de video.
+/// </summary>
 public class AppVideoMetadata
 {
     public string RutaArchivo { get; set; } = string.Empty;

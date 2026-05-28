@@ -8,6 +8,11 @@ namespace ExploradorArchivos.Mp3;
 
 public enum ModoRepetir { Desactivado, RepetirUno, RepetirTodos }
 
+/// <summary>
+/// Motor principal de audio que utiliza la biblioteca NAudio.
+/// Maneja la decodificación de streams, el dispositivo de salida <c>WaveOutEvent</c>,
+/// colas de reproducción, orden aleatorio y sincronización con la UI.
+/// </summary>
 public class GestorReproduccion : IDisposable
 {
     private WaveOutEvent? _waveOut;
@@ -64,6 +69,12 @@ public class GestorReproduccion : IDisposable
         };
     }
 
+    /// <summary>
+    /// Limpia la cola actual y encola de manera asíncrona una nueva lista de pistas.
+    /// Inicia la reproducción automáticamente con la primera canción o con la pista especificada.
+    /// </summary>
+    /// <param name="rutas">Lista de rutas físicas de archivos de audio.</param>
+    /// <param name="rutaInicial">Archivo por el que debe comenzar a reproducir (opcional).</param>
     public void CargarCola(List<string> rutas, string? rutaInicial = null)
     {
         DetenerInterno();
@@ -86,6 +97,10 @@ public class GestorReproduccion : IDisposable
         ReproducirActual();
     }
 
+    /// <summary>
+    /// Inicia o reanuda la reproducción de la canción actual. Si no hay instancia activa, 
+    /// la crea invocando el motor de lectura interno.
+    /// </summary>
     public void Play()
     {
         if (_waveOut == null && CancionActual != null) { ReproducirActual(); return; }
@@ -111,6 +126,10 @@ public class GestorReproduccion : IDisposable
 
     public void Stop() { DetenerInterno(); EstadoCambiado?.Invoke(false); }
 
+    /// <summary>
+    /// Avanza a la siguiente pista de la cola. Su comportamiento difiere según el modo de repetición
+    /// (reproducir de nuevo la misma, seguir la cola aleatoria, o detenerse al final).
+    /// </summary>
     public void Siguiente()
     {
         if (_cola.Count == 0) return;
@@ -134,6 +153,10 @@ public class GestorReproduccion : IDisposable
         ReproducirActual();
     }
 
+    /// <summary>
+    /// Regresa a la pista anterior, o reinicia la canción actual si ya han pasado más de 3 segundos
+    /// de reproducción (comportamiento estándar de reproductores comerciales).
+    /// </summary>
     public void Anterior()
     {
         if (_cola.Count == 0) return;
@@ -171,6 +194,11 @@ public class GestorReproduccion : IDisposable
         }
     }
 
+    /// <summary>
+    /// Núcleo de la reproducción. Detiene el stream actual, libera buffers 
+    /// y carga asíncronamente el nuevo archivo en el hardware de audio,
+    /// disparando adicionalmente la búsqueda de letras por internet.
+    /// </summary>
     private void ReproducirActual()
     {
         if (_cambiando) return;
@@ -241,6 +269,10 @@ public class GestorReproduccion : IDisposable
         }
     }
 
+    /// <summary>
+    /// Libera los recursos de hardware (WaveOut) y los descriptores de archivo (AudioFileReader)
+    /// para evitar bloqueos del sistema o fugas de memoria al cambiar de pista.
+    /// </summary>
     private void DetenerInterno()
     {
         _timerPosicion.Stop();
@@ -254,6 +286,11 @@ public class GestorReproduccion : IDisposable
         if (_audioReader != null) { _audioReader.Dispose(); _audioReader = null; }
     }
 
+    /// <summary>
+    /// Reconstruye el orden interno de reproducción. Si el <c>ModoAleatorio</c> está activo, 
+    /// implementa un algoritmo de Fisher-Yates shuffle sobre la cola actual, manteniendo
+    /// la canción en reproducción en la posición 0.
+    /// </summary>
     private void RegenerarOrden()
     {
         int cancionActualRealIdx = (_indiceCola >= 0 && _indiceCola < _ordenReproduccion.Count)

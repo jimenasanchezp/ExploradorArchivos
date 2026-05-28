@@ -16,7 +16,10 @@ namespace ExploradorArchivos;
 /// </summary>
 public partial class Form1
 {
-    // En Form1.Visualizacion.cs
+    /// <summary>
+    /// Carga los ítems en el ListView principal aplicando los filtros visuales seleccionados.
+    /// Utiliza LINQ para ordenar los elementos mostrando los más recientes primero.
+    /// </summary>
     private void PoblarListViewDesdeMemoria()
     {
         listViewPrincipal.BeginUpdate();
@@ -50,6 +53,10 @@ public partial class Form1
 
     // === FILTROS RÁPIDOS (CHIPS) ===
 
+    /// <summary>
+    /// Genera pestañas interactivas (Chips) en la barra superior (Todos, Carpetas, Imágenes, Audio, Video, Otros)
+    /// permitiendo la segmentación rápida de los archivos visualizados.
+    /// </summary>
     private void ConfigurarFiltrosRapidos()
     {
         _pnlFiltros = new FlowLayoutPanel
@@ -121,6 +128,10 @@ public partial class Form1
 
     // === VISTA DE MINIATURAS ===
 
+    /// <summary>
+    /// Configura el contenedor <c>ImageList</c> y el botón de interfaz (Toggle)
+    /// que permite cambiar dinámicamente entre la vista de "Detalles" y la vista de "Iconos Grandes".
+    /// </summary>
     private void ConfigurarVistaMiniaturas()
     {
         _imageListMiniaturas = new ImageList
@@ -161,6 +172,11 @@ public partial class Form1
         pnlTop.Controls.Add(_btnToggleVista);
     }
 
+    /// <summary>
+    /// Hilo secundario (Task) que lee las fotos del disco asíncronamente, 
+    /// las escala a formato miniatura y las inyecta en el ImageList para 
+    /// evitar el congelamiento de la interfaz de usuario al hacer scroll.
+    /// </summary>
     private async Task GenerarMiniaturasAsync()
     {
         if (!_imageListMiniaturas.Images.ContainsKey("folder"))
@@ -202,6 +218,10 @@ public partial class Form1
         }
     }
 
+    /// <summary>
+    /// Crea un ícono básico (Bitmap) incrustando un emoji como texto,
+    /// utilizado como "fallback" visual cuando un archivo no tiene miniatura disponible.
+    /// </summary>
     private Bitmap GenerarIconoBase(string emoji)
     {
         Bitmap bmp = new Bitmap(96, 96);
@@ -216,6 +236,11 @@ public partial class Form1
 
     // === ORDENAMIENTO POR COLUMNAS ===
 
+    /// <summary>
+    /// Procesa los clics en las cabeceras de columnas del ListView, invocando al 
+    /// comparador avanzado (<see cref="ListViewSorter"/>) e indicando visualmente 
+    /// la dirección de ordenamiento (ascendente ▲ o descendente ▼).
+    /// </summary>
     private void ListViewPrincipal_ColumnClick(object? sender, ColumnClickEventArgs e)
     {
         if (e.Column == _sorter.ColumnToSort)
@@ -239,6 +264,10 @@ public partial class Form1
 
     // === EXPORTACIÓN CSV ===
 
+    /// <summary>
+    /// Inicia el proceso de exportación del contenido de la carpeta actual a un archivo CSV.
+    /// Delega la carga pesada de forma asíncrona a <see cref="CsvIndexer"/> para no bloquear la UI.
+    /// </summary>
     private async void BtnExportarCSV_Click(object? sender, EventArgs e)
     {
         SaveFileDialog sfd = new SaveFileDialog { Filter = "CSV|*.csv", FileName = "Indice.csv" };
@@ -259,6 +288,11 @@ public partial class Form1
 
     // === ESTADÍSTICAS ===
 
+    /// <summary>
+    /// Calcula agregados estadísticos del directorio actual (número de archivos, 
+    /// carpetas y segmentación por tipos) utilizando consultas LINQ en memoria, 
+    /// actualizando la barra de estado inferior.
+    /// </summary>
     private void ActualizarEstadisticas()
     {
         int carpetas = _itemsActuales.Count(x => x.EsCarpeta);

@@ -6,6 +6,10 @@ using Microsoft.Web.WebView2.WinForms; // ¡Requisito indispensable para PDFs!
 
 namespace ExploradorArchivos.UI
 {
+    /// <summary>
+    /// Ventana de vista previa ultra rápida ("Quick Look" estilo macOS).
+    /// Permite previsualizar imágenes, texto y PDFs sin abrir un editor completo.
+    /// </summary>
     public class QuickLookForm : Form
     {
         private PictureBox? _pictureBox;

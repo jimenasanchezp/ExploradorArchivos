@@ -11,6 +11,11 @@ using ExploradorArchivos.UI;
 
 namespace ExploradorArchivos.AppDataFusion;
 
+/// <summary>
+/// Interfaz unificada "Data Fusion Arena". 
+/// Orquesta la carga (JSON, CSV, XML, TXT, Bases de datos),
+/// normalización, geocodificación, visualización en DataGridView y generación de gráficos interactivos.
+/// </summary>
 public partial class MainForm : Form
 {
     // â”€â”€ Data state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -19,6 +24,7 @@ public partial class MainForm : Form
     private List<DataItem> _datosVista = new();
     private string? _rutaInicial;
     private bool isDragging = false;
+    private bool _isBinding = false;
     private Point lastCursor;
 
     private Dictionary<string, List<DataItem>> _porCategoria = new();
@@ -39,6 +45,7 @@ public partial class MainForm : Form
     };
 
     private string _ultimoTipoCargado = "";
+    private int _activeUpdates = 0;
 
     private static readonly List<(string Display, string Clave)> _colsDefault = new()
     {
@@ -71,6 +78,8 @@ public partial class MainForm : Form
 
         ConfigurarDataGridViews();
         dgvTodos.CellPainting += DgvTodos_CellPainting!;
+        dgvTodos.CellValueChanged += DgvTodos_CellValueChanged!;
+        dgvTodos.DataError += DgvTodos_DataError!;
         ThemeRenderer.ApplyTheme(this);
 
         Text = "DATA FUSION ARENA Â· DATA ENGINE";
@@ -108,6 +117,10 @@ public partial class MainForm : Form
         };
     }
 
+    /// <summary>
+    /// Configura los botones estilo "Semáforo" (Cerrar, Minimizar, Maximizar) típicos de macOS
+    /// para la barra superior de la aplicación.
+    /// </summary>
     private void ConfigurarSemaforo()
     {
         Button btnClose = CrearBotonSemaforo(Color.FromArgb(255, 95, 86), 0);
@@ -128,6 +141,10 @@ public partial class MainForm : Form
         pnlSemaforo.Controls.Add(btnMax);
     }
 
+    /// <summary>
+    /// Configura los eventos del mouse para permitir arrastrar la ventana
+    /// haciendo clic en el panel superior (pnlLogo).
+    /// </summary>
     private void ConfigurarArrastre()
     {
         pnlLogo.MouseDown += (s, e) => { if (e.Button == MouseButtons.Left) { isDragging = true; lastCursor = e.Location; } };
@@ -135,6 +152,12 @@ public partial class MainForm : Form
         pnlLogo.MouseUp += (s, e) => { isDragging = false; };
     }
 
+    /// <summary>
+    /// Crea un botón circular con estilo plano para el semáforo de la barra de título.
+    /// </summary>
+    /// <param name="color">Color de fondo del botón.</param>
+    /// <param name="x">Posición horizontal del botón dentro del panel.</param>
+    /// <returns>El botón configurado.</returns>
     private Button CrearBotonSemaforo(Color color, int x)
     {
         Button btn = new Button
@@ -154,6 +177,10 @@ public partial class MainForm : Form
         return btn;
     }
 
+    /// <summary>
+    /// Aplica estilos visuales fijos al TabControl principal para mantener
+    /// coherencia con el tema del módulo Data Fusion.
+    /// </summary>
     private void ConfigurarEstiloTabControl()
     {
         tabControl1.Appearance = TabAppearance.Normal;
@@ -167,6 +194,11 @@ public partial class MainForm : Form
     //  COLUMN / COMBOBOX MANAGEMENT
     // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
+    /// <summary>
+    /// Traduce un nombre de columna amigable (Display) a su clave original o interna.
+    /// </summary>
+    /// <param name="display">Nombre de la columna a buscar.</param>
+    /// <returns>La clave correspondiente, o el mismo nombre en minúsculas si no se encuentra.</returns>
     private string TraducirClave(string display)
     {
         foreach (var (d, c) in _infoColumnas)
@@ -175,6 +207,10 @@ public partial class MainForm : Form
         return display.ToLower();
     }
 
+    /// <summary>
+    /// Reconstruye la lista de columnas disponibles (`_infoColumnas`) basándose en el último 
+    /// conector o lector de datos utilizado (JSON, CSV, BD, etc.), aplicando mapeos personalizados.
+    /// </summary>
     private void ReconstruirInfoColumnas()
     {
         _infoColumnas.Clear();
@@ -206,6 +242,12 @@ public partial class MainForm : Form
         }
     }
 
+    /// <summary>
+    /// Construye la lista de columnas disponibles a partir de los datos leídos de un archivo,
+    /// aplicando el mapeo de columnas configurado por el usuario.
+    /// </summary>
+    /// <param name="columnas">Lista de nombres de columnas originales.</param>
+    /// <param name="mapeo">Diccionario de mapeo de columnas a roles predefinidos.</param>
     private void BuildFromReader(List<string> columnas, Dictionary<string, string> mapeo)
     {
         var ya = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -222,6 +264,12 @@ public partial class MainForm : Form
             _infoColumnas.Add(("Longitud", "longitude"));
     }
 
+    /// <summary>
+    /// Construye la lista de columnas disponibles a partir de una conexión a Base de Datos,
+    /// aplicando el mapeo de columnas.
+    /// </summary>
+    /// <param name="columnas">Lista de nombres de columnas originales de la BD.</param>
+    /// <param name="mapeo">Diccionario de mapeo de columnas a roles predefinidos.</param>
     private void BuildFromConnector(List<string> columnas, Dictionary<string, string> mapeo)
     {
         var ya = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -238,6 +286,10 @@ public partial class MainForm : Form
             _infoColumnas.Add(("Longitud", "longitude"));
     }
 
+    /// <summary>
+    /// Refresca los elementos de los Comboboxes de la interfaz de búsqueda, ordenamiento 
+    /// y filtros basándose en la lista de columnas actualizada.
+    /// </summary>
     private void RefrescarComboboxes()
     {
         var items = _infoColumnas.Select(c => c.Display).Distinct().ToArray<object>();
@@ -266,6 +318,11 @@ public partial class MainForm : Form
     //  NUMERIC / CURRENCY DETECTION
     // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
+    /// <summary>
+    /// Analiza una muestra de los datos cargados para detectar automáticamente qué columnas
+    /// son mayoritariamente numéricas y cuáles podrían representar valores de moneda.
+    /// Útil para la renderización dinámica de celdas en el DataGridView y opciones de gráficas.
+    /// </summary>
     private void DetectarNumericosYMoneda()
     {
         _numericDisplays.Clear();
@@ -301,6 +358,10 @@ public partial class MainForm : Form
     //  CHART
     // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
+    /// <summary>
+    /// Refresca las opciones de los comboboxes de la pestaña de Gráficas
+    /// para permitir agrupar y visualizar por las columnas detectadas.
+    /// </summary>
     private void RefrescarCombosGrafica()
     {
         if (cmbGrupoGrafica == null || cmbMetricaGrafica == null) return;
@@ -327,6 +388,10 @@ public partial class MainForm : Form
         if (mi >= 0 && mi < cmbMetricaGrafica.Items.Count) cmbMetricaGrafica.SelectedIndex = mi;
     }
 
+    /// <summary>
+    /// Re-calcula los valores agrupados o métricas según la configuración seleccionada por el usuario
+    /// y actualiza el control Chart (gráfico) principal.
+    /// </summary>
     private void ActualizarChart()
     {
         try
@@ -445,6 +510,11 @@ public partial class MainForm : Form
     private async void BtnCargarXml_Click(object? sender, EventArgs e) => await CargarConDialogoAsync("xml");
     private async void BtnCargarTxt_Click(object? sender, EventArgs e) => await CargarConDialogoAsync("txt");
 
+    /// <summary>
+    /// Abre un cuadro de diálogo para que el usuario seleccione un archivo local
+    /// e invoca el proceso asíncrono de carga.
+    /// </summary>
+    /// <param name="extension">La extensión esperada (json, csv, xml, txt).</param>
     private async Task CargarConDialogoAsync(string extension)
     {
         using var dlg = new OpenFileDialog
@@ -482,6 +552,13 @@ public partial class MainForm : Form
     }
 
 
+    /// <summary>
+    /// Core de carga de archivos: lee el archivo especificado utilizando el parser
+    /// correspondiente según su tipo, lo normaliza a objetos DataItem, y lo agrega al grid central.
+    /// </summary>
+    /// <param name="ruta">Ruta física del archivo a cargar.</param>
+    /// <param name="tipo">Formato del archivo (json, csv, xml, txt).</param>
+    /// <param name="silencioso">Si es verdadero, no mostrará pop-ups en caso de error o éxito (útil para cargas batch).</param>
     private async Task CargarArchivoAsync(string ruta, string tipo, bool silencioso = false)
     {
         if (!File.Exists(ruta))
@@ -533,6 +610,11 @@ public partial class MainForm : Form
     private void BtnExportarXml_Click(object? sender, EventArgs e) => _ = ExportarAsync("xml");
     private void BtnExportarTxt_Click(object? sender, EventArgs e) => _ = ExportarAsync("txt");
 
+    /// <summary>
+    /// Procesa la exportación asíncrona de los datos actualmente visualizados o cargados
+    /// a un archivo local en el formato seleccionado.
+    /// </summary>
+    /// <param name="formato">El formato de destino (csv, json, xml, txt).</param>
     private async Task ExportarAsync(string formato)
     {
         var datos = _datosVista.Count > 0 ? _datosVista : _datosBase;
@@ -608,6 +690,10 @@ public partial class MainForm : Form
     //  DATABASE CONNECTION (READ)
     // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
+    /// <summary>
+    /// Maneja la conexión bidireccional con PostgreSQL. Permite tanto importar datos de la base de datos
+    /// al DataGrid, como migrar/guardar los datos actuales en memoria hacia una tabla de PostgreSQL.
+    /// </summary>
     private async void BtnConectarPostgres_Click(object sender, EventArgs e)
     {
         bool esEscritura = false;
@@ -644,6 +730,13 @@ public partial class MainForm : Form
                 {
                     ActualizarEstadoBarra($"Migrado a PostgreSQL: {result.Mensaje}");
                     MessageBox.Show(result.Mensaje, "Migración Completada", MessageBoxButtons.OK, MessageBoxIcon.Information);
+
+                    var pg = new PostgreSqlConnector(dlg.CadenaConexion, dlg.NombreTabla);
+                    await Task.Run(() => pg.ObtenerNombresColumnas());
+                    _lastPgConnector = pg;
+                    _lastMdConnector = null;
+                    _ultimoTipoCargado = "postgresql";
+                    await ActualizarTodoAsync();
                 }
                 else
                 {
@@ -674,7 +767,7 @@ public partial class MainForm : Form
             using var dlgCols = new FormSeleccionColumnas(cols, pg.MapeoColumnas);
             if (dlgCols.ShowDialog() != DialogResult.OK) return;
 
-            pg.SobreescribirMapeo(dlgCols.ColCategoria, dlgCols.ColValor,
+            pg.SobreescribirMapeo(dlgCols.ColId, dlgCols.ColCategoria, dlgCols.ColValor,
                                   dlgCols.ColNombre, dlgCols.ColFecha);
 
             ActualizarEstadoBarra("Cargando datos PostgreSQL...");
@@ -689,6 +782,10 @@ public partial class MainForm : Form
         }
     }
 
+    /// <summary>
+    /// Maneja la conexión bidireccional con MariaDB/MySQL. Permite importar datos desde el servidor
+    /// o migrar los datos locales masivamente hacia una tabla en MariaDB.
+    /// </summary>
     private async void BtnConectarMariaDB_Click(object sender, EventArgs e)
     {
         bool esEscritura = false;
@@ -725,6 +822,13 @@ public partial class MainForm : Form
                 {
                     ActualizarEstadoBarra($"Migrado a MariaDB: {result.Mensaje}");
                     MessageBox.Show(result.Mensaje, "Migración Completada", MessageBoxButtons.OK, MessageBoxIcon.Information);
+
+                    var md = new MariaDbConnector(dlg.CadenaConexion, dlg.NombreTabla);
+                    await Task.Run(() => md.ObtenerNombresColumnas());
+                    _lastMdConnector = md;
+                    _lastPgConnector = null;
+                    _ultimoTipoCargado = "mariadb";
+                    await ActualizarTodoAsync();
                 }
                 else
                 {
@@ -755,7 +859,7 @@ public partial class MainForm : Form
             using var dlgCols = new FormSeleccionColumnas(cols, md.MapeoColumnas);
             if (dlgCols.ShowDialog() != DialogResult.OK) return;
 
-            md.SobreescribirMapeo(dlgCols.ColCategoria, dlgCols.ColValor,
+            md.SobreescribirMapeo(dlgCols.ColId, dlgCols.ColCategoria, dlgCols.ColValor,
                                   dlgCols.ColNombre, dlgCols.ColFecha);
 
             ActualizarEstadoBarra("Cargando datos MariaDB...");
@@ -770,14 +874,29 @@ public partial class MainForm : Form
         }
     }
 
+    /// <summary>
+    /// Vuelve a consultar la base de datos activa (PostgreSQL o MariaDB) para recargar
+    /// los datos más recientes y sincronizar la vista local.
+    /// </summary>
     private async void BtnRefresh_Click(object sender, EventArgs e)
     {
         if (_lastPgConnector == null && _lastMdConnector == null)
         {
             MessageBox.Show("No hay bases de datos conectadas.",
-                "Sin conexiÃ³n", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                "Sin conexión", MessageBoxButtons.OK, MessageBoxIcon.Information);
             return;
         }
+
+        dgvTodos.EndEdit();
+
+        // Esperar a que terminen las actualizaciones asíncronas activas (máximo 3 segundos)
+        int intentos = 0;
+        while (_activeUpdates > 0 && intentos < 30)
+        {
+            await Task.Delay(100);
+            intentos++;
+        }
+
         _datos.RemoveAll(d => d.Fuente is "postgresql" or "mariadb");
         if (_lastPgConnector != null)
         {
@@ -800,6 +919,10 @@ public partial class MainForm : Form
     //  FILTER / SORT
     // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
+    /// <summary>
+    /// Ejecuta una búsqueda y filtrado de datos en memoria según la columna seleccionada,
+    /// actualizando el DataGrid con los resultados.
+    /// </summary>
     private async void BtnFiltrar_Click(object? sender, EventArgs e)
     {
         string display = cmbCampoBusqueda.Text, clave = TraducirClave(display),
@@ -812,6 +935,9 @@ public partial class MainForm : Form
         ActualizarEstadoBarra($"Filtro '{display}' = '{valor}' â†’ {_datosVista.Count} resultados.");
     }
 
+    /// <summary>
+    /// Restablece la vista de datos al estado original (sin filtros).
+    /// </summary>
     private async void BtnLimpiarFiltro_Click(object? sender, EventArgs e)
     {
         txtBusqueda.Text = "";
@@ -820,6 +946,10 @@ public partial class MainForm : Form
         ActualizarEstadoBarra($"Filtro limpiado â€” {_datosVista.Count} registros.");
     }
 
+    /// <summary>
+    /// Ordena ascendente o descendentemente la vista actual de datos utilizando LINQ
+    /// según la columna configurada.
+    /// </summary>
     private async void BtnOrdenar_Click(object? sender, EventArgs e)
     {
         string display = cmbCampoOrden.Text, clave = TraducirClave(display);
@@ -855,6 +985,10 @@ public partial class MainForm : Form
     //  PROCESSING / LINQ
     // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
+    /// <summary>
+    /// Analiza el conjunto de datos activo en busca de registros idénticos o 
+    /// extremadamente similares basados en criterios lógicos, y los muestra en la pestaña de procesamiento.
+    /// </summary>
     private async void BtnDetectarDuplicados_Click(object? sender, EventArgs e)
     {
         ActualizarEstadoBarra("Detectando duplicados...");
@@ -867,6 +1001,9 @@ public partial class MainForm : Form
         ActualizarEstadoBarra($"Duplicados: {dupes.Count}");
     }
 
+    /// <summary>
+    /// Confirma y ejecuta la eliminación de los duplicados detectados del conjunto global de datos.
+    /// </summary>
     private async void BtnEliminarDuplicados_Click(object? sender, EventArgs e)
     {
         if (MessageBox.Show("Â¿Eliminar duplicados? Esta acciÃ³n no se puede deshacer.",
@@ -879,6 +1016,10 @@ public partial class MainForm : Form
         btnEliminarDuplicados.Enabled = false;
     }
 
+    /// <summary>
+    /// Normaliza una cadena de texto (remueve tildes, diacríticos y convierte a minúsculas)
+    /// para facilitar comparaciones y búsquedas insensibles a mayúsculas o acentos.
+    /// </summary>
     private static string Normalizar(string t)
     {
         if (string.IsNullOrEmpty(t)) return "";
@@ -891,6 +1032,9 @@ public partial class MainForm : Form
         return sb.ToString();
     }
 
+    /// <summary>
+    /// Ejecuta una consulta dinámica LINQ (.Where) sobre los datos y muestra los resultados en la pestaña de procesos.
+    /// </summary>
     private async void BtnLinqWhere_Click(object? sender, EventArgs e)
     {
         string display = cmbLinqCampo.Text, clave = TraducirClave(display), valor = txtLinqFiltro.Text.Trim();
@@ -900,6 +1044,9 @@ public partial class MainForm : Form
         lblProcInfo.Text = $"LINQ .Where(): {res.Count} registros encontrados.";
     }
 
+    /// <summary>
+    /// Ejecuta una consulta dinámica LINQ (.GroupBy) agrupando por categoría y sumarizando los valores.
+    /// </summary>
     private async void BtnLinqGroupBy_Click(object? sender, EventArgs e)
     {
         ActualizarEstadoBarra("LINQ GroupBy (CategorÃ­a)...");
@@ -917,6 +1064,9 @@ public partial class MainForm : Form
         lblProcInfo.Text = $"LINQ .GroupBy(): {res.Count} grupos creados por CategorÃ­a.";
     }
 
+    /// <summary>
+    /// Ejecuta un ordenamiento (.OrderBy) utilizando LINQ puro en memoria.
+    /// </summary>
     private async void BtnLinqOrderBy_Click(object? sender, EventArgs e)
     {
         string display = cmbLinqCampo.Text, clave = TraducirClave(display);
@@ -940,6 +1090,10 @@ public partial class MainForm : Form
     //  UPDATE ALL
     // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
+    /// <summary>
+    /// Orquestador central de la interfaz. Vuelve a calcular índices, agrupaciones, columnas
+    /// y redibuja las gráficas y DataGridViews cuando los datos principales han cambiado.
+    /// </summary>
     private async Task ActualizarTodoAsync()
     {
         // El geocoding ahora solo se activa manualmente con el botÃ³n de la API para mayor velocidad de carga.
@@ -1024,6 +1178,10 @@ public partial class MainForm : Form
     //  BIND GRID
     // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
+    /// <summary>
+    /// Genera y vincula un DataTable dinámico de manera asíncrona a un DataGridView,
+    /// aplicando un límite de visualización para mantener el rendimiento gráfico.
+    /// </summary>
     private async Task BindGridAsync(DataGridView dgv, List<DataItem> items,
         Label? contadorLabel, bool usarColsDefault = false)
     {
@@ -1045,62 +1203,79 @@ public partial class MainForm : Form
             AplicarDataTable(dgv, dt, items.Count, limitado, contadorLabel, colInfos);
     }
 
+    /// <summary>
+    /// Asigna el DataTable creado al DataGridView en el hilo de la interfaz de usuario,
+    /// configurando automáticamente el ancho, alineación y estilo de las columnas generadas.
+    /// </summary>
     private void AplicarDataTable(DataGridView dgv, DataTable dt, int totalReal, bool limitado,
         Label? contadorLabel, List<(string Display, string Clave)> colInfos)
     {
-        dgv.DataSource = null; dgv.Columns.Clear(); dgv.AutoGenerateColumns = false;
-        var cm = colInfos.ToDictionary(c => c.Display, c => c.Clave, StringComparer.OrdinalIgnoreCase);
-        string? nombreDisplay = colInfos.FirstOrDefault(c => c.Clave == "nombre").Display;
-
-        foreach (DataColumn col in dt.Columns)
+        _isBinding = true;
+        try
         {
-            string clave = cm.TryGetValue(col.ColumnName, out var cv) ? cv : col.ColumnName.ToLower();
-            var dgvCol = new DataGridViewTextBoxColumn
-            {
-                Name = col.ColumnName,
-                HeaderText = col.ColumnName,
-                DataPropertyName = col.ColumnName,
-                ReadOnly = true,
-                SortMode = DataGridViewColumnSortMode.Automatic,
-                MinimumWidth = 60,
-            };
-            dgvCol.Width = clave switch
-            {
-                "id" => 60,
-                "nombre" => 200,
-                "categoria" => 140,
-                "valor" => 100,
-                "fecha" => 105,
-                "fuente" => 90,
-                _ => 120
-            };
+            dgv.DataSource = null; dgv.Columns.Clear(); dgv.AutoGenerateColumns = false;
+            var cm = colInfos.ToDictionary(c => c.Display, c => c.Clave, StringComparer.OrdinalIgnoreCase);
+            string? nombreDisplay = colInfos.FirstOrDefault(c => c.Clave == "nombre").Display;
 
-            if (!string.IsNullOrEmpty(nombreDisplay) && col.ColumnName == nombreDisplay)
-            { dgvCol.AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill; dgvCol.MinimumWidth = 150; }
-
-            bool esNumerico = clave is "id" or "valor" || _numericDisplays.Contains(col.ColumnName);
-            if (esNumerico)
+            foreach (DataColumn col in dt.Columns)
             {
-                dgvCol.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
-                dgvCol.HeaderCell.Style.Alignment = DataGridViewContentAlignment.MiddleRight;
+                if (col.ColumnName == "_itemRef_") continue;
+                string clave = cm.TryGetValue(col.ColumnName, out var cv) ? cv : col.ColumnName.ToLower();
+                var dgvCol = new DataGridViewTextBoxColumn
+                {
+                    Name = col.ColumnName,
+                    HeaderText = col.ColumnName,
+                    DataPropertyName = col.ColumnName,
+                    ReadOnly = (dgv != dgvTodos) || (clave == "id"),
+                    SortMode = DataGridViewColumnSortMode.Automatic,
+                    MinimumWidth = 60,
+                };
+                dgvCol.Width = clave switch
+                {
+                    "id" => 60,
+                    "nombre" => 200,
+                    "categoria" => 140,
+                    "valor" => 100,
+                    "fecha" => 105,
+                    "fuente" => 90,
+                    _ => 120
+                };
+
+                if (!string.IsNullOrEmpty(nombreDisplay) && col.ColumnName == nombreDisplay)
+                { dgvCol.AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill; dgvCol.MinimumWidth = 150; }
+
+                bool esNumerico = clave is "id" or "valor" || _numericDisplays.Contains(col.ColumnName);
+                if (esNumerico)
+                {
+                    dgvCol.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
+                    dgvCol.HeaderCell.Style.Alignment = DataGridViewContentAlignment.MiddleRight;
+                }
+                dgv.Columns.Add(dgvCol);
             }
-            dgv.Columns.Add(dgvCol);
+
+            dgv.DataSource = dt;
+            dgv.CellFormatting -= DgvCellFormatting!;
+            dgv.CellFormatting += DgvCellFormatting!;
+
+            // Forzar dibujo de lÃ­neas si no estÃ¡n por defecto
+            dgv.CellBorderStyle = DataGridViewCellBorderStyle.Single;
+            dgv.GridColor = Color.LightGray;
+
+            if (contadorLabel != null)
+                contadorLabel.Text = limitado
+                    ? $"Mostrando {DISPLAY_LIMIT:N0} de {totalReal:N0}"
+                    : $"{totalReal:N0} registros";
         }
-
-        dgv.DataSource = dt;
-        dgv.CellFormatting -= DgvCellFormatting!;
-        dgv.CellFormatting += DgvCellFormatting!;
-
-        // Forzar dibujo de lÃ­neas si no estÃ¡n por defecto
-        dgv.CellBorderStyle = DataGridViewCellBorderStyle.Single;
-        dgv.GridColor = Color.LightGray;
-
-        if (contadorLabel != null)
-            contadorLabel.Text = limitado
-                ? $"Mostrando {DISPLAY_LIMIT:N0} de {totalReal:N0}"
-                : $"{totalReal:N0} registros";
+        finally
+        {
+            _isBinding = false;
+        }
     }
 
+    /// <summary>
+    /// Construye en memoria un objeto DataTable mapeando las propiedades fijas y dinámicas (CamposExtra)
+    /// de los DataItems según la información de columnas especificada.
+    /// </summary>
     private static DataTable BuildDataTable(
         List<DataItem> items,
         List<(string Display, string Clave)> colInfos,
@@ -1113,10 +1288,13 @@ public partial class MainForm : Form
             var tipo = clave switch { "id" => typeof(int), "valor" => typeof(double), _ => typeof(string) };
             if (!dt.Columns.Contains(display)) dt.Columns.Add(display, tipo);
         }
+        dt.Columns.Add("_itemRef_", typeof(DataItem));
+
         dt.BeginLoadData();
         foreach (var item in items)
         {
             var row = dt.NewRow();
+            row["_itemRef_"] = item;
             foreach (var (display, clave) in colInfos)
             {
                 if (!dt.Columns.Contains(display)) continue;
@@ -1146,6 +1324,10 @@ public partial class MainForm : Form
         return dt;
     }
 
+    /// <summary>
+    /// Formatea las celdas en tiempo de renderizado: aplica colores de fondo distintivos
+    /// según la fuente de datos y formatea los valores numéricos detectados como moneda.
+    /// </summary>
     private void DgvCellFormatting(object sender, DataGridViewCellFormattingEventArgs e)
     {
         if (e.RowIndex < 0) return;
@@ -1189,6 +1371,10 @@ public partial class MainForm : Form
     //  GRID SETUP
     // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
+    /// <summary>
+    /// Aplica estilos visuales premium a todos los controles DataGridView de la aplicación
+    /// de forma estandarizada.
+    /// </summary>
     private void ConfigurarDataGridViews()
     {
         foreach (var dgv in new[] { dgvTodos, dgvCategoria, dgvProcesamiento })
@@ -1197,6 +1383,7 @@ public partial class MainForm : Form
             dgv.AutoGenerateColumns = false;
             dgv.BackgroundColor = Color.White;
             dgv.BorderStyle = BorderStyle.FixedSingle;
+            dgv.ReadOnly = (dgv != dgvTodos);
             
             // Lineas fijas
             dgv.CellBorderStyle = DataGridViewCellBorderStyle.Single;
@@ -1224,6 +1411,9 @@ public partial class MainForm : Form
     //  STATUS BAR
     // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
+    /// <summary>
+    /// Actualiza el texto de la barra de estado de manera thread-safe.
+    /// </summary>
     private void ActualizarEstadoBarra(string mensaje)
     {
         if (lblStatus.GetCurrentParent()?.InvokeRequired == true)
@@ -1237,6 +1427,10 @@ public partial class MainForm : Form
     //  HELPERS
     // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
+    /// <summary>
+    /// Busca de manera segura un valor dentro del diccionario de campos dinámicos (CamposExtra)
+    /// ignorando diferencias entre mayúsculas y minúsculas.
+    /// </summary>
     private static string BuscarExtra(DataItem item, string clave)
     {
         if (string.IsNullOrEmpty(clave)) return "";
@@ -1246,6 +1440,10 @@ public partial class MainForm : Form
         return "";
     }
 
+    /// <summary>
+    /// Limpia por completo la memoria de la aplicación, eliminando datos, cachés,
+    /// selecciones y reiniciando el estado visual a cero.
+    /// </summary>
     private void MenuLimpiarDatos_Click(object sender, EventArgs e)
     {
         if (MessageBox.Show("Â¿Limpiar todos los datos en memoria?", "Confirmar",
@@ -1330,6 +1528,10 @@ public partial class MainForm : Form
         _ = ActualizarTodoAsync();
     }
 
+    /// <summary>
+    /// Evento de pintado personalizado (Custom Paint) para dibujar "Badges" (etiquetas redondeadas)
+    /// en la columna 'Fuente' de la tabla, logrando un estilo UI moderno.
+    /// </summary>
     private void DgvTodos_CellPainting(object sender, DataGridViewCellPaintingEventArgs e)
     {
         if (e.RowIndex < 0 || e.ColumnIndex < 0) return;
@@ -1379,6 +1581,473 @@ public partial class MainForm : Form
         path.AddArc(rect.X, rect.Bottom - d, d, d, 90, 90);
         path.CloseFigure();
         return path;
+    }
+
+    /// <summary>
+    /// Evento disparado cada vez que el usuario edita directamente una celda del DataGridView.
+    /// Actualiza el objeto en memoria y lanza asíncronamente la sincronización hacia las bases de datos.
+    /// </summary>
+    private void DgvTodos_CellValueChanged(object sender, DataGridViewCellEventArgs e)
+    {
+        if (_isBinding) return;
+        if (e.RowIndex < 0 || e.ColumnIndex < 0) return;
+
+        var dgv = (DataGridView)sender;
+        var col = dgv.Columns[e.ColumnIndex];
+        var row = dgv.Rows[e.RowIndex];
+
+        if (row.DataBoundItem is DataRowView drv)
+        {
+            var dr = drv.Row;
+            if (dr.Table.Columns.Contains("_itemRef_") && dr["_itemRef_"] is DataItem item)
+            {
+                object newVal = dr[col.Name];
+                string valStr = newVal?.ToString() ?? "";
+
+                // Buscar Clave correspondiente en _infoColumnas o _colsDefault
+                string? clave = null;
+                foreach (var info in _infoColumnas)
+                {
+                    if (string.Equals(info.Display, col.Name, StringComparison.OrdinalIgnoreCase))
+                    {
+                        clave = info.Clave;
+                        break;
+                    }
+                }
+                if (clave == null)
+                {
+                    foreach (var info in _colsDefault)
+                    {
+                        if (string.Equals(info.Display, col.Name, StringComparison.OrdinalIgnoreCase))
+                        {
+                            clave = info.Clave;
+                            break;
+                        }
+                    }
+                }
+                if (clave == null) clave = col.Name;
+
+                switch (clave.ToLowerInvariant())
+                {
+                    case "id":
+                        if (newVal is int idInt) item.Id = idInt;
+                        else if (int.TryParse(valStr, out int idVal)) item.Id = idVal;
+                        break;
+                    case "nombre":
+                        item.Nombre = valStr;
+                        break;
+                    case "categoria":
+                        item.Categoria = valStr;
+                        break;
+                    case "valor":
+                        if (newVal is double valDbl) item.Valor = valDbl;
+                        else if (double.TryParse(valStr, out double dblVal)) item.Valor = dblVal;
+                        break;
+                    case "fecha":
+                        if (newVal is DateTime dtVal) item.Fecha = dtVal;
+                        else if (DateTime.TryParse(valStr, out DateTime dtVal2)) item.Fecha = dtVal2;
+                        break;
+                    case "fuente":
+                        item.Fuente = valStr;
+                        break;
+                    case "latitude":
+                        if (double.TryParse(valStr, out double latVal)) item.Latitude = latVal;
+                        else item.Latitude = null;
+                        break;
+                    case "longitude":
+                        if (double.TryParse(valStr, out double lonVal)) item.Longitude = lonVal;
+                        else item.Longitude = null;
+                        break;
+                    default:
+                        item.CamposExtra[clave] = valStr;
+                        break;
+                }
+
+                // Actualizar cachés y gráficos de forma ligera
+                _porCategoria = DataProcessor.AgruparPorCategoria(_datosBase);
+                _porId = DataProcessor.IndexarPorId(_datos);
+
+                ActualizarChart();
+
+                // Refrescar lista de categorías
+                lstCategorias.Items.Clear();
+                foreach (var cat in _porCategoria.Keys.OrderBy(k => k))
+                    lstCategorias.Items.Add(cat);
+
+                ActualizarEstadoBarra($"Registro ID {item.Id} editado: '{col.Name}' modificado a '{valStr}'.");
+
+                // Sincronizar con la base de datos de forma asíncrona si hay una conexión activa
+                if (string.Equals(item.Fuente, "postgresql", StringComparison.OrdinalIgnoreCase) && _lastPgConnector != null)
+                {
+                    _ = SincronizarFilaPostgreSQLAsync(_lastPgConnector, item, col.Name, valStr);
+                }
+                else if (string.Equals(item.Fuente, "mariadb", StringComparison.OrdinalIgnoreCase) && _lastMdConnector != null)
+                {
+                    _ = SincronizarFilaMariaDBAsync(_lastMdConnector, item, col.Name, valStr);
+                }
+                else
+                {
+                    // Fallbacks por si el Fuente no coincide pero hay una única BD activa
+                    if (_lastPgConnector != null && _lastMdConnector == null)
+                    {
+                        _ = SincronizarFilaPostgreSQLAsync(_lastPgConnector, item, col.Name, valStr);
+                    }
+                    else if (_lastMdConnector != null && _lastPgConnector == null)
+                    {
+                        _ = SincronizarFilaMariaDBAsync(_lastMdConnector, item, col.Name, valStr);
+                    }
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Sincroniza un cambio de celda específico hacia la base de datos PostgreSQL en tiempo real.
+    /// Resuelve automáticamente la Primary Key o el identificador único para construir el comando UPDATE.
+    /// </summary>
+    private async Task SincronizarFilaPostgreSQLAsync(PostgreSqlConnector connector, DataItem item, string colName, string valStr)
+    {
+        System.Threading.Interlocked.Increment(ref _activeUpdates);
+        try
+        {
+            // 1. Determinar la columna identificadora (WHERE) usando la PK real de la BD
+            string? colId = null;
+
+            // Prioridad 1: PK real detectada desde information_schema
+            if (!string.IsNullOrEmpty(connector.ColPrimaryKey) &&
+                connector.UltimasColumnas.Any(c => string.Equals(c, connector.ColPrimaryKey, StringComparison.OrdinalIgnoreCase)))
+            {
+                colId = connector.ColPrimaryKey;
+            }
+
+            // Prioridad 2: Columna mapeada como "id"
+            if (string.IsNullOrEmpty(colId))
+                colId = connector.MapeoColumnas.FirstOrDefault(kv => kv.Value == "id").Key;
+
+            // Prioridad 3: Columna cuyo nombre sea exactamente "id"
+            if (string.IsNullOrEmpty(colId))
+                colId = connector.UltimasColumnas.FirstOrDefault(c => string.Equals(c, "id", StringComparison.OrdinalIgnoreCase));
+
+            // Prioridad 4: Primera columna que contenga "id" en su nombre
+            if (string.IsNullOrEmpty(colId))
+                colId = connector.UltimasColumnas.FirstOrDefault(c => c.ToLowerInvariant().Contains("id"));
+
+            // Prioridad 5 (último recurso): primera columna de la tabla
+            if (string.IsNullOrEmpty(colId) && connector.UltimasColumnas.Count > 0)
+            {
+                colId = connector.UltimasColumnas[0];
+                Console.WriteLine($"[PostgreSQL Sync] ⚠ Sin PK — usando primera columna '{colId}' como identificador");
+            }
+
+            if (string.IsNullOrEmpty(colId))
+            {
+                ActualizarEstadoBarra("⚠️ No se puede sincronizar: La tabla PostgreSQL está vacía o sin columnas.");
+                return;
+            }
+
+            // Normalizar al nombre exacto de la columna en la BD
+            var colIdExact = connector.UltimasColumnas.FirstOrDefault(c => string.Equals(c, colId, StringComparison.OrdinalIgnoreCase));
+            if (colIdExact != null) colId = colIdExact;
+
+            // 2. Resolver el nombre de columna de la BD para el campo editado
+            string dbColName = colName;
+            var match = connector.UltimasColumnas.FirstOrDefault(c => string.Equals(c, colName, StringComparison.OrdinalIgnoreCase));
+            if (match != null)
+            {
+                dbColName = match;
+            }
+            else
+            {
+                string sanitized = Database.DatabaseWriter.SanitizarNombre(colName);
+                match = connector.UltimasColumnas.FirstOrDefault(c => string.Equals(c, sanitized, StringComparison.OrdinalIgnoreCase));
+                if (match != null) dbColName = match;
+                else dbColName = sanitized;
+            }
+
+            // 3. Obtener el valor del identificador para el WHERE
+            object idVal = item.Id;
+            string? extraId = null;
+
+            // Buscar en CamposExtra por nombre exacto de la PK
+            foreach (var kv in item.CamposExtra)
+            {
+                if (string.Equals(kv.Key, colId, StringComparison.OrdinalIgnoreCase))
+                {
+                    extraId = kv.Value;
+                    break;
+                }
+            }
+
+            // Si no se encontró, buscar por columna mapeada como "id"
+            if (string.IsNullOrEmpty(extraId))
+            {
+                string? mappedIdCol = connector.MapeoColumnas.FirstOrDefault(kv => kv.Value == "id").Key;
+                if (mappedIdCol != null)
+                {
+                    foreach (var kv in item.CamposExtra)
+                    {
+                        if (string.Equals(kv.Key, mappedIdCol, StringComparison.OrdinalIgnoreCase))
+                        {
+                            extraId = kv.Value;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            // Si aún no, buscar en propiedades mapeadas del item
+            if (string.IsNullOrEmpty(extraId))
+            {
+                string? mappedRole = connector.MapeoColumnas.TryGetValue(colId, out var role) ? role : null;
+                if (mappedRole != null)
+                {
+                    extraId = mappedRole switch
+                    {
+                        "valor"     => item.Valor.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                        "nombre"    => item.Nombre,
+                        "categoria" => item.Categoria,
+                        "fecha"     => item.Fecha.ToString("yyyy-MM-dd"),
+                        _           => null
+                    };
+                }
+            }
+
+            if (!string.IsNullOrEmpty(extraId))
+            {
+                if (int.TryParse(extraId, out int idInt))
+                    idVal = idInt;
+                else
+                    idVal = extraId;
+            }
+
+            Console.WriteLine($"[PostgreSQL Sync] Tabla={connector.Tabla} PK={colId} idVal={idVal} col={dbColName} val={valStr}");
+
+            // 4. Convertir el valor al tipo correcto
+            object? dbValue = valStr;
+            if (string.Equals(dbColName, "valor", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(dbColName, "value", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(dbColName, "price", StringComparison.OrdinalIgnoreCase))
+            {
+                if (double.TryParse(valStr, NumberStyles.Any, CultureInfo.InvariantCulture, out double dblVal))
+                    dbValue = dblVal;
+                else
+                    dbValue = DBNull.Value;
+            }
+            else if (string.IsNullOrEmpty(valStr))
+            {
+                dbValue = DBNull.Value;
+            }
+
+            ActualizarEstadoBarra($"Sincronizando cambio en BD PostgreSQL (tabla: {connector.Tabla})...");
+            var (ok, error) = await Database.DatabaseWriter.ActualizarCampoPostgreSQLAsync(
+                connector.CadenaConexion,
+                connector.Tabla,
+                colId,
+                idVal,
+                dbColName,
+                dbValue
+            );
+
+            if (ok)
+            {
+                ActualizarEstadoBarra($"✓ Base de datos PostgreSQL actualizada (ID {idVal}: '{dbColName}' = '{valStr}').");
+            }
+            else
+            {
+                ActualizarEstadoBarra($"❌ Error al sincronizar cambio en BD PostgreSQL (ID {idVal}): {error}");
+                MessageBox.Show($"Error al guardar cambios en la base de datos PostgreSQL (ID: {idVal}):\n{error}", 
+                    "Error de Sincronización", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            ActualizarEstadoBarra($"❌ Error inesperado al sincronizar cambio en PostgreSQL: {ex.Message}");
+            MessageBox.Show($"Error inesperado en PostgreSQL:\n{ex.Message}", "Error de Sincronización", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+        finally
+        {
+            System.Threading.Interlocked.Decrement(ref _activeUpdates);
+        }
+    }
+
+
+    /// <summary>
+    /// Sincroniza un cambio de celda específico hacia la base de datos MariaDB en tiempo real.
+    /// Resuelve automáticamente la Primary Key o el identificador único para construir el comando UPDATE.
+    /// </summary>
+    private async Task SincronizarFilaMariaDBAsync(MariaDbConnector connector, DataItem item, string colName, string valStr)
+    {
+        System.Threading.Interlocked.Increment(ref _activeUpdates);
+        try
+        {
+            // 1. Determinar la columna identificadora (WHERE) usando la PK real de la BD
+            string? colId = null;
+
+            // Prioridad 1: PK real detectada desde INFORMATION_SCHEMA
+            if (!string.IsNullOrEmpty(connector.ColPrimaryKey) &&
+                connector.UltimasColumnas.Any(c => string.Equals(c, connector.ColPrimaryKey, StringComparison.OrdinalIgnoreCase)))
+            {
+                colId = connector.ColPrimaryKey;
+            }
+
+            // Prioridad 2: Columna mapeada como "id"
+            if (string.IsNullOrEmpty(colId))
+                colId = connector.MapeoColumnas.FirstOrDefault(kv => kv.Value == "id").Key;
+
+            // Prioridad 3: Columna cuyo nombre sea exactamente "id"
+            if (string.IsNullOrEmpty(colId))
+                colId = connector.UltimasColumnas.FirstOrDefault(c => string.Equals(c, "id", StringComparison.OrdinalIgnoreCase));
+
+            // Prioridad 4: Primera columna que contenga "id" en su nombre
+            if (string.IsNullOrEmpty(colId))
+                colId = connector.UltimasColumnas.FirstOrDefault(c => c.ToLowerInvariant().Contains("id"));
+
+            // Prioridad 5 (último recurso): primera columna de la tabla
+            if (string.IsNullOrEmpty(colId) && connector.UltimasColumnas.Count > 0)
+            {
+                colId = connector.UltimasColumnas[0];
+                Console.WriteLine($"[MariaDB Sync] ⚠ Sin PK \u2014 usando primera columna '{colId}' como identificador");
+            }
+
+            if (string.IsNullOrEmpty(colId))
+            {
+                ActualizarEstadoBarra("⚠️ No se puede sincronizar: La tabla está vacía o sin columnas.");
+                return;
+            }
+
+
+            // Normalizar al nombre exacto de la columna en la BD (case-sensitive)
+            var colIdExact = connector.UltimasColumnas.FirstOrDefault(c => string.Equals(c, colId, StringComparison.OrdinalIgnoreCase));
+            if (colIdExact != null) colId = colIdExact;
+
+            // 2. Resolver el nombre de columna de la BD para el campo editado
+            string dbColName = colName;
+            var match = connector.UltimasColumnas.FirstOrDefault(c => string.Equals(c, colName, StringComparison.OrdinalIgnoreCase));
+            if (match != null)
+            {
+                dbColName = match;
+            }
+            else
+            {
+                string sanitized = Database.DatabaseWriter.SanitizarNombre(colName);
+                match = connector.UltimasColumnas.FirstOrDefault(c => string.Equals(c, sanitized, StringComparison.OrdinalIgnoreCase));
+                if (match != null) dbColName = match;
+                else dbColName = sanitized;
+            }
+
+            // 3. Obtener el valor del identificador para el WHERE
+            //    Buscar primero en CamposExtra usando el nombre real de la PK
+            object idVal = item.Id;
+            string? extraId = null;
+
+            // Buscar por el nombre exacto de la columna PK en CamposExtra
+            foreach (var kv in item.CamposExtra)
+            {
+                if (string.Equals(kv.Key, colId, StringComparison.OrdinalIgnoreCase))
+                {
+                    extraId = kv.Value;
+                    break;
+                }
+            }
+
+            // Si no encontramos por el nombre de PK, intentar por la columna mapeada como "id"
+            if (string.IsNullOrEmpty(extraId))
+            {
+                string? mappedIdCol = connector.MapeoColumnas.FirstOrDefault(kv => kv.Value == "id").Key;
+                if (mappedIdCol != null)
+                {
+                    foreach (var kv in item.CamposExtra)
+                    {
+                        if (string.Equals(kv.Key, mappedIdCol, StringComparison.OrdinalIgnoreCase))
+                        {
+                            extraId = kv.Value;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            // Si aún no, buscar en las propiedades mapeadas del item
+            // (por si el identificador es una columna mapeada como valor/nombre/etc.)
+            if (string.IsNullOrEmpty(extraId))
+            {
+                string? mappedRole = connector.MapeoColumnas.TryGetValue(colId, out var role) ? role : null;
+                if (mappedRole != null)
+                {
+                    extraId = mappedRole switch
+                    {
+                        "valor"    => item.Valor.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                        "nombre"   => item.Nombre,
+                        "categoria"=> item.Categoria,
+                        "fecha"    => item.Fecha.ToString("yyyy-MM-dd"),
+                        _          => null
+                    };
+                }
+            }
+
+            if (!string.IsNullOrEmpty(extraId))
+            {
+                if (int.TryParse(extraId, out int idInt))
+                    idVal = idInt;
+                else
+                    idVal = extraId;
+            }
+
+
+            Console.WriteLine($"[MariaDB Sync] Tabla={connector.Tabla} PK={colId} idVal={idVal} col={dbColName} val={valStr}");
+
+            // 4. Convertir el valor al tipo correcto si es necesario
+            object? dbValue = valStr;
+            if (string.Equals(dbColName, "valor", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(dbColName, "value", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(dbColName, "price", StringComparison.OrdinalIgnoreCase))
+            {
+                if (double.TryParse(valStr, NumberStyles.Any, CultureInfo.InvariantCulture, out double dblVal))
+                    dbValue = dblVal;
+                else
+                    dbValue = DBNull.Value;
+            }
+            else if (string.IsNullOrEmpty(valStr))
+            {
+                dbValue = DBNull.Value;
+            }
+
+            ActualizarEstadoBarra($"Sincronizando cambio en BD MariaDB (tabla: {connector.Tabla})...");
+            var (ok, error) = await Database.DatabaseWriter.ActualizarCampoMariaDBAsync(
+                connector.CadenaConexion,
+                connector.Tabla,
+                colId,
+                idVal,
+                dbColName,
+                dbValue
+            );
+
+            if (ok)
+            {
+                ActualizarEstadoBarra($"✓ Base de datos MariaDB actualizada (ID {idVal}: '{dbColName}' = '{valStr}').");
+            }
+            else
+            {
+                ActualizarEstadoBarra($"❌ Error al sincronizar cambio en BD MariaDB (ID {idVal}): {error}");
+                MessageBox.Show($"Error al guardar cambios en la base de datos MariaDB (ID: {idVal}):\n{error}", 
+                    "Error de Sincronización", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            ActualizarEstadoBarra($"❌ Error inesperado al sincronizar cambio en MariaDB: {ex.Message}");
+            MessageBox.Show($"Error inesperado en MariaDB:\n{ex.Message}", "Error de Sincronización", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+        finally
+        {
+            System.Threading.Interlocked.Decrement(ref _activeUpdates);
+        }
+    }
+
+    private void DgvTodos_DataError(object sender, DataGridViewDataErrorEventArgs e)
+    {
+        e.ThrowException = false;
+        ActualizarEstadoBarra($"⚠️ Error de formato: Valor inválido para la columna '{dgvTodos.Columns[e.ColumnIndex].HeaderText}'.");
     }
 }
 

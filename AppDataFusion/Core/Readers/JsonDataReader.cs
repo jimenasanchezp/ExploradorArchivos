@@ -14,6 +14,10 @@ public static class JsonDataReader
     public static List<string> UltimasColumnas { get; private set; } = new();
     public static Dictionary<string, string> MapeoColumnas { get; private set; } = new(StringComparer.OrdinalIgnoreCase);
 
+    /// <summary>
+    /// Analiza un archivo JSON e intenta extraer la información detectando inteligentemente
+    /// si es un array plano de objetos, un formato matricial (array de arrays) o una estructura "fields/records".
+    /// </summary>
     public static List<DataItem> Leer(string rutaArchivo)
     {
         var lista = new List<DataItem>();
@@ -116,6 +120,10 @@ public static class JsonDataReader
     //  { "fields": [{"id":"col","type":"text"}, ...],
     //    "records": [[v1,v2,...], [v1,v2,...]] }
     // ══════════════════════════════════════════════════════════════
+    /// <summary>
+    /// Extrae datos tabulares desde un formato en el que las columnas están definidas en una propiedad 'fields' 
+    /// y los valores en una matriz 'records'.
+    /// </summary>
     private static List<DataItem> LeerFieldsRecords(JsonElement fieldsEl, JsonElement recordsEl)
     {
         var lista = new List<DataItem>();
@@ -191,6 +199,10 @@ public static class JsonDataReader
     //  FORMATO array de arrays (primera fila = encabezados opcional)
     //  [[col1,col2,...],[v1,v2,...],[v1,v2,...]]
     // ══════════════════════════════════════════════════════════════
+    /// <summary>
+    /// Procesa el JSON como una estructura tabular simple de matriz (array bidimensional).
+    /// Si la primera fila contiene solo textos, la toma como nombres de columnas.
+    /// </summary>
     private static List<DataItem> LeerArrayDeArrays(List<JsonElement> elementos)
     {
         var lista = new List<DataItem>();
@@ -255,6 +267,10 @@ public static class JsonDataReader
     // ══════════════════════════════════════════════════════════════
     //  FORMATO array de objetos (comportamiento original)
     // ══════════════════════════════════════════════════════════════
+    /// <summary>
+    /// Analiza el formato JSON estándar de un array que contiene un objeto por fila,
+    /// inspeccionando el primer objeto para mapear dinámicamente las propiedades a los campos base.
+    /// </summary>
     private static List<DataItem> LeerArrayObjetos(List<JsonElement> elementos)
     {
         var lista = new List<DataItem>();
@@ -419,6 +435,10 @@ public static class JsonDataReader
         return null;
     }
 
+    /// <summary>
+    /// Recuperador de emergencia (parser robusto custom). Escanea la cadena cruda del JSON
+    /// en búsqueda de delimitadores '{' y '}' para extraer objetos parciales ignorando corrupciones sintácticas externas.
+    /// </summary>
     private static List<DataItem> RecuperarJsonParcial(string contenido)
     {
         var lista = new List<DataItem>();

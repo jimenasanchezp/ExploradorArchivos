@@ -10,6 +10,11 @@ using ExploradorArchivos.UI;
 
 namespace ExploradorArchivos.AppCamara;
 
+/// <summary>
+/// Interfaz para el módulo de Cámara.
+/// Soporta la toma de fotografías y la grabación de video nativo utilizando la biblioteca <c>AForge</c>
+/// para la captura de frames y P/Invoke (Video for Windows) para la codificación AVI.
+/// </summary>
 public partial class AppCamaraForm : Form
 {
     // ─── Captura de cámara ───────────────────────────────────────────────────
@@ -55,6 +60,10 @@ public partial class AppCamaraForm : Form
     // ════════════════════════════════════════════════════════════════════════
     #region Inicialización UI
 
+    /// <summary>
+    /// Configura y renderiza dinámicamente todos los elementos visuales de la cámara
+    /// (vista previa, barra superior, semáforos, panel de botones de captura).
+    /// </summary>
     private void InitializeCustomComponents()
     {
         ThemeRenderer.ApplyTheme(this);
@@ -200,6 +209,10 @@ public partial class AppCamaraForm : Form
         ReposicionarBotones(btnCancelar);
     }
 
+    /// <summary>
+    /// Reposiciona dinámicamente los botones inferiores (Capturar, Grabar, Cancelar)
+    /// manteniéndolos centrados cuando la ventana cambia de tamaño.
+    /// </summary>
     private void ReposicionarBotones(Button btnCancelar)
     {
         int mitad = this.Width / 2;
@@ -208,6 +221,9 @@ public partial class AppCamaraForm : Form
         btnCancelar.Location = new Point(this.Width - 115, 58);
     }
 
+    /// <summary>
+    /// Inicializa el timer utilizado para llevar el conteo de segundos durante una grabación de video.
+    /// </summary>
     private void InicializarTimerGrabacion()
     {
         _timerGrabacion          = new System.Windows.Forms.Timer();
@@ -215,6 +231,10 @@ public partial class AppCamaraForm : Form
         _timerGrabacion.Tick    += TimerGrabacion_Tick;
     }
 
+    /// <summary>
+    /// Configura los botones estilo "Semaforo" (Cerrar, Minimizar, Maximizar)
+    /// típicos en entornos macOS, ubicados en la barra superior.
+    /// </summary>
     private void ConfigurarSemaforos()
     {
         Panel pnlSemaforos = new Panel
@@ -240,6 +260,12 @@ public partial class AppCamaraForm : Form
         pnlTop.Controls.Add(pnlSemaforos);
     }
 
+    /// <summary>
+    /// Crea un botón circular con estilo plano para el semáforo.
+    /// </summary>
+    /// <param name="color">El color representativo del botón (rojo, amarillo, verde).</param>
+    /// <param name="x">Posición X inicial del botón dentro de su contenedor.</param>
+    /// <returns>El botón dibujado.</returns>
     private Button CrearBotonSemaforo(Color color, int x)
     {
         Button b = new Button
@@ -265,6 +291,10 @@ public partial class AppCamaraForm : Form
     // ════════════════════════════════════════════════════════════════════════
     #region Cámara — Captura de frames
 
+    /// <summary>
+    /// Obtiene todos los dispositivos de captura de video (cámaras web) conectados al sistema,
+    /// y llena el ComboBox selector.
+    /// </summary>
     private void CargarDispositivosCamara()
     {
         try
@@ -291,6 +321,10 @@ public partial class AppCamaraForm : Form
         }
     }
 
+    /// <summary>
+    /// Maneja el cambio de dispositivo seleccionado por el usuario. Detiene la cámara actual
+    /// e inicia la nueva, bloqueándolo si hay una grabación en progreso.
+    /// </summary>
     private void CbCamaras_SelectedIndexChanged(object? sender, EventArgs e)
     {
         if (_grabando)
@@ -302,6 +336,10 @@ public partial class AppCamaraForm : Form
         IniciarCaptura();
     }
 
+    /// <summary>
+    /// Inicializa la cámara seleccionada en el ComboBox y se suscribe al evento <c>NewFrame</c>
+    /// para comenzar a recibir los fotogramas en tiempo real.
+    /// </summary>
     private void IniciarCaptura()
     {
         try
@@ -323,6 +361,10 @@ public partial class AppCamaraForm : Form
         }
     }
 
+    /// <summary>
+    /// Callback que se ejecuta por cada fotograma que llega de la cámara.
+    /// Renderiza el frame en el <c>PictureBox</c> y, si se está grabando, lo envía al <see cref="AviGrabador"/>.
+    /// </summary>
     private void FuenteVideo_NewFrame(object sender, NewFrameEventArgs eventArgs)
     {
         try
@@ -348,6 +390,10 @@ public partial class AppCamaraForm : Form
         catch { }
     }
 
+    /// <summary>
+    /// Detiene de manera segura el dispositivo de captura de video y limpia 
+    /// los recursos y eventos asociados para liberar la cámara.
+    /// </summary>
     private void DetenerCaptura()
     {
         if (_fuenteVideo != null)
@@ -373,6 +419,10 @@ public partial class AppCamaraForm : Form
     // ════════════════════════════════════════════════════════════════════════
     #region Grabación de Video
 
+    /// <summary>
+    /// Evento disparado al presionar el botón "Grabar Video". Alterna el estado entre Iniciar
+    /// y Detener la grabación según corresponda.
+    /// </summary>
     private void BtnGrabar_Click(object? sender, EventArgs e)
     {
         if (!_grabando)
@@ -381,6 +431,10 @@ public partial class AppCamaraForm : Form
             DetenerGrabacion();
     }
 
+    /// <summary>
+    /// Configura y comienza a escribir los fotogramas en un archivo temporal de formato AVI utilizando el <see cref="AviGrabador"/>.
+    /// Modifica la interfaz para mostrar el estado de "Grabando".
+    /// </summary>
     private void IniciarGrabacion()
     {
         if (picPreview.Image == null)
@@ -427,6 +481,10 @@ public partial class AppCamaraForm : Form
         }
     }
 
+    /// <summary>
+    /// Finaliza la escritura del archivo AVI. Una vez cerrado, intenta usar <c>FFmpeg</c> asíncronamente
+    /// para convertir el archivo crudo (.avi) en un formato comprimido estándar (.mp4).
+    /// </summary>
     private async void DetenerGrabacion()
     {
         _timerGrabacion.Stop();
@@ -488,6 +546,10 @@ public partial class AppCamaraForm : Form
         }
     }
 
+    /// <summary>
+    /// Libera recursos cerrando de forma segura el objeto que mantiene abierto el flujo
+    /// de escritura de video (.avi).
+    /// </summary>
     private void LimpiarGrabador()
     {
         if (_grabador != null)
@@ -502,6 +564,10 @@ public partial class AppCamaraForm : Form
         }
     }
 
+    /// <summary>
+    /// Aumenta el contador de segundos de grabación y actualiza la etiqueta de la interfaz de usuario
+    /// mostrando el formato MM:SS.
+    /// </summary>
     private void TimerGrabacion_Tick(object? sender, EventArgs e)
     {
         _segundosGrabacion++;
@@ -515,6 +581,10 @@ public partial class AppCamaraForm : Form
     // ════════════════════════════════════════════════════════════════════════
     #region Captura de Foto
 
+    /// <summary>
+    /// Toma el frame estático actual que se está mostrando en el PictureBox de previsualización,
+    /// lo convierte a Bitmap y lo guarda en disco como formato JPEG.
+    /// </summary>
     private void BtnCapturar_Click(object? sender, EventArgs e)
     {
         if (picPreview.Image == null)

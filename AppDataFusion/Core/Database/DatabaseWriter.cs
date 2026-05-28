@@ -18,6 +18,10 @@ public static class DatabaseWriter
     //  POSTGRESQL
     // --------------------------------------------------------------
 
+    /// <summary>
+    /// Exporta masivamente una lista de datos locales hacia una nueva tabla en PostgreSQL.
+    /// Deduce dinámicamente si el ID es numérico o de texto y crea la tabla si no existe.
+    /// </summary>
     public static WriteResult EscribirEnPostgreSQL(
         string cadenaConexion,
         string tabla,
@@ -34,7 +38,23 @@ public static class DatabaseWriter
             // Construir lista de columnas definitiva (sin duplicados, en orden original)
             var columnas = BuildColumnasSanitizadas(infoColumnas);
 
-            CrearTablaPostgreSQL(conn, tabla, columnas);
+            // Verificar si el ID contiene caracteres no numéricos
+            bool idEsEntero = true;
+            var colIdInfo = columnas.FirstOrDefault(c => c.Clave == "id");
+            if (colIdInfo != default)
+            {
+                foreach (var item in datos)
+                {
+                    string rawVal = ObtenerValorExport(item, colIdInfo.Display, "id");
+                    if (!string.IsNullOrEmpty(rawVal) && !int.TryParse(rawVal, out _))
+                    {
+                        idEsEntero = false;
+                        break;
+                    }
+                }
+            }
+
+            CrearTablaPostgreSQL(conn, tabla, columnas, idEsEntero);
 
             int total = datos.Count;
             int insertados = 0;
@@ -47,7 +67,7 @@ public static class DatabaseWriter
                 {
                     try
                     {
-                        InsertarItemPostgreSQL(conn, tx, tabla, item, columnas, infoColumnas);
+                        InsertarItemPostgreSQL(conn, tx, tabla, item, columnas, infoColumnas, idEsEntero);
                         insertados++;
                         if (insertados % 100 == 0)
                             progreso?.Report((int)(insertados * 100.0 / total));
@@ -91,34 +111,48 @@ public static class DatabaseWriter
             EscribirEnPostgreSQL(cadenaConexion, tabla, datos, infoColumnas, progreso));
     }
 
+    /// <summary>
+    /// Crea dinámicamente una tabla en PostgreSQL basada en las columnas sanitizadas extraídas
+    /// de la vista de datos actual, determinando automáticamente los tipos de dato (SERIAL, TEXT, DOUBLE PRECISION).
+    /// </summary>
     private static void CrearTablaPostgreSQL(
         NpgsqlConnection conn,
         string tabla,
-        List<(string NombreDB, string Clave, string Display)> columnas)
+        List<(string NombreDB, string Clave, string Display)> columnas,
+        bool idEsEntero)
     {
         // Determinar tipo SQL por clave semántica
         string TipoSQL(string clave) => clave switch
         {
-            "id" => "INTEGER",
+            "id" => (idEsEntero ? "INTEGER" : "TEXT") + " PRIMARY KEY",
             "valor" => "DOUBLE PRECISION",
             "fecha" => "TEXT",   // TEXT es seguro para fechas de formato variable
             _ => "TEXT"
         };
 
-        var defs = columnas.Select(c => $"    \"{c.NombreDB}\" {TipoSQL(c.Clave)}");
+        var defs = columnas.Select(c => $"    \"{c.NombreDB}\" {TipoSQL(c.Clave)}").ToList();
+        if (!columnas.Any(c => string.Equals(c.Clave, "id", StringComparison.OrdinalIgnoreCase)))
+        {
+            defs.Insert(0, "    \"id\" SERIAL PRIMARY KEY");
+        }
         string sql = $"CREATE TABLE IF NOT EXISTS \"{tabla}\" (\n{string.Join(",\n", defs)}\n);";
 
         using var cmd = new NpgsqlCommand(sql, conn);
         cmd.ExecuteNonQuery();
     }
 
+    /// <summary>
+    /// Inserta una única fila (DataItem) en una tabla PostgreSQL mapeando los valores desde el DataItem
+    /// hacia los parámetros seguros del comando SQL (evita inyecciones SQL).
+    /// </summary>
     private static void InsertarItemPostgreSQL(
         NpgsqlConnection conn,
         NpgsqlTransaction tx,
         string tabla,
         DataItem item,
         List<(string NombreDB, string Clave, string Display)> columnas,
-        List<(string Display, string Clave)> infoColumnas)
+        List<(string Display, string Clave)> infoColumnas,
+        bool idEsEntero)
     {
         var colNames = columnas.Select(c => $"\"{c.NombreDB}\"").ToList();
         var paramNames = columnas.Select((c, i) => $"@p{i}").ToList();
@@ -136,10 +170,17 @@ public static class DatabaseWriter
             object dbVal;
             if (clave == "id")
             {
-                if (int.TryParse(rawVal, out int idV))
-                    dbVal = idV;
+                if (idEsEntero)
+                {
+                    if (int.TryParse(rawVal, out int idV))
+                        dbVal = idV;
+                    else
+                        dbVal = DBNull.Value;
+                }
                 else
-                    dbVal = DBNull.Value;
+                {
+                    dbVal = string.IsNullOrEmpty(rawVal) ? DBNull.Value : (object)rawVal;
+                }
             }
             else if (clave == "valor")
             {
@@ -163,6 +204,10 @@ public static class DatabaseWriter
     //  MARIADB
     // --------------------------------------------------------------
 
+    /// <summary>
+    /// Exporta masivamente una lista de datos locales hacia una nueva tabla en MariaDB/MySQL.
+    /// Genera la tabla automáticamente usando tipos de dato compatibles con MySQL (INT, VARCHAR, DOUBLE, TEXT).
+    /// </summary>
     public static WriteResult EscribirEnMariaDB(
         string cadenaConexion,
         string tabla,
@@ -178,7 +223,23 @@ public static class DatabaseWriter
 
             var columnas = BuildColumnasSanitizadas(infoColumnas);
 
-            CrearTablaMariaDB(conn, tabla, columnas);
+            // Verificar si el ID contiene caracteres no numéricos
+            bool idEsEntero = true;
+            var colIdInfo = columnas.FirstOrDefault(c => c.Clave == "id");
+            if (colIdInfo != default)
+            {
+                foreach (var item in datos)
+                {
+                    string rawVal = ObtenerValorExport(item, colIdInfo.Display, "id");
+                    if (!string.IsNullOrEmpty(rawVal) && !int.TryParse(rawVal, out _))
+                    {
+                        idEsEntero = false;
+                        break;
+                    }
+                }
+            }
+
+            CrearTablaMariaDB(conn, tabla, columnas, idEsEntero);
 
             int total = datos.Count;
             int insertados = 0;
@@ -191,7 +252,7 @@ public static class DatabaseWriter
                 {
                     try
                     {
-                        InsertarItemMariaDB(conn, tx, tabla, item, columnas, infoColumnas);
+                        InsertarItemMariaDB(conn, tx, tabla, item, columnas, infoColumnas, idEsEntero);
                         insertados++;
                         if (insertados % 100 == 0)
                             progreso?.Report((int)(insertados * 100.0 / total));
@@ -235,32 +296,46 @@ public static class DatabaseWriter
             EscribirEnMariaDB(cadenaConexion, tabla, datos, infoColumnas, progreso));
     }
 
+    /// <summary>
+    /// Crea dinámicamente una tabla en MariaDB basada en las columnas sanitizadas extraídas de los datos,
+    /// aplicando dialectos SQL propios de MySQL (ENGINE=InnoDB, AUTO_INCREMENT).
+    /// </summary>
     private static void CrearTablaMariaDB(
         MySqlConnection conn,
         string tabla,
-        List<(string NombreDB, string Clave, string Display)> columnas)
+        List<(string NombreDB, string Clave, string Display)> columnas,
+        bool idEsEntero)
     {
         string TipoSQL(string clave) => clave switch
         {
-            "id" => "INT",
+            "id" => (idEsEntero ? "INT" : "VARCHAR(255)") + " PRIMARY KEY",
             "valor" => "DOUBLE",
             _ => "TEXT"
         };
 
-        var defs = columnas.Select(c => $"    `{c.NombreDB}` {TipoSQL(c.Clave)}");
+        var defs = columnas.Select(c => $"    `{c.NombreDB}` {TipoSQL(c.Clave)}").ToList();
+        if (!columnas.Any(c => string.Equals(c.Clave, "id", StringComparison.OrdinalIgnoreCase)))
+        {
+            defs.Insert(0, "    `id` INT AUTO_INCREMENT PRIMARY KEY");
+        }
         string sql = $"CREATE TABLE IF NOT EXISTS `{tabla}` (\n{string.Join(",\n", defs)}\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;";
 
         using var cmd = new MySqlCommand(sql, conn);
         cmd.ExecuteNonQuery();
     }
 
+    /// <summary>
+    /// Inserta un único registro (DataItem) en MariaDB, asignando cuidadosamente los valores
+    /// extraídos a parámetros seguros de la consulta para prevenir inyección SQL.
+    /// </summary>
     private static void InsertarItemMariaDB(
         MySqlConnection conn,
         MySqlTransaction tx,
         string tabla,
         DataItem item,
         List<(string NombreDB, string Clave, string Display)> columnas,
-        List<(string Display, string Clave)> infoColumnas)
+        List<(string Display, string Clave)> infoColumnas,
+        bool idEsEntero)
     {
         var colNames = columnas.Select(c => $"`{c.NombreDB}`").ToList();
         var paramNames = columnas.Select((c, i) => $"@p{i}").ToList();
@@ -278,10 +353,17 @@ public static class DatabaseWriter
             object dbVal;
             if (clave == "id")
             {
-                if (int.TryParse(rawVal, out int idV))
-                    dbVal = idV;
+                if (idEsEntero)
+                {
+                    if (int.TryParse(rawVal, out int idV))
+                        dbVal = idV;
+                    else
+                        dbVal = DBNull.Value;
+                }
                 else
-                    dbVal = DBNull.Value;
+                {
+                    dbVal = string.IsNullOrEmpty(rawVal) ? DBNull.Value : (object)rawVal;
+                }
             }
             else if (clave == "valor")
             {
@@ -301,6 +383,10 @@ public static class DatabaseWriter
         cmd.ExecuteNonQuery();
     }
 
+    /// <summary>
+    /// Construye de manera segura una cadena de conexión para PostgreSQL manejando valores por defecto
+    /// para el puerto y el nombre de la base de datos maestra (postgres).
+    /// </summary>
     public static string BuildPostgreSqlConnectionString(string host, string puerto, string database, string usuario, string contrasena)
     {
         var builder = new NpgsqlConnectionStringBuilder
@@ -314,6 +400,9 @@ public static class DatabaseWriter
         return builder.ConnectionString;
     }
 
+    /// <summary>
+    /// Construye de manera segura una cadena de conexión para MariaDB/MySQL validando el puerto (default 3306).
+    /// </summary>
     public static string BuildMariaDbConnectionString(string host, string puerto, string database, string usuario, string contrasena)
     {
         var builder = new MySqlConnectionStringBuilder
@@ -334,6 +423,9 @@ public static class DatabaseWriter
     //  OBTENER BASES DE DATOS DISPONIBLES
     // --------------------------------------------------------------
 
+    /// <summary>
+    /// Enumera todas las bases de datos disponibles y con permiso de acceso en el servidor PostgreSQL remoto.
+    /// </summary>
     public static List<string> ObtenerBasesDatosPostgreSQL(string host, string puerto, string usuario, string contrasena)
     {
         var dbs = new List<string>();
@@ -355,6 +447,9 @@ public static class DatabaseWriter
         return dbs;
     }
 
+    /// <summary>
+    /// Enumera todas las bases de datos (Schemas/Databases) alojadas en el servidor MariaDB remoto.
+    /// </summary>
     public static List<string> ObtenerBasesDatosMariaDB(string host, string puerto, string usuario, string contrasena)
     {
         var dbs = new List<string>();
@@ -379,6 +474,10 @@ public static class DatabaseWriter
     //  OBTENER TABLAS DISPONIBLES
     // --------------------------------------------------------------
 
+    /// <summary>
+    /// Enumera todas las tablas base de usuario (no de sistema) dentro del esquema 'public' 
+    /// en la base de datos PostgreSQL conectada.
+    /// </summary>
     public static List<string> ObtenerTablasPostgreSQL(string cadenaConexion)
     {
         var tablas = new List<string>();
@@ -400,6 +499,9 @@ public static class DatabaseWriter
         return tablas;
     }
 
+    /// <summary>
+    /// Extrae y enlista el nombre de todas las tablas base que residen en la base de datos MariaDB seleccionada.
+    /// </summary>
     public static List<string> ObtenerTablasMariaDB(string cadenaConexion)
     {
         var tablas = new List<string>();
@@ -483,7 +585,7 @@ public static class DatabaseWriter
         };
     }
 
-    private static string SanitizarNombre(string nombre)
+    public static string SanitizarNombre(string nombre)
     {
         var sb = new System.Text.StringBuilder();
         foreach (char c in nombre)
@@ -493,7 +595,199 @@ public static class DatabaseWriter
         if (char.IsDigit(s[0])) s = "_" + s;
         return s.ToLowerInvariant();
     }
+
+    /// <summary>
+    /// Realiza un UPDATE sincronizado de una sola celda/campo hacia PostgreSQL, descubriendo dinámicamente
+    /// los tipos de la columna y el ID para enviar los datos con seguridad en parámetros fuertemente tipados.
+    /// </summary>
+    public static (bool Exito, string Error) ActualizarCampoPostgreSQL(
+        string cadenaConexion,
+        string tabla,
+        string colId,
+        object idVal,
+        string colNombre,
+        object? nuevoValor)
+    {
+        try
+        {
+            using var conn = new NpgsqlConnection(cadenaConexion);
+            conn.Open();
+
+            // Detectar el tipo de dato de las columnas en PostgreSQL para evitar errores de tipo en parámetros
+            string? dataType = null;
+            string? idDataType = null;
+            try
+            {
+                string typeSql = "SELECT column_name, data_type FROM information_schema.columns WHERE (table_name = @tab OR table_name = @tabLower) AND (column_name = @col OR column_name = @colId);";
+                using var cmdType = new NpgsqlCommand(typeSql, conn);
+                cmdType.Parameters.AddWithValue("@tab", tabla);
+                cmdType.Parameters.AddWithValue("@tabLower", tabla.ToLowerInvariant());
+                cmdType.Parameters.AddWithValue("@col", colNombre);
+                cmdType.Parameters.AddWithValue("@colId", colId);
+                using var r = cmdType.ExecuteReader();
+                while (r.Read())
+                {
+                    string cName = r.GetString(0);
+                    string dType = r.GetString(1);
+                    if (string.Equals(cName, colNombre, StringComparison.OrdinalIgnoreCase)) dataType = dType;
+                    if (string.Equals(cName, colId, StringComparison.OrdinalIgnoreCase)) idDataType = dType;
+                }
+            }
+            catch { }
+
+            object? dbValue = nuevoValor;
+            if (dbValue != null && dataType != null)
+            {
+                string valStr = dbValue.ToString() ?? "";
+                string dtLower = dataType.ToLowerInvariant();
+                if (dtLower.Contains("int") || dtLower.Contains("integer"))
+                {
+                    if (int.TryParse(valStr, out int intVal))
+                        dbValue = intVal;
+                    else if (string.IsNullOrEmpty(valStr.Trim()))
+                        dbValue = DBNull.Value;
+                }
+                else if (dtLower.Contains("double") || dtLower.Contains("real") || dtLower.Contains("numeric") || dtLower.Contains("decimal") || dtLower.Contains("precision"))
+                {
+                    if (double.TryParse(valStr, NumberStyles.Any, CultureInfo.InvariantCulture, out double dblVal))
+                        dbValue = dblVal;
+                    else if (string.IsNullOrEmpty(valStr.Trim()))
+                        dbValue = DBNull.Value;
+                }
+                else if (dtLower.Contains("bool") || dtLower.Contains("boolean"))
+                {
+                    if (bool.TryParse(valStr, out bool boolVal))
+                        dbValue = boolVal;
+                    else if (string.IsNullOrEmpty(valStr.Trim()))
+                        dbValue = DBNull.Value;
+                }
+            }
+
+            object finalIdVal = idVal;
+            if (idVal != null && idDataType != null)
+            {
+                string idStr = idVal.ToString() ?? "";
+                string idDtLower = idDataType.ToLowerInvariant();
+                if (idDtLower.Contains("text") || idDtLower.Contains("char"))
+                {
+                    finalIdVal = idStr; // PostgreSQL espera un texto
+                }
+                else if (idDtLower.Contains("int") || idDtLower.Contains("integer"))
+                {
+                    if (int.TryParse(idStr, out int intId))
+                        finalIdVal = intId; // PostgreSQL espera un entero
+                }
+            }
+
+            string sql = $"UPDATE \"{tabla}\" SET \"{colNombre}\" = @val WHERE \"{colId}\" = @id;";
+            using var cmd = new NpgsqlCommand(sql, conn);
+            cmd.Parameters.AddWithValue("@val", dbValue ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@id", finalIdVal);
+            int rows = cmd.ExecuteNonQuery();
+            if (rows == 0)
+            {
+                return (false, "No se encontró ningún registro en la base de datos con ese identificador.");
+            }
+            return (true, "");
+        }
+        catch (Exception ex)
+        {
+            string colsInfo = "";
+            try
+            {
+                using var conn2 = new NpgsqlConnection(cadenaConexion);
+                conn2.Open();
+                using var cmdCols = new NpgsqlCommand(
+                    "SELECT column_name FROM information_schema.columns WHERE table_name = @tab", conn2);
+                cmdCols.Parameters.AddWithValue("@tab", tabla);
+                using var rCols = cmdCols.ExecuteReader();
+                var colList = new List<string>();
+                while (rCols.Read()) colList.Add(rCols.GetString(0));
+                colsInfo = "\nColumnas en BD: " + string.Join(", ", colList);
+            }
+            catch (Exception exCols)
+            {
+                colsInfo = "\n(No se pudo leer columnas de la tabla: " + exCols.Message + ")";
+            }
+            return (false, $"{ex.Message}.{colsInfo}");
+        }
+    }
+
+    public static async Task<(bool Exito, string Error)> ActualizarCampoPostgreSQLAsync(
+        string cadenaConexion,
+        string tabla,
+        string colId,
+        object idVal,
+        string colNombre,
+        object? nuevoValor)
+    {
+        return await Task.Run(() => ActualizarCampoPostgreSQL(cadenaConexion, tabla, colId, idVal, colNombre, nuevoValor));
+    }
+
+    /// <summary>
+    /// Ejecuta una actualización singular (UPDATE) en tiempo real hacia una celda específica de una tabla en MariaDB,
+    /// mapeando el identificador para actualizar exactamente el registro correcto.
+    /// </summary>
+    public static (bool Exito, string Error) ActualizarCampoMariaDB(
+        string cadenaConexion,
+        string tabla,
+        string colId,
+        object idVal,
+        string colNombre,
+        object? nuevoValor)
+    {
+        try
+        {
+            using var conn = new MySqlConnection(cadenaConexion);
+            conn.Open();
+            string sql = $"UPDATE `{tabla}` SET `{colNombre}` = @val WHERE `{colId}` = @id;";
+            using var cmd = new MySqlCommand(sql, conn);
+            cmd.Parameters.AddWithValue("@val", nuevoValor ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@id", idVal);
+            int rows = cmd.ExecuteNonQuery();
+            if (rows == 0)
+            {
+                return (false, "No se encontró ningún registro en la base de datos con ese identificador.");
+            }
+            return (true, "");
+        }
+        catch (Exception ex)
+        {
+            string colsInfo = "";
+            try
+            {
+                using var conn2 = new MySqlConnection(cadenaConexion);
+                conn2.Open();
+                using var cmdCols = new MySqlCommand(
+                    "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = @tab AND TABLE_SCHEMA = @schema", conn2);
+                cmdCols.Parameters.AddWithValue("@tab", tabla);
+                cmdCols.Parameters.AddWithValue("@schema", conn2.Database);
+                using var rCols = cmdCols.ExecuteReader();
+                var colList = new List<string>();
+                while (rCols.Read()) colList.Add(rCols.GetString(0));
+                colsInfo = "\nColumnas en BD: " + string.Join(", ", colList);
+            }
+            catch (Exception exCols)
+            {
+                colsInfo = "\n(No se pudo leer columnas de la tabla: " + exCols.Message + ")";
+            }
+            return (false, $"{ex.Message}.{colsInfo}");
+        }
+    }
+
+    public static async Task<(bool Exito, string Error)> ActualizarCampoMariaDBAsync(
+        string cadenaConexion,
+        string tabla,
+        string colId,
+        object idVal,
+        string colNombre,
+        object? nuevoValor)
+    {
+        return await Task.Run(() => ActualizarCampoMariaDB(cadenaConexion, tabla, colId, idVal, colNombre, nuevoValor));
+    }
 }
+
+
 
 public class WriteResult
 {

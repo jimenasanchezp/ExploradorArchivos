@@ -40,6 +40,10 @@ public static class TxtDataReader
         "release", "publicacion", "publicación", "lanzamiento"
     };
 
+    /// <summary>
+    /// Abre un archivo de texto plano de manera transaccional y analiza líneas para inferir
+    /// dinámicamente si posee delimitadores consistentes, mapeando los resultados al formato interno.
+    /// </summary>
     public static List<DataItem> Leer(string rutaArchivo)
     {
         var lista = new List<DataItem>();
@@ -128,6 +132,10 @@ public static class TxtDataReader
         return lista;
     }
 
+    /// <summary>
+    /// Divide y limpia una única línea de texto delimitada, llenando un objeto DataItem de 
+    /// acuerdo con el mapa pre-calculado de columnas.
+    /// </summary>
     private static void ProcesarLineaTxt(string linea, char sep, string[] headers, int[] mapa, int rowNum, List<DataItem> lista)
     {
         try
@@ -177,6 +185,10 @@ public static class TxtDataReader
         return linea;
     }
 
+    /// <summary>
+    /// Analiza una muestra estadística de las primeras líneas del archivo contra posibles 
+    /// caracteres candidatos (| ; , \t) para determinar cuál es el separador real del documento.
+    /// </summary>
     private static char DetectarSeparador(string[] lineas)
     {
         char[] candidatos = { '|', '\t', ';', ',' };
@@ -210,6 +222,10 @@ public static class TxtDataReader
         return count;
     }
 
+    /// <summary>
+    /// Heurística sencilla que examina la primera fila tokenizada intentando averiguar si actúa
+    /// como una fila de encabezados o si directamente contiene información de un registro de datos.
+    /// </summary>
     private static bool EsEncabezado(string[] tokens)
     {
         if (tokens.Length == 0) return false;

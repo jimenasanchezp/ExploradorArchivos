@@ -3,6 +3,9 @@ using System.Windows.Forms;
 
 namespace ExploradorArchivos.UI;
 
+/// <summary>
+/// Visor de imágenes aislado con soporte de zoom básico mediante teclado (Teclas + y -).
+/// </summary>
 public class ImageViewerForm : Form
 {    
     private PictureBox _pictureBox = null!; 

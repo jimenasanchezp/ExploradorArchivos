@@ -4,8 +4,18 @@ using System.Text;
 
 namespace ExploradorArchivos.AppFoto;
 
+/// <summary>
+/// Motor de procesamiento de imágenes GDI+.
+/// Proporciona utilidades para aplicar filtros con <c>ColorMatrix</c>, ajustes de brillo/contraste,
+/// recortes, dibujo de primitivas y modificación de tags EXIF (incluyendo GPS).
+/// </summary>
 public static class AppFotoProcessor
 {
+    /// <summary>
+    /// Lee el tag EXIF de orientación (0x0112) y rota la imagen automáticamente
+    /// a su orientación visual correcta (RotateFlip), eliminando el tag para no aplicar la rotación doble.
+    /// </summary>
+    /// <param name="img">Objeto imagen cargado en memoria.</param>
     public static void CorrectOrientation(Image img)
     {
         if (Array.IndexOf(img.PropertyIdList, 0x0112) == -1) return;
@@ -32,6 +42,12 @@ public static class AppFotoProcessor
         }
     }
 
+    /// <summary>
+    /// Aplica un filtro de color predefinido sobre la imagen original utilizando transformaciones de matrices de color.
+    /// </summary>
+    /// <param name="original">Imagen base a transformar.</param>
+    /// <param name="filtro">Nombre del filtro (BN, Sepia, Soft).</param>
+    /// <returns>Una nueva instancia <see cref="Bitmap"/> con el filtro aplicado.</returns>
     public static Bitmap AplicarFiltro(Image original, string filtro)
     {
         Bitmap bmp = new Bitmap(original.Width, original.Height);
@@ -54,6 +70,10 @@ public static class AppFotoProcessor
         return bmp;
     }
 
+    /// <summary>
+    /// Aplica dinámicamente un ajuste combinado de Brillo, Contraste, Saturación y balances tonales
+    /// calculando y aplicando una única <see cref="ColorMatrix"/> para mejor rendimiento.
+    /// </summary>
     public static Bitmap AjustarImagen(Image original, float brillo, float contraste, float saturacion, float luces, float sombras)
     {
         // brillo: -100 a 100 -> mBrillo: -1.0 a 1.0
@@ -99,11 +119,17 @@ public static class AppFotoProcessor
         return bmp;
     }
 
+    /// <summary>
+    /// Gira o voltea la imagen según el tipo de rotación especificado.
+    /// </summary>
     public static void Rotar(Image img, RotateFlipType tipo)
     {
         img.RotateFlip(tipo);
     }
 
+    /// <summary>
+    /// Crea una nueva imagen extrayendo un área rectangular específica de la imagen original.
+    /// </summary>
     public static Bitmap Recortar(Image original, Rectangle area)
     {
         Bitmap bmp = new Bitmap(area.Width, area.Height);
@@ -115,6 +141,9 @@ public static class AppFotoProcessor
         return bmp;
     }
 
+    /// <summary>
+    /// Dibuja una línea suavizada (AntiAlias) entre dos puntos directamente sobre la imagen dada.
+    /// </summary>
     public static void DibujarLinea(Image img, Point p1, Point p2, Color color, float grosor)
     {
         using (Graphics g = Graphics.FromImage(img))
@@ -125,6 +154,9 @@ public static class AppFotoProcessor
         }
     }
 
+    /// <summary>
+    /// Incrusta texto renderizado con alta calidad sobre la imagen en las coordenadas indicadas.
+    /// </summary>
     public static void DibujarTexto(Image img, string texto, Point p, Font fuente, Color color)
     {
         using (Graphics g = Graphics.FromImage(img))
@@ -135,6 +167,13 @@ public static class AppFotoProcessor
         }
     }
 
+    /// <summary>
+    /// Sobrescribe el archivo JPEG inyectando los tags EXIF estándar para coordenadas geográficas (GPS).
+    /// </summary>
+    /// <param name="img">Imagen a guardar.</param>
+    /// <param name="ruta">Ruta física de destino (debe ser formato JPEG).</param>
+    /// <param name="lat">Latitud en formato decimal.</param>
+    /// <param name="lon">Longitud en formato decimal.</param>
     public static void GuardarConGps(Image img, string ruta, double lat, double lon)
     {
         // 0x0000: GPSVersionID, 0x0001: GPSLatitudeRef, 0x0002: GPSLatitude, 0x0003: GPSLongitudeRef, 0x0004: GPSLongitude

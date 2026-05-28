@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Runtime.InteropServices;
@@ -7,10 +7,18 @@ using ExploradorArchivos.Models;
 
 namespace ExploradorArchivos.Services;
 
+/// <summary>
+/// Provee servicios encapsulados para operaciones físicas del sistema de archivos, 
+/// incluyendo acceso a funciones nativas del sistema operativo (P/Invoke) para el manejo de la Papelera.
+/// </summary>
 public static class FileService
 {
     // === P/INVOKE PARA LA PAPELERA DE RECICLAJE ===
-    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Auto)] // Estructura para SHFileOperation
+    /// <summary>
+    /// Estructura requerida por la API nativa <c>shell32.dll</c> para ejecutar operaciones 
+    /// seguras de archivos en el sistema operativo Windows.
+    /// </summary>
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Auto)] 
     struct SHFILEOPSTRUCT
     {
         public IntPtr hwnd;
@@ -30,7 +38,13 @@ public static class FileService
     private const ushort FOF_ALLOWUNDO = 0x0040; // Envía a la papelera
     private const ushort FOF_NOCONFIRMATION = 0x0010; // No pregunta "Estás seguro?"
 
-    public static bool EnviarAPapelera(string ruta) // Método para enviar archivos o carpetas a la papelera de reciclaje
+    /// <summary>
+    /// Envía archivos o carpetas de forma segura a la Papelera de Reciclaje.
+    /// Utiliza flags nativos para permitir la acción de deshacer (Undo) y omitir ventanas de confirmación del sistema.
+    /// </summary>
+    /// <param name="ruta">Ruta absoluta del elemento a eliminar.</param>
+    /// <returns>Verdadero si la operación fue exitosa, falso en caso contrario.</returns>
+    public static bool EnviarAPapelera(string ruta)
     {
         try
         {
@@ -47,7 +61,12 @@ public static class FileService
     }
 
     // === LECTURA ASÍNCRONA DE DIRECTORIOS ===
-    // Motor de Búsqueda de archivos y carpetas en una ruta dada, con manejo de excepciones para permisos
+    /// <summary>
+    /// Mapea asíncronamente archivos y carpetas de un directorio físico a objetos <see cref="FileSystemItem"/>.
+    /// Ejecuta la operación en un hilo secundario mediante <c>Task.Run</c> para evitar congelar la interfaz de usuario.
+    /// </summary>
+    /// <param name="rutaPath">Ruta absoluta del directorio a inspeccionar.</param>
+    /// <returns>Lista de objetos que representan el contenido del directorio.</returns>
     public static async Task<List<FileSystemItem>> ObtenerContenidoAsync(string rutaPath)
     {
         return await Task.Run(() =>
@@ -100,7 +119,11 @@ public static class FileService
         });
     }
 
-    // Método auxiliar para formatear el tamaño de los archivos en una forma legible (B, KB, MB, etc.)
+    /// <summary>
+    /// Convierte bytes crudos a formatos legibles por el usuario (B, KB, MB, GB, TB).
+    /// </summary>
+    /// <param name="bytes">Tamaño en bytes a convertir.</param>
+    /// <returns>Cadena formateada con el peso exacto en la unidad más adecuada.</returns>
     private static string FormatearTamano(long bytes)
     {
         string[] sufijos = { "B", "KB", "MB", "GB", "TB" };

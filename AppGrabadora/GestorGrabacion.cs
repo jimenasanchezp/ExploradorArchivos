@@ -3,11 +3,19 @@ using NAudio.Wave;
 
 namespace ExploradorArchivos.AppGrabadora
 {
+    /// <summary>
+    /// Maneja la captura asíncrona de audio desde el micrófono utilizando <c>NAudio</c>.
+    /// Escribe los flujos en crudo directamente a un archivo WAV en disco.
+    /// </summary>
     public class GestorGrabacion : IDisposable
     {
         private WaveInEvent? _waveIn;
         private WaveFileWriter? _writer;
 
+        /// <summary>
+        /// Inicializa el dispositivo de grabación y comienza a volcar el audio capturado al archivo especificado.
+        /// </summary>
+        /// <param name="rutaArchivoSalida">Ruta absoluta del archivo destino (.wav).</param>
         public void IniciarGrabacion(string rutaArchivoSalida)
         {
             _waveIn = new WaveInEvent
@@ -23,6 +31,9 @@ namespace ExploradorArchivos.AppGrabadora
             _waveIn.StartRecording();
         }
 
+        /// <summary>
+        /// Detiene la grabación actual y cierra el flujo hacia el archivo.
+        /// </summary>
         public void DetenerGrabacion()
         {
             if (_waveIn != null)

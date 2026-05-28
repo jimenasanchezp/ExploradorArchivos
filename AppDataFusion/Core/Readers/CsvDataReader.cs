@@ -9,6 +9,10 @@ public static class CsvDataReader
     public static Dictionary<string, string> MapeoColumnas { get; private set; } =
         new(StringComparer.OrdinalIgnoreCase);
 
+    /// <summary>
+    /// Abre y lee un archivo CSV en modo streaming, mapeando dinámicamente sus columnas
+    /// a las propiedades de <see cref="DataItem"/> según las coincidencias semánticas encontradas.
+    /// </summary>
     public static List<DataItem> Leer(string rutaArchivo, char separador = ',')
     {
         var lista = new List<DataItem>();
@@ -50,11 +54,11 @@ public static class CsvDataReader
 
             UltimasColumnas = encabezadosRaw.Take(totalCols).ToList();
 
-            int idxId = BuscarColumna(mapa, "id", "car_id", "usedcarskuid", "sku_id", "codigo", "code", "sku", "#", "uuid", "guid");
-            int idxNombre = BuscarColumna(mapa, "nombre", "name", "titulo", "title", "producto", "juego", "descripcion", "description", "brand", "marca", "model", "modelo");
-            int idxCat = BuscarColumna(mapa, "categoria", "category", "genero", "genre", "tipo", "type", "grupo", "group", "body", "car_type");
-            int idxValor = BuscarColumna(mapa, "valor", "value", "precio", "price", "monto", "amount", "ventas", "score", "puntos", "points", "salary", "total");
-            int idxFecha = BuscarColumnaExacta(mapa, "fecha", "date", "releasedate", "created_at", "anio", "model_year");
+            int idxId = BuscarColumna(mapa, "id", "car_id", "usedcarskuid", "sku_id", "codigo", "code", "sku", "#", "uuid", "guid", "_id", "num", "numero", "idx", "index", "rank", "no", "student_id");
+            int idxNombre = BuscarColumna(mapa, "nombre", "name", "titulo", "title", "producto", "juego", "descripcion", "description", "brand", "marca", "model", "modelo", "micrositio", "persona", "person", "autor", "author", "atleta", "athlete");
+            int idxCat = BuscarColumna(mapa, "categoria", "category", "genero", "gender", "sexo", "sex", "genre", "tipo", "type", "grupo", "group", "body", "car_type", "level", "nivel", "clasificacion", "clase", "class", "division");
+            int idxValor = BuscarColumna(mapa, "valor", "value", "precio", "price", "monto", "amount", "ventas", "sales", "score", "puntos", "points", "salary", "total", "edad", "age", "promedio", "avg", "cantidad", "count");
+            int idxFecha = BuscarColumnaExacta(mapa, "fecha", "date", "releasedate", "created_at", "anio", "model_year", "periodo", "period", "updated_at", "timestamp", "fecha_registro", "fecha_reporte");
 
             var mapeadas = new HashSet<int>(new[] { idxId, idxNombre, idxCat, idxValor, idxFecha }.Where(x => x >= 0));
             
@@ -129,6 +133,10 @@ public static class CsvDataReader
     // Parser robusto: maneja comillas dobles, listas Python ["..."],
     // y campos con corchetes sin comillas envolventes.
     // ──────────────────────────────────────────────────────────────
+    /// <summary>
+    /// Parser robusto personalizado que divide una línea en columnas respetando
+    /// el encapsulamiento de comillas dobles, llaves JSON o corchetes que puedan contener el caracter separador.
+    /// </summary>
     private static List<string> SepararCsvRobust(string linea, char sep)
     {
         var campos = new List<string>();

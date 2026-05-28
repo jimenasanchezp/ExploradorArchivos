@@ -32,11 +32,11 @@ namespace ExploradorArchivos
             btnExportarCSV = new Button();
             btnActualizar = new Button();
             btnNuevaCarpeta = new Button();
-            btnCamara = new Button();
             pnlAddressBorder = new Panel();
             txtDireccion = new TextBox();
             btnSubir = new Button();
             btnAtras = new Button();
+            btnCamara = new Button();
             pnlBottom = new Panel();
             pnlTrash = new Panel();
             lblTrash = new Label();
@@ -139,9 +139,8 @@ namespace ExploradorArchivos
             txtDireccion.Font = new Font("Segoe UI", 11F);
             txtDireccion.ForeColor = Color.FromArgb(45, 45, 45);
             txtDireccion.Location = new Point(2, 2);
-            txtDireccion.Multiline = false;
             txtDireccion.Name = "txtDireccion";
-            txtDireccion.Size = new Size(762, 26);
+            txtDireccion.Size = new Size(762, 25);
             txtDireccion.TabIndex = 0;
             // 
             // btnSubir
@@ -167,6 +166,13 @@ namespace ExploradorArchivos
             btnAtras.TabIndex = 0;
             btnAtras.Text = "◄";
             btnAtras.UseVisualStyleBackColor = true;
+            // 
+            // btnCamara
+            // 
+            btnCamara.Location = new Point(0, 0);
+            btnCamara.Name = "btnCamara";
+            btnCamara.Size = new Size(75, 23);
+            btnCamara.TabIndex = 0;
             // 
             // pnlBottom
             // 
@@ -227,7 +233,7 @@ namespace ExploradorArchivos
             splitContainerMain.Panel2.Controls.Add(treeViewLateral);
             splitContainerMain.Panel2.Controls.Add(pnlSearch);
             splitContainerMain.Size = new Size(1200, 610);
-            splitContainerMain.SplitterDistance = 852;
+            splitContainerMain.SplitterDistance = 900;
             splitContainerMain.SplitterWidth = 2;
             splitContainerMain.TabIndex = 2;
             // 
@@ -243,7 +249,7 @@ namespace ExploradorArchivos
             listViewPrincipal.Location = new Point(0, 0);
             listViewPrincipal.Name = "listViewPrincipal";
             listViewPrincipal.OwnerDraw = true;
-            listViewPrincipal.Size = new Size(852, 610);
+            listViewPrincipal.Size = new Size(900, 610);
             listViewPrincipal.TabIndex = 0;
             listViewPrincipal.UseCompatibleStateImageBehavior = false;
             listViewPrincipal.View = View.Details;
@@ -281,7 +287,7 @@ namespace ExploradorArchivos
             treeViewLateral.Name = "treeViewLateral";
             treeViewLateral.ShowLines = false;
             treeViewLateral.ShowPlusMinus = false;
-            treeViewLateral.Size = new Size(346, 560);
+            treeViewLateral.Size = new Size(298, 560);
             treeViewLateral.TabIndex = 1;
             // 
             // pnlSearch
@@ -292,7 +298,7 @@ namespace ExploradorArchivos
             pnlSearch.Dock = DockStyle.Top;
             pnlSearch.Location = new Point(0, 0);
             pnlSearch.Name = "pnlSearch";
-            pnlSearch.Size = new Size(346, 50);
+            pnlSearch.Size = new Size(298, 50);
             pnlSearch.TabIndex = 0;
             // 
             // btnBuscar
@@ -302,7 +308,7 @@ namespace ExploradorArchivos
             btnBuscar.FlatAppearance.BorderSize = 0;
             btnBuscar.FlatStyle = FlatStyle.Flat;
             btnBuscar.ForeColor = Color.White;
-            btnBuscar.Location = new Point(263, 10);
+            btnBuscar.Location = new Point(215, 10);
             btnBuscar.Name = "btnBuscar";
             btnBuscar.Size = new Size(75, 30);
             btnBuscar.TabIndex = 1;
@@ -317,7 +323,7 @@ namespace ExploradorArchivos
             pnlSearchBorder.Location = new Point(6, 10);
             pnlSearchBorder.Name = "pnlSearchBorder";
             pnlSearchBorder.Padding = new Padding(2);
-            pnlSearchBorder.Size = new Size(251, 30);
+            pnlSearchBorder.Size = new Size(203, 30);
             pnlSearchBorder.TabIndex = 0;
             // 
             // txtBuscar
@@ -330,7 +336,7 @@ namespace ExploradorArchivos
             txtBuscar.Location = new Point(2, 2);
             txtBuscar.Multiline = true;
             txtBuscar.Name = "txtBuscar";
-            txtBuscar.Size = new Size(247, 26);
+            txtBuscar.Size = new Size(199, 26);
             txtBuscar.TabIndex = 0;
             // 
             // Form1
@@ -342,12 +348,12 @@ namespace ExploradorArchivos
             Controls.Add(splitContainerMain);
             Controls.Add(pnlBottom);
             Controls.Add(pnlTop);
-            Font = new Font("Segoe UI", 10F, FontStyle.Regular, GraphicsUnit.Point, 0); // La fuente se establecerá dinámicamente en Form1.cs
+            Font = new Font("Segoe UI", 10F, FontStyle.Regular, GraphicsUnit.Point, 0);
+            FormBorderStyle = FormBorderStyle.None;
             Margin = new Padding(4);
             MinimumSize = new Size(800, 500);
             Name = "Form1";
             StartPosition = FormStartPosition.CenterScreen;
-            FormBorderStyle = FormBorderStyle.None;
             Text = "Explorador de Archivos";
             pnlTop.ResumeLayout(false);
             pnlAddressBorder.ResumeLayout(false);

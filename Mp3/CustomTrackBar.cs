@@ -6,8 +6,8 @@ using System.Windows.Forms;
 namespace ExploradorArchivos.Mp3;
 
 /// <summary>
-/// TrackBar 100% OwnerDraw con diseño premium.
-/// Barra delgada con gradiente Rose→Violet y thumb circular con glow.
+/// Control de barra de progreso 100% OwnerDraw.
+/// Dibuja un raíl delgado y un pulgar circular que reacciona a los eventos del mouse.
 /// </summary>
 public class CustomTrackBar : Control
 {
@@ -58,6 +58,10 @@ public class CustomTrackBar : Control
         this.Cursor = Cursors.Hand;
     }
 
+    /// <summary>
+    /// Sobrescribe el renderizado por defecto para dibujar la barra de progreso utilizando GDI+.
+    /// Incluye suavizado (AntiAlias) y dibuja el raíl, el progreso y un pulgar dinámico en hover.
+    /// </summary>
     protected override void OnPaint(PaintEventArgs e)
     {
         var g = e.Graphics;
@@ -132,6 +136,11 @@ public class CustomTrackBar : Control
         base.OnMouseLeave(e);
     }
 
+    /// <summary>
+    /// Calcula el nuevo valor de progreso (0.0 a 1.0) basado en la posición en X del mouse
+    /// respecto a la anchura del control, respetando los márgenes.
+    /// </summary>
+    /// <param name="mouseX">Posición X actual del puntero del ratón.</param>
     private void UpdateValueFromMouse(int mouseX)
     {
         int margin = THUMB_RADIUS + 2;

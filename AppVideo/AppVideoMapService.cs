@@ -2,6 +2,9 @@ using System;
 
 namespace ExploradorArchivos.AppVideo;
 
+/// <summary>
+/// Genera plantillas HTML dinámicas para integrar <c>Leaflet.js</c> y visualizar coordenadas de videos en el mapa.
+/// </summary>
 public static class AppVideoMapService
 {
     public static string GenerarMapaHtml(double lat, double lon)

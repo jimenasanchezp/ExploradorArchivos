@@ -9,6 +9,11 @@ using System.Windows.Forms;
 
 namespace ExploradorArchivos.UI;
 
+/// <summary>
+/// Interfaz gráfica para enviar correos electrónicos con archivos adjuntos.
+/// Implementa un cliente SMTP interno para envíos directos, sorteando 
+/// las limitaciones o ausencias de clientes de correo instalados (MAPI).
+/// </summary>
 public class SendMailForm : Form
 {
     private string _filePath;

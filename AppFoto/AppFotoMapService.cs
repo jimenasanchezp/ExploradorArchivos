@@ -2,8 +2,16 @@ using System;
 
 namespace ExploradorArchivos.AppFoto;
 
+/// <summary>
+/// Genera plantillas HTML dinámicas para integrar <c>Leaflet.js</c> y mapas de OpenStreetMap.
+/// Permite visualizar coordenadas EXIF o interactuar gráficamente para seleccionar una ubicación.
+/// </summary>
 public static class AppFotoMapService
 {
+    /// <summary>
+    /// Genera código HTML/JS de solo lectura que coloca un marcador en las coordenadas dadas.
+    /// Utiliza un estilo incrustado que se ajusta automáticamente al contenedor del <c>WebView2</c>.
+    /// </summary>
     public static string GenerarMapaHtml(double lat, double lon)
     {
         return $@"
@@ -32,6 +40,10 @@ public static class AppFotoMapService
         </html>";
     }
 
+    /// <summary>
+    /// Genera código HTML/JS interactivo para seleccionar una ubicación en el mapa global.
+    /// Utiliza <c>window.chrome.webview.postMessage</c> para enviar los datos de vuelta a la aplicación C#.
+    /// </summary>
     public static string GenerarMapaPickerHtml()
     {
         return $@"

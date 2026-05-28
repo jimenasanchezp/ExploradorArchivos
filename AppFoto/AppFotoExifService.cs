@@ -6,8 +6,17 @@ using System.Text;
 
 namespace ExploradorArchivos.AppFoto;
 
+/// <summary>
+/// Servicio encargado de extraer metadatos EXIF de imágenes utilizando <c>System.Drawing</c>.
+/// Parsea dimensiones, modelo de cámara, fecha de captura y geolocalización (GPS).
+/// </summary>
 public static class AppFotoExifService
 {
+    /// <summary>
+    /// Lee el archivo de imagen especificado y mapea sus propiedades EXIF a un objeto <see cref="AppFotoMetadata"/>.
+    /// </summary>
+    /// <param name="ruta">Ruta física de la imagen.</param>
+    /// <returns>Modelo poblado con la información extraída de la imagen.</returns>
     public static AppFotoMetadata LeerMetadatos(string ruta)
     {
         var meta = new AppFotoMetadata
@@ -55,6 +64,12 @@ public static class AppFotoExifService
         return meta;
     }
 
+    /// <summary>
+    /// Decodifica las coordenadas GPS crudas (grados, minutos y segundos) desde el tag EXIF a un formato decimal estándar.
+    /// </summary>
+    /// <param name="prop">Tag EXIF correspondiente al valor de longitud/latitud.</param>
+    /// <param name="refProp">Tag EXIF correspondiente a la orientación cardinal (N/S o E/W).</param>
+    /// <returns>Valor double de la coordenada, o nulo en caso de formato incorrecto.</returns>
     private static double? ParseGpsCoordinate(PropertyItem prop, PropertyItem refProp)
     {
         try

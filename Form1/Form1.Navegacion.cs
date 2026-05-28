@@ -15,6 +15,11 @@ namespace ExploradorArchivos;
 /// </summary>
 public partial class Form1
 {
+    /// <summary>
+    /// Obtiene de forma asíncrona los elementos físicos del disco o carga las vistas virtuales del equipo (Inicio, Favoritos, EsteEquipo).
+    /// </summary>
+    /// <param name="ruta">Ruta física o nombre de la vista virtual a cargar.</param>
+    /// <param name="guardarHistorial">Indica si se debe guardar la ruta actual en la pila de historial antes de navegar.</param>
     private async void CargarDirectorio(string ruta, bool guardarHistorial = true)
     {
         if (guardarHistorial && !string.IsNullOrEmpty(_rutaActual) && _rutaActual != ruta)
@@ -73,6 +78,9 @@ public partial class Form1
         _ = GenerarMiniaturasAsync();
     }
 
+    /// <summary>
+    /// Genera la vista virtual de Favoritos, mostrando los elementos fijados por el usuario.
+    /// </summary>
     private void GenerarVistaFavoritos()
     {
         listViewPrincipal.BeginUpdate();
@@ -110,6 +118,10 @@ public partial class Form1
         _itemsActuales.Clear();
     }
 
+    /// <summary>
+    /// Crea un Dashboard dinámico con accesos rápidos a carpetas del usuario
+    /// y una lista de los archivos modificados más recientemente en el sistema.
+    /// </summary>
     private void GenerarVistaInicio()
     {
         listViewPrincipal.BeginUpdate();
@@ -169,7 +181,10 @@ public partial class Form1
         _itemsActuales.Clear();
     }
 
-    // Vista de Este Equipo: muestra las unidades de disco disponibles
+    /// <summary>
+    /// Usa <see cref="DriveInfo.GetDrives"/> para listar y pintar discos duros e información
+    /// de almacenamiento (tamaño total y espacio libre).
+    /// </summary>
     private void GenerarVistaEsteEquipo()
     {
         listViewPrincipal.BeginUpdate();
@@ -199,6 +214,10 @@ public partial class Form1
 
     // === TREEVIEW (PANEL LATERAL) ===
 
+    /// <summary>
+    /// Rellena el panel lateral izquierdo (TreeView) con las vistas principales, favoritos,
+    /// discos duros locales y las carpetas de la ubicación actual.
+    /// </summary>
     private void PoblarTreeViewNormal()
     {
         treeViewLateral.BeginUpdate();
@@ -259,8 +278,10 @@ public partial class Form1
         treeViewLateral.EndUpdate();
     }
 
-    // Evento que procesa la selección del panel lateral para redireccionar
-    // el explorador hacia la ruta física del nodo clickeado.
+    /// <summary>
+    /// Evento que procesa la selección del panel lateral para redireccionar
+    /// el explorador hacia la ruta física del nodo clickeado.
+    /// </summary>
     private void TreeViewLateral_NodeMouseDoubleClick(object? sender, TreeNodeMouseClickEventArgs e)
     {
         if (e.Node.Tag != null)
@@ -277,6 +298,10 @@ public partial class Form1
 
     // === BREADCRUMBS ===
 
+    /// <summary>
+    /// Parsea la ruta física actual en segmentos para generar botones interactivos individuales
+    /// que permiten saltos rápidos de directorio.
+    /// </summary>
     private void ActualizarBreadcrumbs()
     {
         _flpBreadcrumbs.Controls.Clear();
@@ -315,6 +340,9 @@ public partial class Form1
         }
     }
 
+    /// <summary>
+    /// Oculta la barra de breadcrumbs y muestra un campo de texto clásico para ingresar rutas manualmente.
+    /// </summary>
     private void MostrarTextBoxDireccion()
     {
         _flpBreadcrumbs.Visible = false;
@@ -324,6 +352,9 @@ public partial class Form1
         txtDireccion.SelectAll();
     }
 
+    /// <summary>
+    /// Oculta el campo de texto y vuelve a mostrar la barra interactiva de breadcrumbs.
+    /// </summary>
     private void OcultarTextBoxDireccion()
     {
         txtDireccion.Visible = false;

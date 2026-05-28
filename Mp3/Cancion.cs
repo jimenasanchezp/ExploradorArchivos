@@ -5,6 +5,10 @@ using System.Linq;
 
 namespace ExploradorArchivos.Mp3
 {
+    /// <summary>
+    /// Modelo enriquecido para representar una pista musical.
+    /// Almacena metadatos estándar (ID3v2) y recursos multimedia como la portada y la letra de la canción.
+    /// </summary>
     public class Cancion
     {
         // === PROPIEDADES ===
@@ -22,7 +26,11 @@ namespace ExploradorArchivos.Mp3
         // Constructor vacío para creación manual
         public Cancion() { }
 
-        // Constructor principal: carga metadatos del archivo
+        /// <summary>
+        /// Constructor principal: extrae etiquetas ID3v2 (Título, Artista, Álbum, Año, Duración) 
+        /// con <c>TagLib.File</c> y carga recursos asociados de manera automática.
+        /// </summary>
+        /// <param name="ruta">Ruta física del archivo de audio.</param>
         public Cancion(string ruta)
         {
             RutaArchivo = ruta;

@@ -4,6 +4,11 @@ using System.Net.Http.Headers;
 
 namespace ExploradorArchivos.AppDataFusion.Services;
 
+/// <summary>
+/// Servicio de geocodificación que interactúa con la API pública de Nominatim (OpenStreetMap)
+/// para resolver asíncronamente nombres de ciudades/ubicaciones en coordenadas (latitud y longitud).
+/// Implementa políticas de caché y throttle (1 req/sec) para no saturar la API.
+/// </summary>
 public static class GeocodingService
 {
     private static readonly HttpClient _httpClient = new();
@@ -18,6 +23,10 @@ public static class GeocodingService
 
     private static readonly string[] _cityKeywords = { "ciudad", "ciudades", "city", "town", "location", "ubicacion" };
 
+    /// <summary>
+    /// Intenta resolver y asignar las coordenadas para una lista de <c>DataItem</c>,
+    /// priorizando campos que contengan palabras clave como "ciudad" o "location".
+    /// </summary>
     public static async Task IdentificarCoordenadasAsync(IEnumerable<DataItem> items)
     {
         int count = 0;

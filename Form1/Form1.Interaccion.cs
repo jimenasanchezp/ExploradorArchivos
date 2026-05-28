@@ -19,7 +19,11 @@ namespace ExploradorArchivos;
 /// </summary>
 public partial class Form1
 {
-    // Doble clic en el ListView para abrir archivos o navegar a carpetas
+    /// <summary>
+    /// Evento disparado al hacer doble clic en el ListView principal.
+    /// Funciona como el "Router de Módulos", identificando si se debe abrir una carpeta 
+    /// o lanzar un archivo con su módulo correspondiente (Video, Foto, Música, etc.).
+    /// </summary>
     private void ListViewPrincipal_DoubleClick(object? sender, EventArgs e)
     {
         if (listViewPrincipal.SelectedItems.Count == 0) return;
@@ -29,7 +33,12 @@ public partial class Form1
         else AbrirArchivoConAppPredeterminada(ruta);
     }
 
-    // Método para abrir archivos con la aplicación predeterminada del sistema
+    /// <summary>
+    /// Intenta abrir el archivo seleccionado utilizando las aplicaciones nativas de la suite
+    /// (AppFoto, AppVideo, AppMusic, AppDataFusion, Visor de Texto).
+    /// Si el formato no es soportado nativamente, delega la apertura al sistema operativo.
+    /// </summary>
+    /// <param name="ruta">Ruta física del archivo a abrir.</param>
     private void AbrirArchivoConAppPredeterminada(string ruta)
     {
         try
@@ -105,7 +114,10 @@ public partial class Form1
         }
     }
 
-    // Mapea la tecla espacio para activar el Quick Look (vista previa rápida) de archivos, y atajos Ctrl+C, Ctrl+X, Ctrl+V
+    /// <summary>
+    /// Mapea atajos de teclado globales sobre la vista principal.
+    /// Soporta atajos de portapapeles (Ctrl+C, Ctrl+X, Ctrl+V) y activa la previsualización rápida (Quick Look) con la barra espaciadora.
+    /// </summary>
     private void ListViewPrincipal_KeyDown(object? sender, KeyEventArgs e)
     {
         if (e.Control)
@@ -145,7 +157,10 @@ public partial class Form1
         }
     }
 
-    // Mapea la tecla Enter para activar la búsqueda en el ListView
+    /// <summary>
+    /// Mapea la tecla Enter en la barra de búsqueda para ejecutar un filtrado 
+    /// ultrarrápido en memoria sobre los archivos del directorio actual.
+    /// </summary>
     private void TxtBuscar_KeyDown(object? sender, KeyEventArgs e)
     {
         if (e.KeyCode == Keys.Enter)
@@ -189,7 +204,10 @@ public partial class Form1
         }
     }
 
-    // Evento Click para crear una nueva carpeta
+    /// <summary>
+    /// Evento disparado para crear una nueva subcarpeta en el directorio actual.
+    /// Muestra un diálogo solicitando el nombre y maneja caracteres inválidos o colisiones.
+    /// </summary>
     private void BtnNuevaCarpeta_Click(object? sender, EventArgs e)
     {
         if (_rutaActual == "Inicio" || _rutaActual == "EsteEquipo" || !Directory.Exists(_rutaActual))
@@ -357,7 +375,12 @@ public partial class Form1
         }
     }
 
-    // Helper robusto para mover archivos y carpetas
+    /// <summary>
+    /// Helper robusto para mover conjuntos de archivos o carpetas de forma segura
+    /// mediante operaciones Drag & Drop, validando colisiones y reemplazos.
+    /// </summary>
+    /// <param name="items">Colección de elementos seleccionados a mover.</param>
+    /// <param name="destDir">Directorio físico de destino.</param>
     private void MoverItems(ListView.SelectedListViewItemCollection items, string destDir)
     {
         bool algunaModificacion = false;

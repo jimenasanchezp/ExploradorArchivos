@@ -5,6 +5,10 @@ using System.IO;
 
 namespace ExploradorArchivos.UI;
 
+/// <summary>
+/// Establece la paleta de colores temáticos y las rutinas de dibujo manual GDI+ 
+/// para aplicar la estética clásica Estilo 95 / Soft Pastel a los controles de la interfaz.
+/// </summary>
 public static class ThemeRenderer
 {
     // === Total Pink Classic Palette ===
@@ -48,12 +52,20 @@ public static class ThemeRenderer
         g.DrawLine(penDark, bounds.Right - 1, bounds.Top + 1, bounds.Right - 1, bounds.Bottom - 1);
     }
 
+    /// <summary>
+    /// Dibuja las cabeceras de las columnas del ListView.
+    /// Utiliza el dibujo por defecto del sistema para mantener la funcionalidad de ordenamiento.
+    /// </summary>
     public static void DrawListViewColumnHeader(object sender, DrawListViewColumnHeaderEventArgs e)
     {
         // Forzamos el dibujo por defecto para evitar errores con los grupos
         e.DrawDefault = true;
     }
 
+    /// <summary>
+    /// Dibuja manualmente los elementos del ListView cuando está en modo LargeIcon (Vista de Miniaturas).
+    /// Genera un diseño de tarjeta con iconos centrados.
+    /// </summary>
     public static void DrawListViewItem(object sender, DrawListViewItemEventArgs e)
     {
         if (e.Item == null || e.Item.ListView == null) return;
@@ -79,6 +91,10 @@ public static class ThemeRenderer
         e.Graphics.DrawString(e.Item.Text, nameFont, new SolidBrush(isSelected ? SelectionText : MainText), textRect, format);
     }
 
+    /// <summary>
+    /// Dibuja manualmente las celdas y filas del ListView cuando está en modo Detalles.
+    /// Aplica colores pastel según el estado de selección, íconos y líneas de separación suaves.
+    /// </summary>
     public static void DrawListViewSubItem(object sender, DrawListViewSubItemEventArgs e)
     {
         if (e.Item?.ListView?.View != View.Details) return;
@@ -114,6 +130,10 @@ public static class ThemeRenderer
         }
     }
 
+    /// <summary>
+    /// Pinta manualmente los nodos del panel lateral (TreeView) utilizando la paleta pastel
+    /// e inyecta íconos dinámicos en formato texto (emojis) dependiendo del tipo de ruta o extensión.
+    /// </summary>
     public static void DrawTreeNode(object sender, DrawTreeNodeEventArgs e)
     {
         if (e.Node == null) return;
@@ -156,6 +176,11 @@ public static class ThemeRenderer
         e.Graphics.DrawString(e.Node.Text, textFont, new SolidBrush(foreColor), e.Bounds.X + 28, e.Bounds.Y + 5);
     }
 
+    /// <summary>
+    /// Aplica de manera recursiva la tipografía clásica y la paleta rosa pastel a 
+    /// todos los controles y subcontroles de una ventana determinada.
+    /// </summary>
+    /// <param name="parent">Control o formulario raíz sobre el cual iterar.</param>
     public static void ApplyTheme(Control parent)
     {
         if (parent is Form) parent.BackColor = MainBg;

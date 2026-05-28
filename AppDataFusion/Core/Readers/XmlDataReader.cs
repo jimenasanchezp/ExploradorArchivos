@@ -44,6 +44,10 @@ public static class XmlDataReader
         @"<(/?)\s*([^>\s/""'=]+(?:\s+[^>=/\s""']+)+)\s*(/?)\s*>",
         RegexOptions.Compiled);
 
+    /// <summary>
+    /// Intenta parsear un documento XML complejo utilizando expresiones regulares
+    /// de pre-procesamiento para normalizar inconsistencias y leer la estructura iterativa.
+    /// </summary>
     public static List<DataItem> Leer(string rutaArchivo)
     {
         var lista = new List<DataItem>();
@@ -153,6 +157,10 @@ public static class XmlDataReader
     }
 
     // Obtiene el nivel correcto: <data><row> -> devuelve los <row>
+    /// <summary>
+    /// Navega el árbol del documento (DOM) intentando adivinar de manera heurística 
+    /// en qué profundidad o nivel anidado se encuentra realmente la colección de registros (las filas).
+    /// </summary>
     private static List<XElement> ObtenerElementosDatos(XElement root)
     {
         var hijos = root.Elements().ToList();
@@ -168,6 +176,10 @@ public static class XmlDataReader
         return hijos;
     }
 
+    /// <summary>
+    /// Toma el primer objeto del XML que se considera un registro de datos y analiza 
+    /// todos sus atributos e hijos para descubrir cómo mapear la información.
+    /// </summary>
     private static void DetectarMetadatos(XElement primerElemento)
     {
         var nombres = new List<string>();

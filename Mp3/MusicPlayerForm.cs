@@ -77,6 +77,10 @@ namespace ExploradorArchivos.Mp3
             this.WindowState = FormWindowState.Normal;
         }
 
+        /// <summary>
+        /// Inicializa y posiciona absolutamente (usando código, sin el diseñador visual) todos los
+        /// componentes de la interfaz estética de "Glass Minimalist", configurando los paneles principales.
+        /// </summary>
         private void InicializarComponentes()
         {
             ThemeRenderer.ApplyTheme(this);
@@ -388,6 +392,10 @@ namespace ExploradorArchivos.Mp3
             _gestor.EstadoCambiado += OnEstadoCambiado;
         }
 
+        /// <summary>
+        /// Actualiza la interfaz gráfica en tiempo real durante una grabación de micrófono,
+        /// formateando el cronómetro dinámicamente y moviendo el slider de manera decorativa.
+        /// </summary>
         private void TimerGrabacion_Tick(object? sender, EventArgs e)
         {
             var elapsed = DateTime.Now - _inicioGrabacion;
@@ -442,6 +450,10 @@ namespace ExploradorArchivos.Mp3
             _btnRepeat.BackColor = _gestor.ModoRepetir != ModoRepetir.Desactivado ? VerdeMenta : GrisSuave;
         }
 
+        /// <summary>
+        /// Delegado del motor de audio que actualiza la UI pesada (Textos, Portada y Letras de canciones)
+        /// de forma asíncrona garantizando que se invoque desde el hilo de la interfaz de usuario.
+        /// </summary>
         private void OnCancionCambiada(Cancion cancion)
         {
             if (InvokeRequired) { BeginInvoke(new Action(() => OnCancionCambiada(cancion))); return; }
@@ -492,6 +504,10 @@ namespace ExploradorArchivos.Mp3
                 e.Graphics.DrawString(cancion.Titulo, this.Font, Brushes.Black, e.Bounds.X + 5, e.Bounds.Y + 10);
         }
 
+        /// <summary>
+        /// Escanea la carpeta predeterminada "Mi Música" del usuario de Windows para cargar 
+        /// automáticamente subcarpetas y proveer botones rápidos de reproducción tipo biblioteca.
+        /// </summary>
         private void CargarCarpetasMusica()
         {
             string musicPath = Environment.GetFolderPath(Environment.SpecialFolder.MyMusic);

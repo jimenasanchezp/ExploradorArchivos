@@ -4,6 +4,10 @@ using System.Windows.Forms;
 
 namespace ExploradorArchivos.UI;
 
+/// <summary>
+/// Ordenador avanzado que implementa <see cref="IComparer"/> para ordenar registros 
+/// del ListView de forma inteligente (ej. considerando unidades de tamaño en lugar de orden alfabético simple).
+/// </summary>
 public class ListViewSorter : IComparer
 {
     public int ColumnToSort { get; set; }
@@ -15,6 +19,10 @@ public class ListViewSorter : IComparer
         OrderOfSort = SortOrder.Ascending;
     }
 
+    /// <summary>
+    /// Compara dos filas del ListView. Mantiene las carpetas siempre arriba y evalúa 
+    /// los valores según el tipo de columna (Fechas reales, Tamaños en bytes, Textos).
+    /// </summary>
     public int Compare(object? x, object? y)
     {
         ListViewItem? itemX = x as ListViewItem;
@@ -63,7 +71,12 @@ public class ListViewSorter : IComparer
         return compareResult;
     }
 
-    // Helper: Convierte "1.5 MB" a número real para que no se ordene alfabéticamente
+    /// <summary>
+    /// Convierte textos legibles de tamaño (ej: "1.5 MB") a números puros en bytes 
+    /// para permitir una comparación matemática precisa en lugar de una comparación alfabética.
+    /// </summary>
+    /// <param name="tamanoTexto">Cadena de texto con el formato de tamaño.</param>
+    /// <returns>Valor numérico del peso en bytes.</returns>
     private double ParsearTamano(string tamanoTexto)
     {
         if (string.IsNullOrWhiteSpace(tamanoTexto) || tamanoTexto == "Carpeta" || tamanoTexto == "0 KB") return 0;

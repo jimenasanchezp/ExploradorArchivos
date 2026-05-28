@@ -14,6 +14,7 @@ El sistema está desarrollado sobre la plataforma **.NET 8.0 Windows Forms** nat
 *   **`LibVLCSharp` & `LibVLCSharp.WinForms` (v3.9.3):** Wrapper de alto rendimiento para embeber el motor VLC con aceleración por hardware en la reproducción de video.
 *   **`Npgsql` (v9.0.2) & `MySqlConnector` (v2.3.7):** Proveedores de base de datos relacionales ADO.NET para interacciones asíncronas de lectura y escritura masiva.
 *   **`Microsoft.Web.WebView2` (v1.0.3912.50):** Control de navegador Chromium embebido que permite inyectar y comunicar mapas interactivos HTML.
+*   **`AForge.Video` & `AForge.Video.DirectShow`:** Captura de video en tiempo real desde hardware de cámaras conectadas mediante DirectShow.
 
 ### 📊 Estructuras de Datos Empleadas
 *   **`List<T>` (Listas Genéricas):** Almacenamiento lineal y dinámico para colecciones de datos, facilitando consultas ultra rápidas mediante **LINQ**.
@@ -387,3 +388,42 @@ Ventana principal de la suite AppData Fusion.
     *   `CargarArchivoAsync(...)`: Procesa el archivo correspondiente según la extensión e inicia asíncronamente la actualización de la grilla de datos y los resúmenes estadísticos.
     *   `ActualizarChart()`: Agrupa la colección actual según los criterios indicados por el usuario y envía los valores agrupados al lienzo `ChartPanel` para redibujarlos inmediatamente en pantalla.
     *   `BindGridAsync(...)`: Carga millones de registros en la grilla visual de forma fluida. Limita automáticamente la visualización física a un máximo de 75,000 registros si es necesario para evitar bloqueos del hilo principal de la interfaz de usuario.
+
+---
+
+## 📂 9. Módulo de Captura de Cámara (`AppCamara/`)
+
+```mermaid
+graph TD
+    AppCamaraForm --> VideoCaptureDevice[AForge DirectShow]
+    AppCamaraForm --> AviGrabador
+    AppCamaraForm --> AppVideoProcessor[Conversión a MP4]
+    AviGrabador --> avifil32[avifil32.dll / Video for Windows]
+```
+
+### 📄 [AppCamaraForm.cs](file:///c:/Users/jimes/source/repos/ExploradorArchivos/AppCamara/AppCamaraForm.cs)
+Interfaz gráfica para el control y previsualización de la cámara, toma de fotografías y grabación de video.
+*   **Métodos Clave:**
+    *   `CargarDispositivosCamara()`: Identifica las cámaras conectadas mediante `FilterInfoCollection` de AForge.
+    *   `FuenteVideo_NewFrame(...)`: Callback asíncrono que recibe fotogramas en tiempo real. Actualiza el `PictureBox` y envía el frame al `AviGrabador` si se está grabando.
+    *   `IniciarGrabacion()` / `DetenerGrabacion()`: Orquesta la grabación de video en disco. Al detener la grabación, invoca asíncronamente a FFmpeg para convertir el archivo temporal `.avi` en `.mp4`.
+    *   `BtnCapturar_Click(...)`: Toma el frame estático actual del PictureBox y lo guarda en disco como `JPEG`.
+
+---
+
+### 📄 [AviGrabador.cs](file:///c:/Users/jimes/source/repos/ExploradorArchivos/AppCamara/AviGrabador.cs)
+Escritor de video AVI usando la API nativa Video for Windows (`avifil32.dll`) a través de P/Invoke.
+*   **Métodos Clave:**
+    *   `Abrir(ruta, ancho, alto, fps)`: Configura el archivo AVI inicializando los flujos de video sin compresión (formato DIB) para máxima velocidad de escritura.
+    *   `EscribirFrame(Bitmap)`: Realiza manipulación de punteros (`LockBits`, `Marshal.Copy`) para invertir y enviar arreglos binarios puros (Bottom-Up BMP) a la API de Windows en tiempo real.
+    *   `Cerrar()`: Cierra de forma segura el manejador de memoria y el archivo.
+
+---
+
+## 📂 10. Módulo de Grabación de Audio (`AppGrabadora/`)
+
+### 📄 [GestorGrabacion.cs](file:///c:/Users/jimes/source/repos/ExploradorArchivos/AppGrabadora/GestorGrabacion.cs)
+Manejador simplificado para la captura de audio en vivo usando hardware de micrófonos.
+*   **Métodos Clave:**
+    *   `IniciarGrabacion(ruta)`: Inicializa `WaveInEvent` de NAudio a $44100$Hz (mono) y establece el `WaveFileWriter` para volcar datos binarios en disco.
+    *   `OnDataAvailable(...)`: Callback nativo que transfiere el búfer de audio capturado al escritor de archivo.

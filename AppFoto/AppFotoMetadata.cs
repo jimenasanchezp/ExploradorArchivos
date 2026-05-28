@@ -2,6 +2,9 @@ using System;
 
 namespace ExploradorArchivos.AppFoto;
 
+/// <summary>
+/// Modelo de datos para representar la información EXIF y técnica de una imagen fotográfica.
+/// </summary>
 public class AppFotoMetadata
 {
     public string RutaArchivo { get; set; } = string.Empty;

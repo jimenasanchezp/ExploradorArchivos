@@ -5,7 +5,10 @@ namespace ExploradorArchivos.AppDataFusion;
 
 // --------------------------------------------------------------
 //  DIÃLOGO â€“ ConexiÃ³n BD con detecciÃ³n automÃ¡tica de tablas
-// --------------------------------------------------------------
+/// <summary>
+/// Formulario dinámico que permite conectarse o migrar datos desde/hacia un servidor de base de datos
+/// (PostgreSQL o MariaDB). Detecta y lista automáticamente las bases de datos y tablas disponibles.
+/// </summary>
 public class FormConexionBD : Form
 {
     public string CadenaConexion { get; private set; } = "";
@@ -299,9 +302,13 @@ public class FormConexionBD : Form
 
 // --------------------------------------------------------------
 //  DIÃLOGO â€“ SelecciÃ³n de columnas
-// --------------------------------------------------------------
+/// <summary>
+/// Formulario que asiste al usuario en la vinculación (mapeo) semántica de columnas 
+/// procedentes de un esquema de base de datos desconocido, hacia el modelo interno normalizado (<c>DataItem</c>).
+/// </summary>
 public class FormSeleccionColumnas : Form
 {
+    public string ColId { get; private set; } = "";
     public string ColCategoria { get; private set; } = "";
     public string ColValor { get; private set; } = "";
     public string ColNombre { get; private set; } = "";
@@ -310,11 +317,11 @@ public class FormSeleccionColumnas : Form
     public FormSeleccionColumnas(List<string> columnas, Dictionary<string, string> mapeoActual)
     {
         Text = "Mapeo de columnas";
-        Size = new Size(480, 295);
         StartPosition = FormStartPosition.CenterParent;
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MaximizeBox = false;
 
+        string sI = mapeoActual.FirstOrDefault(kv => kv.Value == "id").Key ?? "";
         string sC = mapeoActual.FirstOrDefault(kv => kv.Value == "categoria").Key ?? "";
         string sV = mapeoActual.FirstOrDefault(kv => kv.Value == "valor").Key ?? "";
         string sN = mapeoActual.FirstOrDefault(kv => kv.Value == "nombre").Key ?? "";
@@ -359,6 +366,7 @@ public class FormSeleccionColumnas : Form
             return c;
         }
 
+        var lI = Lbl("ID / Identificador principal:", sI); var cI = Cmb(sI); y += 30;
         var lC = Lbl("Categoría (eje X / agrupación):", sC); var cC = Cmb(sC); y += 30;
         var lV = Lbl("Valor numérico (eje Y / suma):", sV); var cV = Cmb(sV); y += 30;
         var lN = Lbl("Nombre / etiqueta:", sN); var cN = Cmb(sN); y += 30;
@@ -397,12 +405,13 @@ public class FormSeleccionColumnas : Form
 
         btnOk.Click += (_, _) =>
         {
+            ColId = cI.Text == "(ninguna)" ? "" : cI.Text;
             ColCategoria = cC.Text == "(ninguna)" ? "" : cC.Text;
             ColValor = cV.Text == "(ninguna)" ? "" : cV.Text;
             ColNombre = cN.Text == "(ninguna)" ? "" : cN.Text;
             ColFecha = cF.Text == "(ninguna)" ? "" : cF.Text;
 
-            var usados = new[] { ColCategoria, ColValor, ColNombre, ColFecha }
+            var usados = new[] { ColId, ColCategoria, ColValor, ColNombre, ColFecha }
                 .Where(x => !string.IsNullOrWhiteSpace(x)).ToList();
             if (usados.Count != usados.Distinct(StringComparer.OrdinalIgnoreCase).Count())
             {
@@ -415,7 +424,7 @@ public class FormSeleccionColumnas : Form
 
         ClientSize = new Size(460, y + 50);
         Controls.AddRange(new Control[]
-            { intro, lC, cC, lV, cV, lN, cN, lF, cF, nota, btnOk, btnCan });
+            { intro, lI, cI, lC, cC, lV, cV, lN, cN, lF, cF, nota, btnOk, btnCan });
         AcceptButton = btnOk;
         CancelButton = btnCan;
         ThemeRenderer.ApplyTheme(this);

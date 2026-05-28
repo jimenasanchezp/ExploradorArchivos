@@ -10,6 +10,11 @@ using Microsoft.Web.WebView2.WinForms;
 
 namespace ExploradorArchivos.AppVideo;
 
+/// <summary>
+/// Interfaz principal del módulo "App Video".
+/// Utiliza <c>LibVLCSharp</c> para la reproducción de video y se integra con <c>FFmpeg</c>
+/// para operaciones de edición asíncronas (filtros y extracción de audio).
+/// </summary>
 public partial class AppVideoForm : Form
 {
     private readonly string _rutaVideo;
@@ -42,6 +47,10 @@ public partial class AppVideoForm : Form
         CargarMetadatos();
     }
 
+    /// <summary>
+    /// Construye la interfaz mediante código para un control total sobre el layout y la apariencia.
+    /// Incorpora el control <c>VideoView</c> de LibVLC, sliders personalizados y una barra lateral de metadatos.
+    /// </summary>
     private void InitializeCustomComponents()
     {
         ThemeRenderer.ApplyTheme(this);
@@ -179,6 +188,10 @@ public partial class AppVideoForm : Form
         };
     }
 
+    /// <summary>
+    /// Renderiza y añade un botón estandarizado a la barra superior, asociándole
+    /// una acción específica (por ejemplo, aplicar un filtro o extraer audio).
+    /// </summary>
     private void AgregarBotonEditor(string texto, int x, Action accion)
     {
         Button btn = new Button {
@@ -196,6 +209,10 @@ public partial class AppVideoForm : Form
         pnlTop.Controls.Add(btn);
     }
     // Semáforos al estilo macOS
+    /// <summary>
+    /// Configura los botones de la barra de título con estilo semáforo (estilo macOS)
+    /// permitiendo cerrar, minimizar o maximizar la ventana.
+    /// </summary>
     private void ConfigurarSemaforos()
     {
         Panel pnlSemaforos = new Panel { Location = new Point(10, 25), Size = new Size(60, 20), BackColor = Color.Transparent };
@@ -215,6 +232,9 @@ public partial class AppVideoForm : Form
         pnlTop.Controls.Add(pnlSemaforos);
     }
 
+    /// <summary>
+    /// Crea un botón circular con estilo plano para el panel de semáforos.
+    /// </summary>
     private Button CrearBotonSemaforo(Color color, int x)
     {
         Button b = new Button { Location = new Point(x, 2), Size = new Size(14, 14), BackColor = color, FlatStyle = FlatStyle.Flat };
@@ -228,6 +248,10 @@ public partial class AppVideoForm : Form
         return b;
     }
 
+    /// <summary>
+    /// Configura el motor nativo de LibVLC y el <c>MediaPlayer</c>.
+    /// Maneja los eventos de cambio de longitud para sincronizar la interfaz de usuario.
+    /// </summary>
     private void InicializarVLC()
     {
         Core.Initialize();
@@ -264,6 +288,10 @@ public partial class AppVideoForm : Form
         CargarMetadatosAsync();
     }
 
+    /// <summary>
+    /// Extrae metadatos del archivo de video (resolución, codec, peso, coordenadas GPS) de manera asíncrona
+    /// y carga dinámicamente un mapa de WebView2 dependiendo de si existen o no las coordenadas.
+    /// </summary>
     private async void CargarMetadatosAsync()
     {
         _metadata = AppVideoProcessor.ObtenerMetadataManual(_rutaVideo);
@@ -290,6 +318,9 @@ public partial class AppVideoForm : Form
         }
     }
 
+    /// <summary>
+    /// Formatea y muestra los metadatos extraídos del video en la barra lateral (Sidebar).
+    /// </summary>
     private void ActualizarInfoMetadata()
     {
         lblMetaInfo.Text = $"Archivo: {_metadata.Nombre}\n" +
@@ -301,6 +332,10 @@ public partial class AppVideoForm : Form
                            $"Longitud: {(_metadata.Longitud?.ToString("F5") ?? "N/A")}";
     }
 
+    /// <summary>
+    /// Carga el selector visual de mapa permitiéndole al usuario hacer clic en un punto
+    /// para asignar manualmente coordenadas GPS a un video que carece de ellas.
+    /// </summary>
     private void ActivarModoMapaPicker()
     {
         webMap.NavigateToString(AppVideoMapService.GenerarMapaPickerHtml());
@@ -341,6 +376,10 @@ public partial class AppVideoForm : Form
         catch { }
     }
 
+    /// <summary>
+    /// Alterna el estado del reproductor de video entre pausa y reproducción,
+    /// cambiando el icono del botón dinámicamente.
+    /// </summary>
     private void TogglePlayPause()
     {
         if (_mediaPlayer.State == VLCState.Ended || _mediaPlayer.State == VLCState.Stopped)
@@ -354,6 +393,10 @@ public partial class AppVideoForm : Form
         _btnPlayPause.Text = _mediaPlayer.IsPlaying ? "⏸" : "▶";
     }
 
+    /// <summary>
+    /// Detiene la reproducción para liberar el archivo y envía el comando asíncrono a FFmpeg para aplicar un filtro de color.
+    /// </summary>
+    /// <param name="nombre">Nombre del filtro (Soft, Sepia, BN).</param>
     private async void AplicarFiltro(string nombre)
     {
         PrepararParaProcesar();
@@ -369,6 +412,10 @@ public partial class AppVideoForm : Form
         ReiniciarReproductor();
     }
 
+    /// <summary>
+    /// Detiene la reproducción y llama asíncronamente a FFmpeg para extraer únicamente 
+    /// la pista de audio y guardarla en formato MP3 en la misma ruta que el video original.
+    /// </summary>
     private async void ExtraerAudio()
     {
         PrepararParaProcesar();
@@ -381,6 +428,10 @@ public partial class AppVideoForm : Form
         ReiniciarReproductor();
     }
 
+    /// <summary>
+    /// Frena la reproducción y elimina la asignación de memoria (media = null) para que VLC
+    /// suelte el archivo de disco, permitiendo que utilidades externas como FFmpeg puedan sobrescribir o leer.
+    /// </summary>
     private void PrepararParaProcesar()
     {
         _mediaPlayer.Stop();
@@ -388,6 +439,10 @@ public partial class AppVideoForm : Form
         _mediaPlayer.Media = null;
     }
 
+    /// <summary>
+    /// Vuelve a crear y montar la instancia de Media en el reproductor para reanudar 
+    /// la vista del video original una vez terminado un proceso.
+    /// </summary>
     private void ReiniciarReproductor()
     {
         using var media = new Media(_libVLC, _rutaVideo, FromType.FromPath);

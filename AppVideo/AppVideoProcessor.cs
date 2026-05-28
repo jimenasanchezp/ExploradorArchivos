@@ -6,16 +6,26 @@ using System.Threading.Tasks;
 
 namespace ExploradorArchivos.AppVideo;
 
+/// <summary>
+/// Proporciona envolturas (wrappers) asíncronas para ejecutar comandos de <c>FFmpeg</c>.
+/// Permite recortar, aplicar filtros y extraer audio de manera eficiente usando procesos nativos.
+/// </summary>
 public static class AppVideoProcessor
 {
     private static string FfmpegPath => Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "ffmpeg.exe");
 
+    /// <summary>
+    /// Recorta asíncronamente un segmento del video especificado sin recodificar (copia directa del codec).
+    /// </summary>
     public static async Task<bool> Recortar(string input, string output, TimeSpan inicio, TimeSpan duracion)
     {
         string arguments = $"-ss {inicio:hh\\:mm\\:ss} -t {duracion:hh\\:mm\\:ss} -i \"{input}\" -c copy \"{output}\" -y";
         return await EjecutarComando(arguments);
     }
 
+    /// <summary>
+    /// Recodifica el video aplicando un filtro de color de FFmpeg (ColorChannelMixer o Hue/Curves).
+    /// </summary>
     public static async Task<bool> AplicarFiltro(string input, string output, string filtro)
     {
         string videoFilter = filtro switch
@@ -47,6 +57,9 @@ public static class AppVideoProcessor
         return await EjecutarComando(arguments);
     }
 
+    /// <summary>
+    /// Extrae únicamente la pista de audio de un video y la exporta (generalmente como MP3/AAC) a 192k.
+    /// </summary>
     public static async Task<bool> ExtraerAudio(string input, string output)
     {
         string arguments = $"-i \"{input}\" -vn -ab 192k -ar 44100 -y \"{output}\"";
@@ -78,6 +91,9 @@ public static class AppVideoProcessor
         }
     }
 
+    /// <summary>
+    /// Obtiene información básica del archivo y carga las coordenadas GPS desde un archivo JSON "companion" (.meta.json).
+    /// </summary>
     public static AppVideoMetadata ObtenerMetadataManual(string ruta)
     {
         var info = new FileInfo(ruta);

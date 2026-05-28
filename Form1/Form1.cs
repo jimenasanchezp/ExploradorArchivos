@@ -15,6 +15,10 @@ using ExploradorArchivos.AppDataFusion;
 
 namespace ExploradorArchivos;
 
+/// <summary>
+/// Formulario principal del Explorador de Archivos (Estilo Clásico / Soft Pastel).
+/// Contiene la inicialización del formulario raíz, declaración de variables globales y las opciones principales de manipulación de archivos.
+/// </summary>
 public partial class Form1 : Form
 {
     // === Estado de navegación ===
@@ -35,6 +39,10 @@ public partial class Form1 : Form
         "favoritos.txt"
     );
 
+    /// <summary>
+    /// Carga los datos almacenados en disco (como la lista de Favoritos y los Accesos Directos)
+    /// desde la carpeta de datos de aplicación (<c>AppData\Roaming\ExploradorArchivos</c>).
+    /// </summary>
     private void CargarDatosPersistentes()
     {
         try
@@ -68,6 +76,10 @@ public partial class Form1 : Form
         catch { }
     }
 
+    /// <summary>
+    /// Guarda en disco los cambios realizados en las listas de Favoritos y Accesos Directos
+    /// para que persistan entre sesiones de la aplicación.
+    /// </summary>
     private void GuardarDatosPersistentes()
     {
         try
@@ -103,9 +115,10 @@ public partial class Form1 : Form
         CargarDirectorio(_rutaActual);
     }
 
-    /* Construye dinamicamente el menu contextual de clic derecho (Abrir, 
-     * QuickLook, Cortar, Copiar, Pegar, Eliminar, Propiedades)
-     utilizando un renderizador personalizado de colores */
+    /// <summary>
+    /// Construye dinámicamente el menú contextual de clic derecho (Abrir, QuickLook, Cortar, Copiar, Pegar, Eliminar, Propiedades)
+    /// utilizando un renderizador personalizado de colores, y enlaza todos los eventos de interación.
+    /// </summary>
     private void ConfigurarContextoMenu()
     {
         ContextMenuStrip menu = new ContextMenuStrip();
@@ -124,9 +137,18 @@ public partial class Form1 : Form
         ToolStripMenuItem itemAppVideo = new ToolStripMenuItem("🎬  App Video");
         ToolStripMenuItem itemAppFoto = new ToolStripMenuItem("🖼️  App Foto");
         ToolStripMenuItem itemAppData = new ToolStripMenuItem("📊  App Data");
+        ToolStripMenuItem itemAppDataLimpio = new ToolStripMenuItem("📊  Abrir App Data");
         ToolStripMenuItem itemMusic = new ToolStripMenuItem("🎵  App Music");
         ToolStripMenuItem itemTexto = new ToolStripMenuItem("📝  Visor de Texto");
-        ToolStripMenuItem itemOffice = new ToolStripMenuItem("🏢  Microsoft Office");
+        ToolStripMenuItem itemExportar = new ToolStripMenuItem("📤  Exportar a...");
+        ToolStripMenuItem itemExportarDocx = new ToolStripMenuItem("📄  .docx");
+        ToolStripMenuItem itemExportarPptx = new ToolStripMenuItem("🖥️  .pptx");
+        ToolStripMenuItem itemExportarXlsx = new ToolStripMenuItem("📊  .xlsx");
+        ToolStripMenuItem itemExportarPdf = new ToolStripMenuItem("📕  .pdf");
+        itemExportar.DropDownItems.AddRange(new ToolStripItem[] {
+            itemExportarDocx, itemExportarPptx, itemExportarXlsx, itemExportarPdf
+        });
+
         ToolStripMenuItem itemPredeterminada = new ToolStripMenuItem("💻  Sistema (App Predeterminada)");
 
         // Eventos de apertura
@@ -135,9 +157,13 @@ public partial class Form1 : Form
         itemAppVideo.Click += (s, e) => AbrirCon(new AppVideoForm(GetSelectedPath()));
         itemAppFoto.Click += (s, e) => AbrirCon(new AppFotoForm(GetSelectedPath()));
         itemAppData.Click += (s, e) => AbrirCon(new ExploradorArchivos.AppDataFusion.MainForm(GetSelectedPath()));
+        itemAppDataLimpio.Click += (s, e) => AbrirCon(new ExploradorArchivos.AppDataFusion.MainForm(null));
         itemMusic.Click += (s, e) => AbrirReproductor(new List<string> { GetSelectedPath() }, GetSelectedPath());
         itemTexto.Click += (s, e) => AbrirCon(new FileViewerForm(GetSelectedPath()));
-        itemOffice.Click += (s, e) => AbrirConOffice(GetSelectedPath());
+        itemExportarDocx.Click += (s, e) => ExportarArchivo(GetSelectedPath(), ".docx");
+        itemExportarPptx.Click += (s, e) => ExportarArchivo(GetSelectedPath(), ".pptx");
+        itemExportarXlsx.Click += (s, e) => ExportarArchivo(GetSelectedPath(), ".xlsx");
+        itemExportarPdf.Click += (s, e) => ExportarArchivo(GetSelectedPath(), ".pdf");
         itemPredeterminada.Click += (s, e) => AbrirConSistema(GetSelectedPath());
 
         ToolStripMenuItem itemFijar = new ToolStripMenuItem("📌  Fijar a acceso directo");
@@ -228,7 +254,7 @@ public partial class Form1 : Form
         itemPropiedades.Click += (s, e) => MostrarPropiedades(GetSelectedPath());
 
         itemAbrirCon.DropDownItems.AddRange(new ToolStripItem[] {
-            itemAppVideo, itemAppFoto, itemAppData, itemMusic, itemTexto, itemOffice, new ToolStripSeparator(), itemPredeterminada
+            itemAppVideo, itemAppFoto, itemAppData, itemMusic, itemTexto, new ToolStripSeparator(), itemPredeterminada
         });
 
         // Crear separadores explícitos
@@ -238,10 +264,10 @@ public partial class Form1 : Form
         ToolStripSeparator sep4 = new ToolStripSeparator();
 
         menu.Items.AddRange(new ToolStripItem[] {
-            itemAbrir, itemAbrirCon, sep1,
+            itemAbrir, itemAbrirCon, itemExportar, sep1,
             itemCopiar, itemPegar, itemRenombrar, itemEliminar, sep2,
             itemEnviarCorreo, itemFijar, itemFavorito, itemVaciarFavoritos, sep3,
-            itemNuevaCarpeta, itemActualizar, sep4,
+            itemNuevaCarpeta, itemActualizar, itemAppDataLimpio, sep4,
             itemPropiedades
         });
 
@@ -259,6 +285,7 @@ public partial class Form1 : Form
             // Mostrar/ocultar según selección
             itemAbrir.Visible = algunItemSeleccionado;
             itemAbrirCon.Visible = algunItemSeleccionado;
+            itemExportar.Visible = algunItemSeleccionado;
             itemCopiar.Visible = algunItemSeleccionado;
             itemRenombrar.Visible = algunItemSeleccionado;
             itemEliminar.Visible = algunItemSeleccionado;
@@ -319,21 +346,22 @@ public partial class Form1 : Form
                 itemAppData.Visible = dataExt.Contains(ext);
                 itemMusic.Visible = mediaExt.Contains(ext);
                 itemTexto.Visible = dataExt.Contains(ext) || new[] { ".cs", ".html", ".css", ".js", ".md", ".py" }.Contains(ext);
-                
-                string[] officeExt = { ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx" };
-                itemOffice.Visible = officeExt.Contains(ext);
             }
         };
     }
 
-    /* Obtiene la ruta completa del item seleccionado en el ListView,
-     * para usar en acciones como abrir, cortar, copiar, eliminar, etc. 
-     * Si no hay item seleccionado, devuelve cadena vacía.*/
+    /// <summary>
+    /// Obtiene la ruta completa del item seleccionado en el ListView.
+    /// Útil para usar en acciones como abrir, cortar, copiar, eliminar, etc.
+    /// </summary>
+    /// <returns>La ruta física del elemento seleccionado, o una cadena vacía si no hay selección.</returns>
     private string GetSelectedPath() => listViewPrincipal.SelectedItems[0].Tag?.ToString() ?? "";
 
 
-    /* Método helper generico que muestra subformularios del explorador
-     * (Visor de imágenes, Reproductor de música, Visor de texto, etc.)*/
+    /// <summary>
+    /// Método auxiliar genérico que muestra subformularios del explorador en pantalla.
+    /// </summary>
+    /// <param name="frm">Instancia del formulario a mostrar (ej. AppVideoForm, AppFotoForm).</param>
     private void AbrirCon(Form frm) => frm.Show();
 
     /// <summary>
@@ -355,43 +383,45 @@ public partial class Form1 : Form
         }
     }
 
-    /* AbrirConSistema utiliza Process.Star UseShellExecute = True 
-     * para delegar la ejecucion al visor predeterminado
-     * del sistema operativo, lo que permite abrir cualquier tipo de archivo*/
+    /// <summary>
+    /// Delega la ejecución del archivo al visor predeterminado del sistema operativo
+    /// mediante <c>Process.Start</c> y <c>UseShellExecute = true</c>.
+    /// </summary>
+    /// <param name="ruta">Ruta física del archivo a ejecutar.</param>
     private void AbrirConSistema(string ruta) => Process.Start(new ProcessStartInfo { FileName = ruta, UseShellExecute = true });
 
-    /* AbrirConOffice determina la aplicación de Office correspondiente (Word, Excel o PowerPoint)
-     * basándose en la extensión de archivo y la inicia pasándole la ruta del archivo */
-    private void AbrirConOffice(string ruta)
+    private async void ExportarArchivo(string ruta, string formatoDestino)
     {
+        if (string.IsNullOrEmpty(ruta) || !File.Exists(ruta)) return;
+        
         try
         {
-            string ext = Path.GetExtension(ruta).ToLower();
-            string? exeName = ext switch
-            {
-                ".doc" or ".docx" => "winword.exe",
-                ".xls" or ".xlsx" or ".csv" => "excel.exe",
-                ".ppt" or ".pptx" => "powerpnt.exe",
-                _ => null
-            };
-
-            if (exeName != null)
-            {
-                Process.Start(new ProcessStartInfo { FileName = exeName, Arguments = $"\"{ruta}\"", UseShellExecute = true });
-            }
-            else
-            {
-                // Fallback al comportamiento del sistema
-                Process.Start(new ProcessStartInfo { FileName = ruta, UseShellExecute = true });
-            }
+            // Deshabilitar la interfaz mientras carga para evitar clicks múltiples
+            this.Enabled = false;
+            
+            await Task.Run(() => ExploradorArchivos.Services.FileConverterService.Convertir(ruta, formatoDestino));
+            
+            MessageBox.Show($"Archivo exportado a {formatoDestino} exitosamente.", "Exportación Completada", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            CargarDirectorio(_rutaActual, false);
+        }
+        catch (NotSupportedException ex)
+        {
+            MessageBox.Show(ex.Message, "Formato No Soportado", MessageBoxButtons.OK, MessageBoxIcon.Warning);
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"Error al intentar abrir el archivo en Microsoft Office: {ex.Message}", "Error de Apertura", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            MessageBox.Show($"Error al exportar el archivo: {ex.Message}", "Error de Exportación", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+        finally
+        {
+            this.Enabled = true;
         }
     }
 
-    //Almacenan la referencia del archivo en el portapapeles del sistema operativo para transacciones I/O futuras
+    /// <summary>
+    /// Almacena la referencia del archivo seleccionado en el portapapeles del sistema para operaciones de mover.
+    /// </summary>
+    /// <param name="ruta">Ruta del archivo a cortar.</param>
     private void CortarArchivo(string ruta)
     {
         var paths = new System.Collections.Specialized.StringCollection { ruta };
@@ -605,9 +635,11 @@ public partial class Form1 : Form
         }
     }
 
-    // En lugar de eliminar permanentemente, se envía el archivo a la papelera
-    // de reciclaje utilizando la función SHFileOperation de Windows, lo que permite
-    // recuperar archivos eliminados accidentalmente.
+    /// <summary>
+    /// Invoca a <see cref="FileService.EnviarAPapelera"/> para eliminar el archivo de forma segura.
+    /// En lugar de eliminar permanentemente, permite deshacer la acción desde la Papelera de Windows.
+    /// </summary>
+    /// <param name="ruta">Ruta absoluta del archivo a eliminar.</param>
     private void EliminarArchivo(string ruta)
     {
         if (MessageBox.Show("¿Seguro que deseas eliminar este archivo?", "Eliminar", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
@@ -616,7 +648,12 @@ public partial class Form1 : Form
             CargarDirectorio(_rutaActual, false);
         }
     }
-    // Ejecuta renombrado de archivos manejando errores comunes mediante File.Move o Directory.Move.
+    /// <summary>
+    /// Maneja el renombrado físico de archivos y directorios en disco.
+    /// Mantiene la extensión original automáticamente si el usuario no la proporciona.
+    /// </summary>
+    /// <param name="rutaOld">Ruta actual del archivo.</param>
+    /// <param name="nuevoNombre">Nuevo nombre deseado.</param>
     private void RenombrarArchivo(string rutaOld, string nuevoNombre)
     {
         try
@@ -634,7 +671,11 @@ public partial class Form1 : Form
         catch (Exception ex) { MessageBox.Show("Error al renombrar: " + ex.Message); }
     }
 
-    // Construye un cuadro de diálogo descriptivo sobre el archivo mostrando su peso exacto, fecha de creación y atributos.
+    /// <summary>
+    /// Lanza un diálogo informativo detallado sobre el archivo.
+    /// Muestra su peso exacto, fecha de creación y atributos.
+    /// </summary>
+    /// <param name="ruta">Ruta del archivo a inspeccionar.</param>
     private void MostrarPropiedades(string ruta)
     {
         var info = new FileInfo(ruta);
@@ -645,7 +686,10 @@ public partial class Form1 : Form
         MessageBox.Show(msg, "Propiedades de Archivo", MessageBoxButtons.OK, MessageBoxIcon.Information);
     }
 
-    // Clase de pintura GDI+ encargada de forzar el dibujo de bordes y rellenos en menús contextuales para ajustarlos a la estética.
+    /// <summary>
+    /// Clase anidada de pintura GDI+ encargada de forzar el dibujo de bordes y rellenos en menús contextuales
+    /// para integrarlos a la estética pastel de la aplicación.
+    /// </summary>
     class CustomMenuRenderer : ToolStripProfessionalRenderer
     {
         protected override void OnRenderMenuItemBackground(ToolStripItemRenderEventArgs e)
@@ -661,6 +705,10 @@ public partial class Form1 : Form
 
     // ===== CONFIGURACIÓN DE INTERFAZ Y ESTILO VISUAL ===
 
+    /// <summary>
+    /// Inicializa y configura toda la interfaz visual utilizando el sistema de renderizado personalizado (ThemeRenderer).
+    /// Asigna las vistas, columnas, colores pastel, eventos OwnerDraw y reordena los paneles para lograr el estilo Minimalista Glass.
+    /// </summary>
     private void ConfigurarUI()
     {
         ThemeRenderer.ApplyTheme(this);

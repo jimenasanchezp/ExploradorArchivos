@@ -3,8 +3,15 @@ using System.Text;
 
 namespace ExploradorArchivos.AppDataFusion.Services;
 
+/// <summary>
+/// Proporciona métodos estáticos para exportar colecciones de datos estructurados (<c>DataItem</c>) 
+/// a múltiples formatos de archivo (CSV, JSON, XML, TXT).
+/// </summary>
 public static class FileExportService
 {
+    /// <summary>
+    /// Exporta los datos a un archivo de texto delimitado por comas (CSV).
+    /// </summary>
     public static void ExportarCsv(string ruta, List<DataItem> datos,
         List<string>? columnas = null, Dictionary<string, string>? mapeo = null)
     {
@@ -17,6 +24,9 @@ public static class FileExportService
         File.WriteAllLines(ruta, lineas, Encoding.UTF8);
     }
 
+    /// <summary>
+    /// Exporta los datos a formato JSON, construyendo la estructura iterativamente con un <c>StringBuilder</c> para alto rendimiento.
+    /// </summary>
     public static void ExportarJson(string ruta, List<DataItem> datos,
         List<string>? columnas = null, Dictionary<string, string>? mapeo = null)
     {

@@ -39,6 +39,9 @@ public class ChartPanel : Panel
         BackColor = BgPanel;
     }
 
+    /// <summary>
+    /// Inyecta los datos a graficar, configura el tipo de gráfica y solicita un repintado inmediato.
+    /// </summary>
     public void SetData(List<(string Label, double Value)> data,
                         TipoGrafica tipo, string titulo)
     {
@@ -48,6 +51,9 @@ public class ChartPanel : Panel
         Invalidate();
     }
 
+    /// <summary>
+    /// Vacía la gráfica actual y repinta el control con su estado inicial.
+    /// </summary>
     public void Limpiar()
     {
         _data.Clear();
@@ -58,6 +64,10 @@ public class ChartPanel : Panel
     // ════════════════════════════════════════════════════════
     //  PAINT
     // ════════════════════════════════════════════════════════
+    /// <summary>
+    /// Ciclo principal de renderizado GDI+. Aplica antialiasing y delega el dibujado 
+    /// según el <see cref="TipoGrafica"/> seleccionado.
+    /// </summary>
     protected override void OnPaint(PaintEventArgs e)
     {
         base.OnPaint(e);

@@ -9,6 +9,11 @@ using System.Collections.Generic;
 
 namespace ExploradorArchivos.AppFoto;
 
+/// <summary>
+/// Interfaz gráfica principal del módulo "App Foto".
+/// Soporta visualización con zoom dinámico, edición (recorte, dibujo, filtros), 
+/// ajuste en tiempo real (brillo, contraste) y gestión de metadatos GPS a través de un mapa integrado.
+/// </summary>
 public partial class AppFotoForm : Form
 {
     private enum ToolMode { None, Draw, Text, Crop }
@@ -54,6 +59,10 @@ public partial class AppFotoForm : Form
         CargarFoto();
     }
 
+    /// <summary>
+    /// Configura dinámicamente todos los controles de la interfaz (botones, sliders, lienzo)
+    /// omitiendo el uso del diseñador visual de Visual Studio en favor de código procedimental escalable.
+    /// </summary>
     private void InitializeCustomComponents()
     {
         ThemeRenderer.ApplyTheme(this);
@@ -134,6 +143,10 @@ public partial class AppFotoForm : Form
         this.Controls.Add(pnlTop);
     }
 
+    /// <summary>
+    /// Construye dinámicamente el panel de ajustes de imagen (brillo, contraste, saturación)
+    /// utilizando un diseño basado en <c>TableLayoutPanel</c> para alineación automática.
+    /// </summary>
     private void ConfigurarPanelAjustes()
     {
         TableLayoutPanel tlp = new TableLayoutPanel { 
@@ -179,6 +192,10 @@ public partial class AppFotoForm : Form
         return trk;
     }
 
+    /// <summary>
+    /// Configura la pestaña de información, incrustando el control <c>WebView2</c> para mostrar el mapa
+    /// interactivo de la ubicación y el panel de etiquetas con metadatos de la cámara.
+    /// </summary>
     private void ConfigurarPanelInfo()
     {
         Panel pnl = new Panel { Dock = DockStyle.Fill, Padding = new Padding(10) };
@@ -253,6 +270,10 @@ public partial class AppFotoForm : Form
         return b;
     }
 
+    /// <summary>
+    /// Lee la imagen desde el disco de manera segura, aplica correcciones de rotación EXIF
+    /// e inicializa el mapa interactivo (<c>WebView2</c>) basándose en los metadatos geográficos.
+    /// </summary>
     private async void CargarFoto()
     {
         try
@@ -303,6 +324,10 @@ public partial class AppFotoForm : Form
         ActualizarImagenEnPantalla();
     }
 
+    /// <summary>
+    /// Aplica instantáneamente los valores combinados de los sliders (brillo, contraste, luces)
+    /// utilizando la pila de deshacer para no degradar la imagen en múltiples pasadas.
+    /// </summary>
     private void AplicarAjustesTiempoReal()
     {
         if (_undoStack.Count == 0) return;
@@ -408,6 +433,10 @@ public partial class AppFotoForm : Form
                            $"Longitud: {(_metadata.Longitud?.ToString("F5") ?? "N/A")}";
     }
 
+    /// <summary>
+    /// Convierte coordenadas de la pantalla (mouse) a las coordenadas reales del píxel 
+    /// en la imagen original, tomando en cuenta el nivel de zoom y el letterboxing del <c>PictureBox</c>.
+    /// </summary>
     private Point GetImagePoint(Point mousePoint)
     {
         if (picPhoto.Image == null) return mousePoint;
@@ -425,6 +454,10 @@ public partial class AppFotoForm : Form
         return new Point((int)((mousePoint.X - dx) / scale), (int)((mousePoint.Y - dy) / scale));
     }
 
+    /// <summary>
+    /// Operación inversa a <see cref="GetImagePoint"/>. Convierte coordenadas del píxel real de la imagen
+    /// a las coordenadas visuales en pantalla para dibujar el rectángulo de selección de recorte interactivo.
+    /// </summary>
     private Point GetMousePoint(Point imagePoint)
     {
         if (picPhoto.Image == null) return imagePoint;
@@ -506,6 +539,10 @@ public partial class AppFotoForm : Form
         }
     }
 
+    /// <summary>
+    /// Exporta la imagen actual al disco. Si la imagen contiene datos GPS y se guarda en JPEG,
+    /// inyecta asíncronamente las etiquetas de geolocalización dentro del nuevo archivo.
+    /// </summary>
     private void GuardarImagen()
     {
         using SaveFileDialog sfd = new SaveFileDialog { Filter = "Imagen JPEG|*.jpg|Imagen PNG|*.png", FileName =  _metadata.Nombre };
