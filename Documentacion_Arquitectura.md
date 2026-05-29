@@ -50,7 +50,7 @@ Contiene la inicialización del formulario raíz, declaración de variables glob
     *   `_sorter` (`ListViewSorter`): Instancia encargada de la ordenación de columnas.
 *   **Métodos Clave:**
     *   `Form1()` (Constructor): Configura los controles principales, activa el pintado manual (`OwnerDraw`) en `ListView` y `TreeView`, asocia eventos y redirige a la pantalla `"Inicio"`.
-    *   `ConfigurarContextoMenu()`: Crea el menú contextual interactivo de opciones clásicas.
+    *   `ConfigurarContextoMenu()`: Crea el menú contextual interactivo de opciones clásicas, el cual también expone la conversión rápida de archivos (a DOCX, XLSX, PPTX, PDF) utilizando el `FileConverterService` y la fijación de accesos directos (📌 Fijar a acceso directo).
     *   `GetSelectedPath()` (string): Retorna la ruta física del elemento seleccionado.
     *   `AbrirCon(Form)`: Muestra sub-formularios del explorador en pantalla.
     *   `AbrirConSistema(string)`: Delega la ejecución del archivo al visor por defecto de Windows mediante `Process.Start`.
@@ -84,8 +84,8 @@ Gestiona las entradas del usuario (teclado, ratón y drag-and-drop).
         *   `.jpg`, `.png`, `.jpeg`, `.webp` $\to$ Lanza el editor avanzado `AppFotoForm`.
         *   `.mp4`, `.mkv` $\to$ Lanza el procesador multimedia de VLC `AppVideoForm`.
         *   Otros $\to$ Abre el lector genérico `FileViewerForm`.
-    *   `PnlTrash_DragEnter()`, `PnlTrash_DragLeave()`, `PnlTrash_DragDrop()`: Gestión interactiva de arrastrar y soltar hacia la Papelera de Reciclaje.
-    *   `ListViewPrincipal_KeyDown(object, KeyEventArgs)`: Mapea atajos. Borra elementos al pulsar `Delete` y lanza el visor superrápido `QuickLookForm` al pulsar la barra espaciadora.
+    *   `ListViewPrincipal_DragDrop()`, `TreeViewLateral_DragDrop()`, `PnlTrash_DragDrop()`: Gestión de interacciones de arrastrar y soltar (Drag & Drop) para mover archivos entre carpetas y para eliminar archivos directamente arrastrándolos hacia la Papelera de Reciclaje.
+    *   `ListViewPrincipal_KeyDown(object, KeyEventArgs)`: Mapea atajos de teclado críticos. Borra elementos al pulsar `Delete` y lanza la visualización nativa e inmediata de archivos mediante `QuickLookForm` pulsando la barra espaciadora.
 
 ---
 
@@ -122,6 +122,26 @@ Motor asíncrono recursivo para exportar árboles completos de directorios.
 
 ---
 
+### 📄 [FileConverterService.cs](file:///c:/Users/jimes/source/repos/ExploradorArchivos/Services/FileConverterService.cs)
+Motor de exportación universal que utiliza librerías como `DocX`, `ClosedXML`, `PdfSharpCore` y `OpenXML`.
+*   **Métodos Clave:**
+    *   `Convertir(rutaOrigen, formatoDestino)`: Orquesta la transformación de archivos de texto plano o imágenes hacia formatos de ofimática y documentos (DOCX, XLSX, PPTX, PDF) de forma transparente.
+
+---
+
+### 📄 [EmailService.cs](file:///c:/Users/jimes/source/repos/ExploradorArchivos/Services/EmailService.cs)
+Integración con clientes de correo del sistema (MAPI).
+*   **Métodos Clave:**
+    *   `EnviarCorreoConAdjunto(IntPtr, string)`: Usa P/Invoke (`Mapi32.dll`) para adjuntar un archivo y abrir la ventana de redacción de correo por defecto de Windows (o usa fallbacks con línea de comandos para Outlook/Thunderbird).
+
+---
+
+### 📄 [RecentFilesService.cs](file:///c:/Users/jimes/source/repos/ExploradorArchivos/Services/RecentFilesService.cs)
+Gestiona la persistencia del historial de archivos y carpetas más visitados.
+*   **Características:** Guarda los accesos y permite listar o indizar elementos de la pantalla de "Inicio".
+
+---
+
 ## 📂 4. Capa de Apariencia y Pintura GDI+ (`UI/` - Classic Theme Engine)
 
 ### 📄 [ThemeRenderer.cs](file:///c:/Users/jimes/source/repos/ExploradorArchivos/UI/ThemeRenderer.cs)
@@ -153,6 +173,14 @@ Ordenador avanzado que implementa `IComparer` para ordenar registros del `ListVi
 *   **Métodos Clave:**
     *   `int Compare(object x, object y)`: Compara dos filas. Traduce las cadenas de peso de archivos a bytes numéricos (`double`) antes de evaluarlas para ordenar el tamaño con precisión física.
     *   `private double ParsearTamano(string)`: Traduce textos legibles (ej: "12 KB") a números puros en bytes.
+
+---
+
+### 📄 Formularios Secundarios y Visores Universales (`UI/`)
+*   **`FileViewerForm.cs`**: Editor y lector genérico de archivos de texto en cualquier codificación. Se invoca automáticamente cuando la extensión no es reconocida.
+*   **`QuickLookForm.cs`**: Visor flotante estilo macOS. Permite previsualizar rápidamente textos o imágenes pulsando la barra espaciadora sin abrir editores pesados.
+*   **`ImageViewerForm.cs`**: Visor de imágenes simple para visualización pura sin herramientas de edición fotográfica pesada.
+*   **`SendMailForm.cs`** / **`InputDialog.cs`**: Ventanas de diálogo flotantes modales para la interacción con el usuario (ej. pedir nombre de archivo nuevo, confirmar correos).
 
 ---
 

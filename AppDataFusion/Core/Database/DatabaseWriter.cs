@@ -38,14 +38,14 @@ public static class DatabaseWriter
             // Construir lista de columnas definitiva (sin duplicados, en orden original)
             var columnas = BuildColumnasSanitizadas(infoColumnas);
 
-            // Verificar si el ID contiene caracteres no numéricos
+            // Verificar si la primera columna contiene caracteres no numéricos
             bool idEsEntero = true;
-            var colIdInfo = columnas.FirstOrDefault(c => c.Clave == "id");
-            if (colIdInfo != default)
+            if (columnas.Count > 0)
             {
+                var colIdInfo = columnas[0];
                 foreach (var item in datos)
                 {
-                    string rawVal = ObtenerValorExport(item, colIdInfo.Display, "id");
+                    string rawVal = ObtenerValorExport(item, colIdInfo.Display, colIdInfo.Clave);
                     if (!string.IsNullOrEmpty(rawVal) && !int.TryParse(rawVal, out _))
                     {
                         idEsEntero = false;
@@ -61,10 +61,12 @@ public static class DatabaseWriter
             int errores = 0;
 
             using var tx = conn.BeginTransaction();
+            string primerError = "";
             try
             {
                 foreach (var item in datos)
                 {
+                    tx.Save("fila"); // Crear un savepoint para esta fila
                     try
                     {
                         InsertarItemPostgreSQL(conn, tx, tabla, item, columnas, infoColumnas, idEsEntero);
@@ -74,7 +76,10 @@ public static class DatabaseWriter
                     }
                     catch (Exception ex)
                     {
+                        tx.Rollback("fila"); // Revertir solo esta fila, no toda la transacción
                         errores++;
+                        if (string.IsNullOrEmpty(primerError))
+                            primerError = ex.Message;
                         Console.WriteLine($"[PG Writer] Error fila {insertados + errores}: {ex.Message}");
                     }
                 }
@@ -91,6 +96,10 @@ public static class DatabaseWriter
             result.Errores = errores;
             result.Exito = true;
             result.Mensaje = $" {insertados} registros insertados en '{tabla}'. Errores: {errores}.";
+            if (errores > 0 && !string.IsNullOrEmpty(primerError))
+            {
+                result.Mensaje += $"\n\nPrimer error detectado:\n{primerError}";
+            }
         }
         catch (Exception ex)
         {
@@ -122,19 +131,18 @@ public static class DatabaseWriter
         bool idEsEntero)
     {
         // Determinar tipo SQL por clave semántica
-        string TipoSQL(string clave) => clave switch
+        string TipoSQL(string clave, int indice)
         {
-            "id" => (idEsEntero ? "INTEGER" : "TEXT") + " PRIMARY KEY",
-            "valor" => "DOUBLE PRECISION",
-            "fecha" => "TEXT",   // TEXT es seguro para fechas de formato variable
-            _ => "TEXT"
-        };
-
-        var defs = columnas.Select(c => $"    \"{c.NombreDB}\" {TipoSQL(c.Clave)}").ToList();
-        if (!columnas.Any(c => string.Equals(c.Clave, "id", StringComparison.OrdinalIgnoreCase)))
-        {
-            defs.Insert(0, "    \"id\" SERIAL PRIMARY KEY");
+            if (indice == 0) return (idEsEntero ? "INTEGER" : "TEXT") + " PRIMARY KEY";
+            return clave switch
+            {
+                "valor" => "DOUBLE PRECISION",
+                "fecha" => "TEXT",   // TEXT es seguro para fechas de formato variable
+                _ => "TEXT"
+            };
         }
+
+        var defs = columnas.Select((c, i) => $"    \"{c.NombreDB}\" {TipoSQL(c.Clave, i)}").ToList();
         string sql = $"CREATE TABLE IF NOT EXISTS \"{tabla}\" (\n{string.Join(",\n", defs)}\n);";
 
         using var cmd = new NpgsqlCommand(sql, conn);
@@ -168,7 +176,7 @@ public static class DatabaseWriter
             string rawVal = ObtenerValorExport(item, display, clave);
 
             object dbVal;
-            if (clave == "id")
+            if (i == 0) // Primera columna siempre es Primary Key
             {
                 if (idEsEntero)
                 {
@@ -306,18 +314,17 @@ public static class DatabaseWriter
         List<(string NombreDB, string Clave, string Display)> columnas,
         bool idEsEntero)
     {
-        string TipoSQL(string clave) => clave switch
+        string TipoSQL(string clave, int indice)
         {
-            "id" => (idEsEntero ? "INT" : "VARCHAR(255)") + " PRIMARY KEY",
-            "valor" => "DOUBLE",
-            _ => "TEXT"
-        };
-
-        var defs = columnas.Select(c => $"    `{c.NombreDB}` {TipoSQL(c.Clave)}").ToList();
-        if (!columnas.Any(c => string.Equals(c.Clave, "id", StringComparison.OrdinalIgnoreCase)))
-        {
-            defs.Insert(0, "    `id` INT AUTO_INCREMENT PRIMARY KEY");
+            if (indice == 0) return (idEsEntero ? "INT" : "VARCHAR(255)") + " PRIMARY KEY";
+            return clave switch
+            {
+                "valor" => "DOUBLE",
+                _ => "TEXT"
+            };
         }
+
+        var defs = columnas.Select((c, i) => $"    `{c.NombreDB}` {TipoSQL(c.Clave, i)}").ToList();
         string sql = $"CREATE TABLE IF NOT EXISTS `{tabla}` (\n{string.Join(",\n", defs)}\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;";
 
         using var cmd = new MySqlCommand(sql, conn);
@@ -351,7 +358,7 @@ public static class DatabaseWriter
             string rawVal = ObtenerValorExport(item, display, clave);
 
             object dbVal;
-            if (clave == "id")
+            if (i == 0) // Primera columna siempre es Primary Key
             {
                 if (idEsEntero)
                 {
