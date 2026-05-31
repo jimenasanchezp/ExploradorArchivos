@@ -20,6 +20,7 @@ El proyecto ha crecido mucho más allá de un simple explorador de archivos trad
 *   **Navegación:** Haz doble clic en las carpetas de la lista principal para entrar a ellas. Usa el botón "Atrás" para regresar.
 *   **Archivos de Texto/Datos:** Al dar doble clic en archivos `.txt`, `.json`, `.csv`, `.xml`, etc., el sistema abrirá automáticamente el `FileViewerForm` o `QuickLookForm` para vista rápida.
 *   **Gestión:** Clic derecho sobre cualquier archivo para renombrar, eliminar o ver propiedades básicas.
+*   **QuickLook (Vista Rápida):** Presiona la barra `Espacio` sobre cualquier archivo seleccionado para abrir su previsualización instantánea. Cuenta con barra de arrastre superior, maximización por doble clic y botones "semáforo" (Cerrar 🔴, Minimizar 🟡, Maximizar 🟢) pintados con GDI+. No se cierra al perder el foco y soporta múltiples extensiones (`.cs`, `.html`, `.css`, `.js`, `.py`, `.bat`, `.cmd`, `.dat`, `.md`, etc.) además de PDFs e imágenes.
 
 ### Nivel 2: Productividad y Multimedia
 *   **Fotografías (`.jpg`, `.png`):** Se abrirán en el `AppFotoForm`. Puedes aplicar filtros retro (Blanco y Negro, Sepia), alterar contraste/brillo, dibujar firmas y exportar las imágenes. Si la foto fue tomada con un celular, mostrará su ubicación GPS en un mapa interactivo.
@@ -27,7 +28,7 @@ El proyecto ha crecido mucho más allá de un simple explorador de archivos trad
 *   **Video (`.mp4`, `.avi`):** Se reproducirán de forma nativa. Incluye herramientas avanzadas para silenciar el video, extraer su pista de audio como MP3, o extraer una ráfaga de imágenes (Frames).
 
 ### Nivel 3: Herramientas Avanzadas (Data Science & OS)
-*   **DataFusion:** Si seleccionas un archivo `.csv` o `.json` masivo, puedes enviarlo al módulo `AppDataFusion`. Este reconstruirá las columnas, permitirá ver los datos de forma ágil sin consumir toda la RAM, generar gráficas analíticas y migrar los datos hacia una base de datos PostgreSQL.
+*   **DataFusion:** Si seleccionas un archivo `.csv` o `.json` masivo, puedes enviarlo al módulo `AppDataFusion`. Este reconstruirá las columnas, permitirá ver los datos de forma ágil sin consumir toda la RAM (grilla virtualizada hasta 75,000 registros), aplicar filtros avanzados con búsquedas exactas utilizando comillas dobles (ej. `"valor"`), buscar u ordenar por geolocalización (`latitude` y `longitude`), exportar a múltiples formatos y enviar los datos directamente por correo electrónico (el botón `📧 Enviar` genera un CSV temporal en `%TEMP%` y abre el cliente de correo predeterminado mediante el protocolo `mailto:`). Además, puedes migrar los datos hacia una base de datos PostgreSQL o MariaDB.
 *   **Terminal Rápida:** Si necesitas ejecutar un comando en la ruta actual, escribe `cmd [tu comando]` en la barra de direcciones superior.
 
 ---
@@ -78,6 +79,17 @@ graph TD
 3. **Aislamiento:** Se levanta un proceso fantasma de `FFmpeg` con `CreateNoWindow = true`.
 4. **Sincronía:** Se utiliza un `TaskCompletionSource` atado al evento `Exited` del proceso, convirtiendo un evento nativo asíncrono del OS en una promesa `Task` controlable.
 
+### C) Flujo de Envío de Datos por Correo (DataFusion)
+1. **Validación:** Se verifica que existan registros visualizados en la grilla.
+2. **Generación Temporal:** Se crea un archivo CSV en el directorio temporal del sistema (`%TEMP%`) conteniendo la lista de datos procesados (incluyendo mapeo de columnas dinámicas).
+3. **Invocación Protocolo mailto:** Se genera una URI con el esquema `mailto:` codificando los parámetros de asunto (`subject`) y cuerpo del mensaje (`body`), el cual incluye la ruta física del archivo CSV temporal.
+4. **Ejecución Shell:** Se inicia un proceso mediante `Process.Start` con `UseShellExecute = true` apuntando a la URI, lo que abre el cliente de correo predeterminado del sistema operativo (Outlook, Thunderbird, etc.) listo para que el usuario adjunte y envíe el archivo.
+
+### D) Mecánica de Filtrado Exacto e Inferencia de Coordenadas en DataProcessor
+1. **Detección de Búsqueda Exacta:** En `DataProcessor.Filtrar`, se determina si el parámetro `exacto` es `true` o si el término de búsqueda está encerrado en comillas dobles (ej. `"valor"`). Si es así, se descartan las comillas y se activa la comparación exacta.
+2. **Comparación Case-Insensitive:** La coincidencia se realiza comparando la cadena normalizada en minúsculas. Si la búsqueda es exacta, se evalúa la igualdad estricta (`==`); si no lo es, se busca la coincidencia parcial (`Contains`).
+3. **Campos Especiales (Coordenadas):** Si el campo a filtrar es `latitude` o `longitude`, el procesador realiza una comparación con el formato de coma flotante de alta precisión (`F6`). En el ordenamiento (`DataProcessor.CompararCampo`), se realiza una conversión a valores numéricos `double` para ordenar los registros con base en su posición geográfica real, evitando la ordenación alfabética errónea de números decimales.
+
 ---
 
 ## 📚 6. Referencia Exhaustiva y Diccionario Completo de Clases
@@ -108,8 +120,9 @@ Esta sección documenta **todas las clases** y funciones de los módulos del sis
 *   `GestorGrabacion`: Usa `WaveInEvent` (NAudio) para capturar el búfer de entrada del micrófono de la PC y escribir directamente al disco duro (`WaveFileWriter`) previniendo desbordamientos de memoria (Buffer Overruns).
 
 ### 📊 AppDataFusion (Data Science y ETL)
-*   `MainForm`: Panel de control de datos. Maneja grillas, gráficas estadísticas (Chart) y conexiones BBDD.
+*   `MainForm`: Panel de control de datos. Maneja la grilla virtualizada con controles de filtrado en la toolbar, ordenación interactiva, botón de exportación por correo (`BtnEnviarCorreo_Click`) y conexiones BBDD.
 *   `CsvDataReader`: Algoritmo inteligente con expresiones regulares `Regex` que lee archivos sin romper los datos por comas dentro de strings.
+*   `DataProcessor`: Contiene la lógica central de ordenación y filtrado. Expone el método `Filtrar` con soporte para coincidencia exacta (`exacto`), filtrado y ordenamiento de geolocalización (`latitude`/`longitude`) y `QuickSort` in-situ de alto rendimiento.
 *   `DatabaseWriter`: Generador dinámico de código SQL (Data Definition Language) que construye las tablas en base a los diccionarios C# y envía el `INSERT` transaccional.
 
 ### 📁 Form1 y Base
@@ -121,6 +134,7 @@ Esta sección documenta **todas las clases** y funciones de los módulos del sis
 *   `FileOperationsService`: Wrapper de `System.IO` para copias, eliminaciones y movimientos asíncronos.
 *   `FileConverterService`: OpenXML SDK para transformar archivos a formatos ofimáticos `.docx` y `.xlsx`.
 *   `ThemeRenderer`: Sobrescribe los eventos de pintado (`OnPaint`) de los controles de Windows para aplicar paletas oscuras (Dark Mode) esquivando el estilo obsoleto por defecto.
+*   `QuickLookForm`: Formulario sin bordes nativos que previsualiza archivos rápidamente. Implementa una barra de título personalizada para arrastrar la ventana, botones "semáforo" (Cerrar, Minimizar, Maximizar) pintados con GDI+ y lógica persistente al desactivarse. Soporta carga de texto extendida, imágenes, PDFs y WebView2.
 
 ---
 
@@ -323,3 +337,66 @@ public static async Task EscribirEnPostgreSQLAsync(string conexion, string tabla
     await tx.CommitAsync();
 }
 ```
+
+### 🔍 7.7 Filtrado Exacto y Case-Insensitive: `DataProcessor.cs`
+Muestra el algoritmo adaptado para discernir y ejecutar búsquedas exactas con comillas dobles, así como el tratamiento de geolocalización.
+
+```csharp
+public static List<DataItem> Filtrar(List<DataItem> datos, string campo, string valor, bool exacto = false)
+{
+    var resultado = new List<DataItem>();
+    // Comprobar si el término de búsqueda viene entrecomillado
+    bool exactMatch = exacto || (valor.StartsWith("\"") && valor.EndsWith("\"") && valor.Length >= 2);
+    string v = (valor.StartsWith("\"") && valor.EndsWith("\"") && valor.Length >= 2) 
+        ? valor.Substring(1, valor.Length - 2).ToLower() 
+        : valor.ToLower();
+    string campoLow = campo.ToLower();
+
+    for (int i = 0; i < datos.Count; i++)
+    {
+        var item = datos[i];
+        
+        bool CheckMatch(string? field)
+        {
+            string f = (field ?? "").ToLower();
+            return exactMatch ? f == v : f.Contains(v);
+        }
+
+        bool match = campoLow switch
+        {
+            "nombre" => CheckMatch(item.Nombre),
+            "categoria" => CheckMatch(item.Categoria),
+            "fuente" => CheckMatch(item.Fuente),
+            "id" => item.Id.ToString() == v,
+            "valor" => CheckMatch(item.Valor.ToString("F2")),
+            "fecha" => CheckMatch(item.Fecha.ToString("yyyy-MM-dd")),
+            "latitude" => CheckMatch(item.Latitude?.ToString("F6")),
+            "longitude" => CheckMatch(item.Longitude?.ToString("F6")),
+            _ => item.CamposExtra != null && item.CamposExtra.TryGetValue(campoLow, out var ev) && ev != null
+                 ? CheckMatch(ev)
+                 : CheckMatch(item.Nombre) || CheckMatch(item.Categoria)
+        };
+        if (match) resultado.Add(item);
+    }
+    return resultado;
+}
+```
+
+### 🎨 7.8 Pintura GDI+ de Semáforos de Ventana: `QuickLookForm.cs`
+Dibuja botones circulares estilo macOS en la barra de título superior con suavizado antialias.
+
+```csharp
+private Button CrearBotonSemaforo(Color color, int x, Color backColor)
+{
+    Button b = new Button { Name = "btnSemaforo", Location = new Point(x, 0), Size = new Size(14, 14), BackColor = color, FlatStyle = FlatStyle.Flat };
+    b.FlatAppearance.BorderSize = 0;
+    b.Paint += (s, e) => {
+        e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+        e.Graphics.Clear(backColor);
+        e.Graphics.FillEllipse(new SolidBrush(color), 0, 0, b.Width - 1, b.Height - 1);
+        e.Graphics.DrawEllipse(new Pen(Color.FromArgb(50, Color.Black)), 0, 0, b.Width - 1, b.Height - 1);
+    };
+    return b;
+}
+```
+

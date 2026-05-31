@@ -1219,7 +1219,8 @@ public partial class MainForm : Form
     private async Task BindGridAsync(DataGridView dgv, List<DataItem> items,
         Label? contadorLabel, bool usarColsDefault = false)
     {
-        contadorLabel?.Invoke(() => contadorLabel.Text = "Cargando...");
+        if (contadorLabel?.IsHandleCreated == true)
+            contadorLabel.Invoke(() => contadorLabel.Text = "Cargando...");
         bool limitado = items.Count > DISPLAY_LIMIT;
         var itemsDisplay = limitado ? items.Take(DISPLAY_LIMIT).ToList() : items;
         var colInfos = usarColsDefault
@@ -1231,6 +1232,7 @@ public partial class MainForm : Form
 
         var dt = await Task.Run(() => BuildDataTable(itemsDisplay, colInfos, numSnap, curSnap));
 
+        if (!dgv.IsHandleCreated) return;
         if (dgv.InvokeRequired)
             dgv.Invoke(() => AplicarDataTable(dgv, dt, items.Count, limitado, contadorLabel, colInfos));
         else

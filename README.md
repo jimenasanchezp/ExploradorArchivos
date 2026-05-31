@@ -29,10 +29,10 @@ El proyecto nació como un explorador de archivos tradicional y evolucionó hast
 | `.jpg`, `.png`, `.bmp` | **AppFoto** | Filtros (BN, Sepia, Soft), ajuste de brillo/contraste/saturación, dibujo libre, recorte, lectura y escritura de coordenadas GPS (EXIF), visualización en mapa |
 | `.mp3`, `.wav` | **Mp3** | Reproducción con cola, carátulas ID3, búsqueda automática de letras por internet, barra de progreso personalizada |
 | `.mp4`, `.avi`, `.mkv` | **AppVideo** | Reproducción con LibVLC, extracción de audio a MP3, silenciado de video, extracción de fotogramas — todo vía FFmpeg |
-| `.csv`, `.json`, `.xml`, `.txt` | **AppDataFusion** | Lectura inteligente sin esquema fijo, gráficas estadísticas, ordenamiento (QuickSort), exportación a `.docx`/`.xlsx`, migración a PostgreSQL o MariaDB |
+| `.csv`, `.json`, `.xml`, `.txt` | **AppDataFusion** | Lectura inteligente sin esquema fijo, grilla virtualizada, ordenamiento (QuickSort) y filtrado avanzado (búsqueda exacta con `""` y geolocalización), exportación a `.docx`/`.xlsx`/correo, migración a PostgreSQL o MariaDB |
 | Cámara web | **AppCamara** | Captura de video en vivo desde la webcam usando P/Invoke nativo a `avicap32.dll` |
 | Micrófono | **AppGrabadora** | Grabación de audio WAV desde el micrófono del sistema usando NAudio |
-| Cualquier otro | **UI/FileViewerForm** | Visor de texto con edición, visor de imágenes, vista previa rápida (QuickLook) |
+| Cualquier otro | **UI/FileViewerForm** | Visor de texto con edición, visor de imágenes, vista previa rápida (QuickLook con controles semáforo, arrastre de ventana y soporte para múltiples extensiones) |
 
 ---
 
@@ -202,6 +202,8 @@ El módulo más complejo. Permite cargar archivos de datos con **esquemas descon
 
 - **Lectura polimórfica:** Cuatro lectores (`CsvDataReader`, `JsonDataReader`, `XmlDataReader`, `TxtDataReader`) convierten cualquier formato a una lista uniforme de `DataItem`. El modelo usa un `Dictionary<string, string> CamposExtra` para capturar columnas que no se conocen en tiempo de compilación.
 - **Virtualización de grilla:** Para no saturar la RAM, la `DataGridView` solo muestra los primeros 75,000 registros de cualquier dataset.
+- **Filtrado Avanzado:** Implementa búsqueda exacta y sensible a mayúsculas cuando el término se escribe entre comillas dobles (ej. `"valor"`), además de filtrado y ordenamiento nativo para columnas de coordenadas (`latitude` y `longitude`).
+- **Exportación por Correo:** Envío directo de los registros visualizados mediante la generación automática de un archivo CSV temporal en el directorio `%TEMP%` y la apertura del cliente de correo nativo (`mailto:`).
 - **Migración a BBDD:** Genera dinámicamente sentencias `CREATE TABLE` e `INSERT` analizando las llaves del diccionario, y envía todo dentro de una transacción atómica.
 
 ### 📷 AppCamara — Captura de webcam nativa
@@ -211,6 +213,14 @@ Usa **P/Invoke** a `avicap32.dll` (API de Windows para captura de video) para ab
 ### 🎙️ AppGrabadora — Grabación de audio
 
 Captura audio del micrófono usando `NAudio` (`WaveInEvent`) y lo escribe directamente a un archivo `.wav` en disco en tiempo real, byte por byte, usando `WaveFileWriter`.
+
+### 🔎 QuickLook — Vista previa rápida (Estilo macOS)
+
+Permite previsualizar archivos de forma ultrarrápida presionando la barra espaciadora:
+- **Barra de título interactiva:** Permite arrastrar la ventana y maximizarla/restaurarla mediante doble clic.
+- **Semáforos de control:** Botones de control al estilo macOS (cerrar rojo, minimizar amarillo, maximizar verde) dibujados a mano con suavizado de bordes mediante GDI+ (`SmoothingMode.AntiAlias`).
+- **Soporte extendido:** Soporta previsualizaciones de imágenes, PDFs, páginas web y una amplia selección de archivos de texto/código (como `.cs`, `.html`, `.css`, `.js`, `.py`, `.bat`, `.cmd`, `.dat`, `.md`, etc.) en un control enriquecido con scroll automático.
+- **Persistencia:** Remueve el cierre automático al desactivar la ventana, permitiendo al usuario interactuar libremente con los botones de control de la barra.
 
 ---
 
@@ -243,6 +253,7 @@ Todas las dependencias se instalan automáticamente con `dotnet restore`. Están
 | Atajo | Acción |
 |---|---|
 | `Enter` | Abrir archivo o carpeta seleccionada |
+| `Espacio` | Abrir o cerrar la vista previa rápida (QuickLook) |
 | `Backspace` | Navegar a la carpeta anterior |
 | `Delete` | Eliminar el archivo seleccionado |
 | `F2` | Renombrar archivo |
