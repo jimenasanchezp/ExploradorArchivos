@@ -27,8 +27,9 @@ partial class MainForm
     private Panel pnlSidebarFiles;
     private Button btnSbJson, btnSbCsv, btnSbXml, btnSbTxt;
 
-    // Sidebar export quick buttons
-    private Panel pnlSidebarExport;
+    // Header action buttons
+    private FlowLayoutPanel pnlHeaderButtons;
+    private Button btnHdrExpCsv, btnHdrExpJson, btnHdrExpXml, btnHdrExpTxt, btnHdrEmail, btnHdrLimpiar;
 
     // Sidebar database buttons
     private Panel pnlSidebarDB;
@@ -332,17 +333,12 @@ partial class MainForm
         pnlSidebarApi.Controls.AddRange(new Control[] { btnSbApi, lblApiTitle, sbDivApi });
 
     // ── TOOLS SECTION ──────────────────────────────────────────────────────────
-        pnlSidebarExport = new Panel { Dock = DockStyle.Top, AutoSize = true, BackColor = clrSidebar };
-        var sbDivTools = SbDivider();
-        var lblToolsTitle = SbSection("Herramientas");
-        var btnSbLimpiar = SbBtn("🧹  Limpiar datos", clrAcento, MenuLimpiarDatos_Click!);
-        pnlSidebarExport.Controls.AddRange(new Control[] { btnSbLimpiar, lblToolsTitle, sbDivTools });
+        // (Moved to header buttons panel)
 
     // ──  ──────────────────────────────────────────────────────────
         pnlSidebar.SuspendLayout();
         pnlSidebar.Controls.Clear();
 
-        pnlSidebar.Controls.Add(pnlSidebarExport);
         pnlSidebar.Controls.Add(pnlSidebarApi);
         pnlSidebar.Controls.Add(pnlSidebarDB);
         pnlSidebar.Controls.Add(pnlSidebarFiles);
@@ -381,31 +377,51 @@ partial class MainForm
         var pnlTitles = new Panel { Dock = DockStyle.Fill, BackColor = Color.Transparent };
         var lblDataset = new Label
         {
-            Text = "Dataset",
-            Location = new Point(0, 10),
+            Text = "DATA FUSION",
+            Location = new Point(0, 16),
             AutoSize = true,
-            ForeColor = Color.Black,
-            Font = new Font("Segoe UI", 28f, FontStyle.Bold)
+            ForeColor = clrTextDim,
+            Font = new Font("Segoe UI", 14f, FontStyle.Bold)
         };
         var lblPrincipal = new Label
         {
-            Text = "Principal",
-            Location = new Point(0, 65),
+            Text = "Panel de Control",
+            Location = new Point(-4, 42),
             AutoSize = true,
             ForeColor = clrAcento,
-            Font = new Font("Segoe UI", 32f, FontStyle.Bold)
+            Font = new Font("Segoe UI", 36f, FontStyle.Bold)
         };
         lblSubtext = new Label
         {
-            Text = "Datos fusionados · Motor activo",
-            Location = new Point(4, 135),
+            Text = "Gestiona, exporta y analiza tus datos unificados",
+            Location = new Point(4, 108),
             AutoSize = true,
-            ForeColor = clrTextDim,
-            Font = new Font("Segoe UI", 10.5f)
+            ForeColor = clrText,
+            Font = new Font("Segoe UI", 11f)
         };
         pnlTitles.Controls.AddRange(new Control[] { lblDataset, lblPrincipal, lblSubtext });
 
-        var pnlHeaderButtons = new FlowLayoutPanel
+        Button HdrBtn(string text, Color bg, Color fg, EventHandler click)
+        {
+            var b = new Button
+            {
+                Text = text,
+                AutoSize = true,
+                Height = 38,
+                FlatStyle = FlatStyle.Flat,
+                BackColor = bg,
+                ForeColor = fg,
+                Font = new Font("Segoe UI Semibold", 10f),
+                Cursor = Cursors.Hand,
+                Margin = new Padding(6, 0, 0, 0),
+                Padding = new Padding(8, 0, 8, 0)
+            };
+            b.FlatAppearance.BorderSize = 0;
+            b.Click += click;
+            return b;
+        }
+
+        pnlHeaderButtons = new FlowLayoutPanel
         {
             Dock = DockStyle.Fill,
             FlowDirection = FlowDirection.RightToLeft,
@@ -413,7 +429,19 @@ partial class MainForm
             BackColor = Color.Transparent
         };
 
+        btnHdrEmail = HdrBtn("📧 Enviar", clrAcento, Color.White, BtnEnviarCorreo_Click!);
+        btnHdrExpCsv = HdrBtn("CSV", clrSurface2, clrTextDim, BtnExportarCsv_Click!);
+        btnHdrExpJson = HdrBtn("JSON", clrSurface2, clrTextDim, BtnExportarJson_Click!);
+        btnHdrExpXml = HdrBtn("XML", clrSurface2, clrTextDim, BtnExportarXml_Click!);
+        btnHdrExpTxt = HdrBtn("TXT", clrSurface2, clrTextDim, BtnExportarTxt_Click!);
+        btnHdrLimpiar = HdrBtn("🧹 Limpiar", Color.White, clrRose, MenuLimpiarDatos_Click!);
+        btnHdrLimpiar.FlatAppearance.BorderSize = 1;
+        btnHdrLimpiar.FlatAppearance.BorderColor = clrRose;
 
+        // Add to flow layout (right to left means first added is rightmost)
+        pnlHeaderButtons.Controls.AddRange(new Control[] { 
+            btnHdrEmail, btnHdrExpCsv, btnHdrExpJson, btnHdrExpXml, btnHdrExpTxt, btnHdrLimpiar 
+        });
 
         tblHeader.Controls.Add(pnlTitles, 0, 0);
         tblHeader.Controls.Add(pnlHeaderButtons, 1, 0);
@@ -440,66 +468,83 @@ partial class MainForm
     // ──  ──────────────────────────────────────────────────────────
     // ── TAB 1 ──────────────────────────────────────────────────────────
     // ──  ──────────────────────────────────────────────────────────
-        pnlToolsTodos = new Panel
+        pnlToolsTodos = new FlowLayoutPanel
         {
             Dock = DockStyle.Top,
-            Height = 70, // Espacio suficiente para los inputs
+            AutoSize = true,
+            AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            WrapContents = true,
             BackColor = clrBg,
-            Padding = new Padding(16, 16, 16, 0)
+            Padding = new Padding(16, 16, 16, 16)
         };
         var toolsBorderBot = new Panel { Dock = DockStyle.Bottom, Height = 1, BackColor = clrBorder };
 
     // ── Reorganizaci ──────────────────────────────────────────────────────────
-        lblBuscar = FLabel("Buscar en:", new Point(16, 24), clrTextDim);
-        cmbCampoBusqueda = FCombo(new Point(100, 20), 130, clrSurface, clrText, new object[] { }, -1);
+        lblBuscar = FLabel("Buscar en:", new Point(0, 0), clrTextDim);
+        lblBuscar.Margin = new Padding(0, 6, 5, 10);
+        
+        cmbCampoBusqueda = FCombo(new Point(0, 0), 130, clrSurface, clrText, new object[] { }, -1);
+        cmbCampoBusqueda.Margin = new Padding(0, 0, 10, 10);
+        cmbCampoBusqueda.SelectedIndexChanged += (s, e) => { if (!string.IsNullOrEmpty(txtBusqueda?.Text)) BtnFiltrar_Click(s, e); };
 
         txtBusqueda = new TextBox
         {
-            Location = new Point(240, 20),
             Width = 250,
             Height = 32,
             BackColor = Color.White,
             ForeColor = clrText,
             BorderStyle = BorderStyle.FixedSingle,
             Font = new Font("Segoe UI", 11f),
-            PlaceholderText = "🔍 Buscar en la tabla..."
+            PlaceholderText = "🔍 Buscar en la tabla...",
+            Margin = new Padding(0, 0, 10, 10)
         };
         txtBusqueda.KeyPress += (s, e) => { if (e.KeyChar == (char)13) BtnFiltrar_Click(s, EventArgs.Empty); };
 
-        btnFiltrar = FButton("Filtrar", new Point(500, 18), 80, clrSurface2, clrRose, BtnFiltrar_Click!);
-        btnLimpiarFiltro = FButton("Limpiar", new Point(590, 18), 80, clrSurface, clrTextDim, BtnLimpiarFiltro_Click!);
+        btnFiltrar = FButton("Filtrar", new Point(0, 0), 80, clrSurface2, clrRose, BtnFiltrar_Click!);
+        btnFiltrar.Margin = new Padding(0, 0, 10, 10);
+        
+        btnLimpiarFiltro = FButton("Limpiar", new Point(0, 0), 80, clrSurface, clrTextDim, BtnLimpiarFiltro_Click!);
+        btnLimpiarFiltro.Margin = new Padding(0, 0, 20, 10);
 
         // Separador vertical
-        var toolsDiv = new Panel { Location = new Point(680, 15), Size = new Size(1, 40), BackColor = clrBorder };
+        var toolsDiv = new Panel { Size = new Size(1, 32), BackColor = clrBorder, Margin = new Padding(0, 0, 20, 10) };
 
-        lblOrdenar = FLabel("Ordenar por:", new Point(700, 24), clrTextDim);
-        cmbCampoOrden = FCombo(new Point(790, 20), 130, clrSurface, clrText, new object[] { }, -1);
+        lblOrdenar = FLabel("Ordenar por:", new Point(0, 0), clrTextDim);
+        lblOrdenar.Margin = new Padding(0, 6, 5, 10);
+        
+        cmbCampoOrden = FCombo(new Point(0, 0), 130, clrSurface, clrText, new object[] { }, -1);
+        cmbCampoOrden.Margin = new Padding(0, 0, 10, 10);
 
-        rbAscendente = FRadio("↑ Asc", new Point(930, 10), true, clrBg);
-        rbDescendente = FRadio("↓ Desc", new Point(930, 32), false, clrBg);
+        var pnlRadios = new Panel { Size = new Size(80, 48), Margin = new Padding(0, -5, 10, 0) };
+        rbAscendente = FRadio("↑ Asc", new Point(0, 0), true, clrBg);
+        rbDescendente = FRadio("↓ Desc", new Point(0, 22), false, clrBg);
+        pnlRadios.Controls.Add(rbAscendente);
+        pnlRadios.Controls.Add(rbDescendente);
 
-        btnOrdenar = FButton("Ordenar ▲", new Point(1010, 18), 100, Color.White, clrRose, BtnOrdenar_Click!);
+        btnOrdenar = FButton("Ordenar ▲", new Point(0, 0), 100, Color.White, clrRose, BtnOrdenar_Click!);
         btnOrdenar.FlatAppearance.BorderSize = 1;
         btnOrdenar.FlatAppearance.BorderColor = clrRose;
+        btnOrdenar.Margin = new Padding(0, 0, 20, 10);
 
         lblContadorTodos = new Label
         {
             Text = "6 registros",
-            Anchor = AnchorStyles.Top | AnchorStyles.Right,
-            Location = new Point(pnlToolsTodos.Width - 120, 24),
             AutoSize = true,
             Font = new Font("Segoe UI", 10f),
-            ForeColor = clrTextDim
+            ForeColor = clrTextDim,
+            Margin = new Padding(10, 6, 0, 0)
         };
 
         pnlToolsTodos.Controls.AddRange(new Control[]
         {
-            toolsBorderBot,
             lblBuscar, cmbCampoBusqueda, txtBusqueda, btnFiltrar, btnLimpiarFiltro,
-            toolsDiv,
-            lblOrdenar, cmbCampoOrden, rbAscendente, rbDescendente, btnOrdenar,
+            toolsDiv, lblOrdenar, cmbCampoOrden, pnlRadios, btnOrdenar,
             lblContadorTodos
         });
+
+        // Add bottom border directly to Tab so it stretches across
+        toolsBorderBot.Dock = DockStyle.Top;
+        tabTodos.Controls.Add(toolsBorderBot);
 
         dgvTodos = BuildGrid(clrBg, clrSurface, clrBorder, clrText, clrTextDim, clrText);
         dgvTodos.Dock = DockStyle.Fill;

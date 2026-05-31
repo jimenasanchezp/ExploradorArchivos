@@ -31,17 +31,58 @@ namespace ExploradorArchivos.UI
                 e.Graphics.DrawRectangle(pen, 1, 1, this.Width - 2, this.Height - 2);
             };
 
-            // 2. Título superior
+            // 2. Barra de título y Semáforos
+            Panel pnlTitleBar = new Panel
+            {
+                Dock = DockStyle.Top,
+                Height = 40,
+                BackColor = ColorTranslator.FromHtml("#1E1E1E")
+            };
+
+            bool isDragging = false;
+            Point lastCursor = Point.Empty;
+            pnlTitleBar.MouseDown += (s, e) => { if (e.Button == MouseButtons.Left) { isDragging = true; lastCursor = e.Location; } };
+            pnlTitleBar.MouseMove += (s, e) => { if (isDragging) { this.Location = new Point(this.Location.X + (e.X - lastCursor.X), this.Location.Y + (e.Y - lastCursor.Y)); } };
+            pnlTitleBar.MouseUp += (s, e) => { isDragging = false; };
+            pnlTitleBar.DoubleClick += (s, e) => {
+                this.WindowState = this.WindowState == FormWindowState.Normal ? FormWindowState.Maximized : FormWindowState.Normal;
+            };
+
+            Panel pnlSemaforos = new Panel { Name = "pnlSemaforos", Location = new Point(15, 13), Size = new Size(60, 20), BackColor = Color.Transparent };
+            
+            Button btnClose = CrearBotonSemaforo(Color.FromArgb(255, 95, 86), 0, pnlTitleBar.BackColor);
+            btnClose.Click += (s, e) => this.Close();
+            
+            Button btnMin = CrearBotonSemaforo(Color.FromArgb(255, 189, 46), 20, pnlTitleBar.BackColor);
+            btnMin.Click += (s, e) => this.WindowState = FormWindowState.Minimized;
+            
+            Button btnMax = CrearBotonSemaforo(Color.FromArgb(39, 201, 63), 40, pnlTitleBar.BackColor);
+            btnMax.Click += (s, e) => {
+                this.WindowState = this.WindowState == FormWindowState.Normal ? FormWindowState.Maximized : FormWindowState.Normal;
+            };
+
+            pnlSemaforos.Controls.AddRange(new Control[] { btnClose, btnMin, btnMax });
+            pnlTitleBar.Controls.Add(pnlSemaforos);
+
             Label lblTitle = new Label
             {
                 Text = Path.GetFileName(filePath),
-                Dock = DockStyle.Top,
-                Height = 40,
+                Dock = DockStyle.Fill,
                 TextAlign = ContentAlignment.MiddleCenter,
                 ForeColor = Color.White,
                 Font = new Font("Segoe UI Variable", 12, FontStyle.Bold)
             };
-            this.Controls.Add(lblTitle);
+            
+            lblTitle.MouseDown += (s, e) => { if (e.Button == MouseButtons.Left) { isDragging = true; lastCursor = e.Location; } };
+            lblTitle.MouseMove += (s, e) => { if (isDragging) { this.Location = new Point(this.Location.X + (e.X - lastCursor.X), this.Location.Y + (e.Y - lastCursor.Y)); } };
+            lblTitle.MouseUp += (s, e) => { isDragging = false; };
+            lblTitle.DoubleClick += (s, e) => {
+                this.WindowState = this.WindowState == FormWindowState.Normal ? FormWindowState.Maximized : FormWindowState.Normal;
+            };
+
+            pnlTitleBar.Controls.Add(lblTitle);
+            lblTitle.SendToBack();
+            this.Controls.Add(pnlTitleBar);
 
             // 3. Cargar el archivo
             CargarContenido(filePath);
@@ -52,8 +93,7 @@ namespace ExploradorArchivos.UI
                     this.Close();
             };
 
-            // Cerrar si haces clic fuera de la ventana
-            this.Deactivate += (s, e) => this.Close();
+            // Se remueve Deactivate para permitir usar los botones de semáforo sin que se cierre automáticamente
         }
 
         private void CargarContenido(string filePath)
@@ -73,7 +113,7 @@ namespace ExploradorArchivos.UI
                 _pictureBox.BringToFront();
             }
             // === TEXTO / CÓDIGO ===
-            else if (ext is ".txt" or ".json" or ".xml" or ".cs" or ".csv" or ".log")
+            else if (ext is ".txt" or ".json" or ".xml" or ".cs" or ".csv" or ".log" or ".py" or ".bat" or ".cmd" or ".dat" or ".md" or ".html" or ".css" or ".js")
             {
                 _richTextBox = new RichTextBox
                 {
@@ -154,6 +194,19 @@ namespace ExploradorArchivos.UI
             _pictureBox?.Image?.Dispose();
             _webView?.Dispose(); // Liberamos memoria de Chromium
             base.OnFormClosed(e);
+        }
+
+        private Button CrearBotonSemaforo(Color color, int x, Color backColor)
+        {
+            Button b = new Button { Name = "btnSemaforo", Location = new Point(x, 0), Size = new Size(14, 14), BackColor = color, FlatStyle = FlatStyle.Flat };
+            b.FlatAppearance.BorderSize = 0;
+            b.Paint += (s, e) => {
+                e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                e.Graphics.Clear(backColor);
+                e.Graphics.FillEllipse(new SolidBrush(color), 0, 0, b.Width - 1, b.Height - 1);
+                e.Graphics.DrawEllipse(new Pen(Color.FromArgb(50, Color.Black)), 0, 0, b.Width - 1, b.Height - 1);
+            };
+            return b;
         }
     }
 }

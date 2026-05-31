@@ -373,6 +373,10 @@ public class FileViewerForm : Form
                 }
                 catch { /* fallback to plain text */ }
             }
+            else if (extension == ".md")
+            {
+                lblInfo.Text = $"{Path.GetFileName(_filePath)} [Markdown]";
+            }
             else
             {
                 lblInfo.Text = Path.GetFileName(_filePath);

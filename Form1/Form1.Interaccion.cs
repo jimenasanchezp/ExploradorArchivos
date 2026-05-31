@@ -50,7 +50,7 @@ public partial class Form1
             string[] imgExt = { ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp" };
             string[] mediaExt = { ".mp3", ".wav", ".flac", ".m4a", ".ogg", ".wma", ".aac" };
             string[] videoExt = { ".mp4", ".mkv", ".avi", ".mov", ".webm", ".wmv", ".flv", ".m4v" };
-            string[] txtExt = { ".cs", ".html", ".css", ".js", ".md", ".py" };
+            string[] txtExt = { ".cs", ".html", ".css", ".js", ".md", ".py", ".bat", ".cmd", ".dat" };
             string[] dataExt = { ".csv", ".json", ".xml", ".txt" };
 
             if (imgExt.Contains(ext))

@@ -76,27 +76,37 @@ public static class DataProcessor
     /// Soporta tanto las propiedades estándar de DataItem como cualquier clave de CamposExtra,
     /// lo que permite filtrar por columnas de datasets personalizados (ej. "fuel_type", "brand").
     /// </summary>
-    public static List<DataItem> Filtrar(List<DataItem> datos, string campo, string valor)
+    public static List<DataItem> Filtrar(List<DataItem> datos, string campo, string valor, bool exacto = false)
     {
         var resultado = new List<DataItem>();
-        string v = valor.ToLower();
+        bool exactMatch = exacto || (valor.StartsWith("\"") && valor.EndsWith("\"") && valor.Length >= 2);
+        string v = (valor.StartsWith("\"") && valor.EndsWith("\"") && valor.Length >= 2) ? valor.Substring(1, valor.Length - 2).ToLower() : valor.ToLower();
         string campoLow = campo.ToLower();
 
         for (int i = 0; i < datos.Count; i++)
         {
             var item = datos[i];
+            
+            bool CheckMatch(string? field)
+            {
+                string f = (field ?? "").ToLower();
+                return exactMatch ? f == v : f.Contains(v);
+            }
+
             bool match = campoLow switch
             {
-                "nombre" => item.Nombre.ToLower().Contains(v),
-                "categoria" => item.Categoria.ToLower().Contains(v),
-                "fuente" => item.Fuente.ToLower().Contains(v),
+                "nombre" => CheckMatch(item.Nombre),
+                "categoria" => CheckMatch(item.Categoria),
+                "fuente" => CheckMatch(item.Fuente),
                 "id" => item.Id.ToString() == v,
-                "valor" => item.Valor.ToString("F2").Contains(v),
-                "fecha" => item.Fecha.ToString("yyyy-MM-dd").Contains(v),
+                "valor" => CheckMatch(item.Valor.ToString("F2")),
+                "fecha" => CheckMatch(item.Fecha.ToString("yyyy-MM-dd")),
+                "latitude" => CheckMatch(item.Latitude?.ToString("F6")),
+                "longitude" => CheckMatch(item.Longitude?.ToString("F6")),
                 // Cualquier otro campo → buscar en CamposExtra; si no existe, fallback amplio
-                _ => item.CamposExtra.TryGetValue(campoLow, out var ev)
-                     ? ev.ToLower().Contains(v)
-                     : item.Nombre.ToLower().Contains(v) || item.Categoria.ToLower().Contains(v)
+                _ => item.CamposExtra != null && item.CamposExtra.TryGetValue(campoLow, out var ev) && ev != null
+                     ? CheckMatch(ev)
+                     : CheckMatch(item.Nombre) || CheckMatch(item.Categoria)
             };
             if (match) resultado.Add(item);
         }
@@ -213,6 +223,8 @@ public static class DataProcessor
             "categoria" => d.Categoria,
             "fecha" => d.Fecha,
             "fuente" => d.Fuente,
+            "latitude" => d.Latitude ?? 0,
+            "longitude" => d.Longitude ?? 0,
             _ => d.CamposExtra.TryGetValue(campo.ToLower(), out var v) ? v : ""
         };
     }
@@ -272,6 +284,8 @@ public static class DataProcessor
             "categoria" => string.Compare(a.Categoria, b.Categoria, StringComparison.OrdinalIgnoreCase),
             "fecha" => a.Fecha.CompareTo(b.Fecha),
             "id" => a.Id.CompareTo(b.Id),
+            "latitude" => (a.Latitude ?? 0).CompareTo(b.Latitude ?? 0),
+            "longitude" => (a.Longitude ?? 0).CompareTo(b.Longitude ?? 0),
             // Cualquier campo desconocido → buscar en CamposExtra con comparación inteligente
             _ => CompararCampoExtra(a, b, campo.ToLower())
         };

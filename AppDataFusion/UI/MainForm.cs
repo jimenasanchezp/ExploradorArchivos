@@ -187,7 +187,7 @@ public partial class MainForm : Form
         tabControl1.ItemSize = new Size(160, 42);
         tabControl1.SizeMode = TabSizeMode.Fixed;
 
-        ActualizarEstadoBarra("Listo â€” carga datos para comenzar.");
+        ActualizarEstadoBarra("Listo, carga datos para comenzar.");
     }
 
     // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
@@ -610,6 +610,43 @@ public partial class MainForm : Form
     private void BtnExportarXml_Click(object? sender, EventArgs e) => _ = ExportarAsync("xml");
     private void BtnExportarTxt_Click(object? sender, EventArgs e) => _ = ExportarAsync("txt");
 
+    private async void BtnEnviarCorreo_Click(object? sender, EventArgs e)
+    {
+        var datos = _datosVista.Count > 0 ? _datosVista : _datosBase;
+        if (datos.Count == 0)
+        {
+            MessageBox.Show("No hay datos para enviar.", "Sin datos", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
+
+        string tempFile = Path.Combine(Path.GetTempPath(), $"DataFusionArena_{DateTime.Now:yyyyMMdd_HHmmss}.csv");
+        var columnas = _infoColumnas.Select(c => c.Display).ToList();
+        var mapeo = _infoColumnas.ToDictionary(c => c.Display, c => c.Clave, StringComparer.OrdinalIgnoreCase);
+
+        ActualizarEstadoBarra($"Preparando archivo para enviar por correo...");
+        await Task.Run(() => FileExportService.ExportarCsv(tempFile, datos, columnas, mapeo));
+
+        string subject = Uri.EscapeDataString("Datos exportados de Data Fusion Arena");
+        string body = Uri.EscapeDataString($"Hola,\n\nSe han exportado {datos.Count} registros. " +
+            $"El archivo se ha guardado temporalmente en:\n{tempFile}\n\nPor favor adjúntelo a este correo.");
+
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = $"mailto:?subject={subject}&body={body}",
+                UseShellExecute = true
+            });
+            ActualizarEstadoBarra("Cliente de correo abierto.");
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"No se pudo abrir el cliente de correo.\n\nEl archivo exportado estÃ¡ en:\n{tempFile}\n\nDetalle: {ex.Message}", 
+                "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+    }
+
+
     /// <summary>
     /// Procesa la exportación asíncrona de los datos actualmente visualizados o cargados
     /// a un archivo local en el formato seleccionado.
@@ -925,12 +962,12 @@ public partial class MainForm : Form
     /// </summary>
     private async void BtnFiltrar_Click(object? sender, EventArgs e)
     {
-        string display = cmbCampoBusqueda.Text, clave = TraducirClave(display),
-               valor = txtBusqueda.Text.Trim();
+        string display = cmbCampoBusqueda.SelectedItem?.ToString() ?? cmbCampoBusqueda.Text;
+        string clave = TraducirClave(display), valor = txtBusqueda.Text.Trim();
         ActualizarEstadoBarra("Filtrando...");
         _datosVista = string.IsNullOrEmpty(valor)
             ? new List<DataItem>(_datosBase)
-            : await Task.Run(() => DataProcessor.Filtrar(_datosBase, clave, valor));
+            : await Task.Run(() => DataProcessor.Filtrar(_datosBase, clave, valor, true));
         await BindGridAsync(dgvTodos, _datosVista, lblContadorTodos);
         ActualizarEstadoBarra($"Filtro '{display}' = '{valor}' â†’ {_datosVista.Count} resultados.");
     }

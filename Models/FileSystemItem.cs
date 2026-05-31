@@ -69,7 +69,7 @@ public class FileSystemItem
             if (ext is ".mp4" or ".mkv" or ".avi") return "Video";
             
             // Clasificación de archivos de texto, código fuente y datos estructurados.
-            if (ext is ".txt" or ".json" or ".xml" or ".cs" or ".csv" or ".log") return "Texto/Código";
+            if (ext is ".txt" or ".json" or ".xml" or ".cs" or ".csv" or ".log" or ".md") return "Texto/Código";
             
             // Archivos genéricos que no coinciden con las categorías anteriores.
             return "Otros";

@@ -20,7 +20,7 @@ public class DataItem
     /// Campos extra que no encajan en las propiedades base.
     /// Útil para columnas adicionales de CSV o atributos XML extras.
     /// </summary>
-    public Dictionary<string, string> CamposExtra { get; set; } = new();
+    public Dictionary<string, string> CamposExtra { get; set; } = new(StringComparer.OrdinalIgnoreCase);
 
     // ──────────────────────────────────────────────────────────────
     // Helpers
