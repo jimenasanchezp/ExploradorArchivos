@@ -278,7 +278,7 @@ Este documento contiene:
 
 ## 👤 Autor
 
-Desarrollado por **Jimena Sánchez**.
+Desarrollado por **Jimena Sanchez** y **Carolina Sustaita**.
 
 ---
 
