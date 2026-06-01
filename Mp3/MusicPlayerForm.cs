@@ -190,13 +190,34 @@ namespace ExploradorArchivos.Mp3
             Button btnEdit = CrearBotonTitle("✏️");
             btnEdit.Size = new Size(30, 25);
             btnEdit.Location = new Point(310, 0);
-            btnEdit.Click += (s, e) => MessageBox.Show("Abrir edición de metadatos (WIP) 🌸"); // Placeholder
+            btnEdit.Click += (s, e) => {
+                var cancion = _gestor.CancionActual;
+                if (cancion != null)
+                {
+                    using (var editor = new MetadataEditorForm(cancion, _gestor))
+                    {
+                        if (editor.ShowDialog(this) == DialogResult.OK)
+                        {
+                            OnCancionCambiada(cancion);
+                        }
+                    }
+                }
+                else
+                {
+                    MessageBox.Show("No hay ninguna canción reproduciéndose actualmente. 🌸", "Aviso", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
+            };
 
-            Panel pnlTitle = CrearPanelInfo("Title:", 30, out _lblTitulo);
-            Panel pnlArtist = CrearPanelInfo("Artist:", 90, out _lblArtista);
-            Panel pnlAlbum = CrearPanelInfo("Album:", 150, out _lblAlbum);
+            // Emojis decorativos flotantes en la cabecera de información
+            Label lblStickerInfo1 = new Label { Text = "🎶✨", Font = new Font("Segoe UI", 12), Location = new Point(120, 0), AutoSize = true, BackColor = Color.Transparent };
+            Label lblStickerInfo2 = new Label { Text = "🎀🧁", Font = new Font("Segoe UI", 12), Location = new Point(230, 0), AutoSize = true, BackColor = Color.Transparent };
+            Label lblStickerInfo3 = new Label { Text = "🎧🍭💕", Font = new Font("Segoe UI", 14), Location = new Point(10, 210), AutoSize = true, BackColor = Color.Transparent };
 
-            pnlInfoContainer.Controls.AddRange(new Control[] { lblDeco1, btnEdit, pnlTitle, pnlArtist, pnlAlbum });
+            Panel pnlTitle = CrearPanelInfo("🎵 Title / Canción:", 30, out _lblTitulo);
+            Panel pnlArtist = CrearPanelInfo("🎤 Artist / Artista:", 90, out _lblArtista);
+            Panel pnlAlbum = CrearPanelInfo("💿 Album / Disco:", 150, out _lblAlbum);
+
+            pnlInfoContainer.Controls.AddRange(new Control[] { lblDeco1, btnEdit, lblStickerInfo1, lblStickerInfo2, lblStickerInfo3, pnlTitle, pnlArtist, pnlAlbum });
             
             Label lblSticker1 = new Label { Text = "⭐", Font = new Font("Segoe UI", 18), Location = new Point(620, 220), AutoSize = true, BackColor = Color.Transparent };
             Label lblSticker2 = new Label { Text = "💿", Font = new Font("Segoe UI", 24), Location = new Point(15, 260), AutoSize = true, BackColor = Color.Transparent };
@@ -209,6 +230,29 @@ namespace ExploradorArchivos.Mp3
             Label lblBib = new Label { Text = "🧸 Mi Biblioteca Musical", Dock = DockStyle.Top, Font = new Font(this.Font.FontFamily, 12, FontStyle.Bold), Height = 30 };
             _lstCola = new ListBox { Dock = DockStyle.Fill, BackColor = Color.White, Font = new Font(this.Font.FontFamily, 10), DrawMode = DrawMode.OwnerDrawFixed, ItemHeight = 35 };
             _lstCola.DrawItem += LstCola_DrawItem;
+
+            ContextMenuStrip menuCola = new ContextMenuStrip();
+            ToolStripMenuItem itemEditar = new ToolStripMenuItem("Editar Metadatos ✏️");
+            itemEditar.Click += (s, e) => {
+                if (_lstCola.SelectedIndex >= 0 && _lstCola.SelectedIndex < _lstCola.Items.Count)
+                {
+                    var cola = _gestor.ObtenerColaOrdenada();
+                    var cancionSelected = cola[_lstCola.SelectedIndex].Cancion;
+                    using (var editor = new MetadataEditorForm(cancionSelected, _gestor))
+                    {
+                        if (editor.ShowDialog(this) == DialogResult.OK)
+                        {
+                            ActualizarCola();
+                            if (_gestor.CancionActual == cancionSelected)
+                            {
+                                OnCancionCambiada(cancionSelected);
+                            }
+                        }
+                    }
+                }
+            };
+            menuCola.Items.Add(itemEditar);
+            _lstCola.ContextMenuStrip = menuCola;
             Panel pnlListBorder = new Panel { Dock = DockStyle.Fill, Padding = new Padding(2) };
             pnlListBorder.Paint += (s, e) => DrawClassicBorder(e.Graphics, pnlListBorder.ClientRectangle, false);
             pnlListBorder.Controls.Add(_lstCola);

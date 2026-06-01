@@ -88,6 +88,7 @@ public partial class AppVideoForm : Form
         AgregarBotonEditor("🎞️ Sepia", startX + 100, () => AplicarFiltro("Sepia"));
         AgregarBotonEditor("🌑 B&N", startX + 200, () => AplicarFiltro("BN"));
         AgregarBotonEditor("🎵 Audio", startX + 300, ExtraerAudio);
+        AgregarBotonEditor("↩️ Revertir", startX + 400, RevertirCambios);
 
         // Main Layout
         SplitContainer split = new SplitContainer { Dock = DockStyle.Fill, SplitterDistance = 800 };
@@ -400,37 +401,132 @@ public partial class AppVideoForm : Form
     }
 
     /// <summary>
-    /// Detiene la reproducción para liberar el archivo y envía el comando asíncrono a FFmpeg para aplicar un filtro de color.
+    /// Detiene la reproducción para liberar el archivo, aplica el filtro de color a un archivo temporal
+    /// y luego reemplaza el video original con la versión filtrada para realizar los cambios sobre el mismo video.
+    /// Preserva los metadatos en un archivo companion .meta.json y crea una copia de seguridad original (.bak) si no existe.
     /// </summary>
     /// <param name="nombre">Nombre del filtro (Soft, Sepia, BN).</param>
     private async void AplicarFiltro(string nombre)
     {
-        PrepararParaProcesar();
-        string output = Path.Combine(Path.GetDirectoryName(_rutaVideo)!, "Filtro_" + Path.GetFileName(_rutaVideo));
+        // Crear copia de seguridad original (.bak) si no existe ya
+        string backupPath = _rutaVideo + ".bak";
+        if (!File.Exists(backupPath))
+        {
+            try
+            {
+                File.Copy(_rutaVideo, backupPath, overwrite: false);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"No se pudo crear una copia de seguridad: {ex.Message}. El proceso continuará pero no se podrá revertir.", "Advertencia", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
+        }
+
+        // Preservar metadatos en el archivo companion .meta.json antes de sobreescribir el video
+        if (_metadata != null)
+        {
+            AppVideoProcessor.GuardarMetadata(_metadata);
+        }
+
+        string tempOutput = Path.Combine(Path.GetDirectoryName(_rutaVideo)!, "temp_" + Guid.NewGuid().ToString("N") + Path.GetExtension(_rutaVideo));
         
         lblMetaInfo.Text = "\nPROCESANDO FILTRO...\nPor favor espera.";
-        bool ok = await AppVideoProcessor.AplicarFiltro(_rutaVideo, output, nombre);
         
-        if (ok) MessageBox.Show("Filtro aplicado con éxito: " + output);
-        else MessageBox.Show("Error al aplicar filtro. Asegúrate de que ffmpeg.exe esté en la carpeta de la app.");
+        // Detener la reproducción para que VLC libere el descriptor del archivo original
+        PrepararParaProcesar();
+        await Task.Delay(500); // Pequeña pausa para asegurar la liberación del archivo por parte de VLC
+        
+        bool ok = await AppVideoProcessor.AplicarFiltro(_rutaVideo, tempOutput, nombre);
+        
+        if (ok)
+        {
+            try
+            {
+                // Reemplazar el archivo de video original con el filtrado
+                if (File.Exists(_rutaVideo))
+                {
+                    File.Delete(_rutaVideo);
+                }
+                File.Move(tempOutput, _rutaVideo);
+                MessageBox.Show("Filtro aplicado con éxito sobre el mismo video.", "Filtro Aplicado", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Filtro aplicado, pero no se pudo reemplazar el archivo original: {ex.Message}\nEl archivo filtrado se guardó en: {tempOutput}", "Error de reemplazo", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
+        }
+        else
+        {
+            MessageBox.Show("Error al aplicar filtro. Asegúrate de que ffmpeg.exe esté en la carpeta de la app.", "Error de FFmpeg", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            if (File.Exists(tempOutput))
+            {
+                try { File.Delete(tempOutput); } catch { }
+            }
+        }
         
         CargarMetadatos();
         ReiniciarReproductor();
     }
 
     /// <summary>
-    /// Detiene la reproducción y llama asíncronamente a FFmpeg para extraer únicamente 
-    /// la pista de audio y guardarla en formato MP3 en la misma ruta que el video original.
+    /// Llama asíncronamente a FFmpeg para extraer únicamente la pista de audio
+    /// y guardarla en formato MP3 en la misma ruta que el video original.
+    /// Se realiza en segundo plano sin interrumpir la reproducción actual del video.
     /// </summary>
     private async void ExtraerAudio()
     {
-        PrepararParaProcesar();
         string output = Path.Combine(Path.GetDirectoryName(_rutaVideo)!, Path.GetFileNameWithoutExtension(_rutaVideo) + ".mp3");
+        
+        string originalMetaText = lblMetaInfo.Text;
+        lblMetaInfo.Text = "\nEXTRAYENDO AUDIO...\nPor favor espera.";
+        
         bool ok = await AppVideoProcessor.ExtraerAudio(_rutaVideo, output);
         
-        if (ok) MessageBox.Show("Audio extraído: " + output);
-        else MessageBox.Show("Error al extraer audio. Asegúrate de que ffmpeg.exe esté en la carpeta de la app.");
+        if (ok)
+        {
+            MessageBox.Show("Audio extraído con éxito en: " + output, "Extracción de Audio", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+        else
+        {
+            MessageBox.Show("Error al extraer audio. Asegúrate de que ffmpeg.exe esté en la carpeta de la app.", "Error de FFmpeg", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
         
+        CargarMetadatos();
+    }
+
+    /// <summary>
+    /// Restaura el video original a partir de la copia de seguridad (.bak) creada antes del primer filtro.
+    /// </summary>
+    private async void RevertirCambios()
+    {
+        string backupPath = _rutaVideo + ".bak";
+        if (!File.Exists(backupPath))
+        {
+            MessageBox.Show("No hay cambios que revertir (el video ya está en su versión original).", "Revertir Cambios", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+
+        var res = MessageBox.Show("¿Deseas revertir todos los filtros aplicados y regresar al video original?", "Confirmar Reversión", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+        if (res != DialogResult.Yes) return;
+
+        PrepararParaProcesar();
+        await Task.Delay(500); // Esperar liberación por parte de VLC
+
+        try
+        {
+            if (File.Exists(_rutaVideo))
+            {
+                File.Delete(_rutaVideo);
+            }
+            File.Move(backupPath, _rutaVideo);
+            MessageBox.Show("Cambios revertidos. Video original restaurado.", "Restaurado", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Error al restaurar el archivo original: {ex.Message}", "Error de restauración", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+
+        CargarMetadatos();
         ReiniciarReproductor();
     }
 

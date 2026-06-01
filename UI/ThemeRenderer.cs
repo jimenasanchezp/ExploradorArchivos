@@ -200,13 +200,16 @@ public static class ThemeRenderer
                 btn.FlatStyle = FlatStyle.Flat;
                 btn.BackColor = MainBg;
                 btn.ForeColor = MainText;
-                btn.Font = new Font(standardFont, FontStyle.Bold);
+                if (!btn.Font.Name.Contains("Segoe", StringComparison.OrdinalIgnoreCase) && !ContieneEmojis(btn.Text))
+                {
+                    btn.Font = new Font(standardFont, FontStyle.Bold);
+                }
             }
             else if (c is Label lbl)
             {
                 lbl.ForeColor = MainText;
                 // Si es un título de grupo (en el sidebar por ejemplo), lo hacemos un poco más grande
-                if (lbl.Text.ToUpper() == lbl.Text && lbl.Text.Length > 3)
+                if (lbl.Text.ToUpper() == lbl.Text && lbl.Text.Length > 3 && !ContieneEmojis(lbl.Text))
                     lbl.Font = new Font(standardFont.FontFamily, 11.5f, FontStyle.Bold);
             }
             else if (c is Panel pnl)
@@ -237,8 +240,32 @@ public static class ThemeRenderer
             
             // Aseguramos que la fuente se aplique a todo después de la recursión si no fue capturado antes
             if (!(c is Button && isSemaforo))
-                c.Font = standardFont;
+            {
+                if (c.Font.Name.Contains("Segoe", StringComparison.OrdinalIgnoreCase) || ContieneEmojis(c.Text))
+                {
+                    if (!c.Font.Name.Contains("Segoe", StringComparison.OrdinalIgnoreCase))
+                    {
+                        c.Font = new Font("Segoe UI Emoji", c.Font.Size, c.Font.Style);
+                    }
+                }
+                else
+                {
+                    c.Font = standardFont;
+                }
+            }
         }
+    }
+
+    private static bool ContieneEmojis(string text)
+    {
+        if (string.IsNullOrEmpty(text)) return false;
+        for (int i = 0; i < text.Length; i++)
+        {
+            char c = text[i];
+            if (char.IsSurrogate(c) || (c >= 0x2000 && c <= 0x32FF) || (c >= 0xFE00 && c <= 0xFE0F))
+                return true;
+        }
+        return false;
     }
 
     private static string GetIconForType(string tipo, string ruta)

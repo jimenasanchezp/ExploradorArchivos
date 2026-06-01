@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Drawing;
 using System.Linq;
 using System.Windows.Forms;
 using NAudio.Wave;
@@ -319,6 +320,83 @@ public class GestorReproduccion : IDisposable
 
     public List<(int IndiceReal, Cancion Cancion)> ObtenerColaOrdenada() =>
         _ordenReproduccion.Select(idx => (idx, _cola[idx])).ToList();
+
+    /// <summary>
+    /// Guarda los metadatos modificados de una canción en disco y actualiza el reproductor.
+    /// Si la canción es la que se reproduce actualmente, detiene temporalmente la reproducción
+    /// para liberar el bloqueo del archivo físico por NAudio, escribe el cambio y reanuda el audio.
+    /// </summary>
+    public bool GuardarMetadatos(Cancion cancion, string nuevoTitulo, string nuevoArtista, Image? nuevaPortada)
+    {
+        bool esCancionActual = (cancion == CancionActual);
+        bool estabaReproduciendo = false;
+        TimeSpan posicionActual = TimeSpan.Zero;
+
+        if (esCancionActual)
+        {
+            estabaReproduciendo = EstaReproduciendo;
+            if (_audioReader != null)
+            {
+                posicionActual = _audioReader.CurrentTime;
+            }
+            DetenerInterno();
+        }
+
+        // Respaldar metadatos anteriores para restaurar en caso de fallo
+        string tituloOriginal = cancion.Titulo;
+        string artistaOriginal = cancion.Artista;
+        Image? portadaOriginal = cancion.Portada;
+
+        // Asignar nuevos valores
+        cancion.Titulo = nuevoTitulo;
+        cancion.Artista = nuevoArtista;
+        cancion.Portada = nuevaPortada != null ? (Image)nuevaPortada.Clone() : null;
+
+        // Intentar guardar físicamente
+        bool guardado = MetadataService.GuardarCambios(cancion);
+
+        if (!guardado)
+        {
+            // Revertir cambios en memoria
+            cancion.Titulo = tituloOriginal;
+            cancion.Artista = artistaOriginal;
+            cancion.Portada = portadaOriginal;
+        }
+        else
+        {
+            // Si guardó con éxito, liberamos la portada vieja
+            portadaOriginal?.Dispose();
+        }
+
+        if (esCancionActual)
+        {
+            // Recargar la canción actual
+            try
+            {
+                if (System.IO.File.Exists(cancion.RutaArchivo))
+                {
+                    _audioReader = new AudioFileReader(cancion.RutaArchivo) { Volume = _volumen };
+                    _audioReader.CurrentTime = posicionActual;
+
+                    _waveOut = new WaveOutEvent();
+                    _waveOut.Init(_audioReader);
+                    _waveOut.PlaybackStopped += OnPlaybackStopped;
+
+                    if (estabaReproduciendo)
+                    {
+                        _waveOut.Play();
+                        _timerPosicion.Start();
+                    }
+                }
+            }
+            catch { }
+
+            CancionCambiada?.Invoke(cancion);
+            EstadoCambiado?.Invoke(estabaReproduciendo);
+        }
+
+        return guardado;
+    }
 
     public void Dispose() { DetenerInterno(); _timerPosicion.Dispose(); }
 }

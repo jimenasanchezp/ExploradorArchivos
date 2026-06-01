@@ -82,11 +82,20 @@ public static class AppVideoProcessor
             using var process = Process.Start(psi);
             if (process == null) return false;
 
+            // Leer stderr de forma asíncrona para evitar que el búfer se llene y bloquee el proceso
+            string errors = await process.StandardError.ReadToEndAsync();
+
             await process.WaitForExitAsync();
+            
+            if (process.ExitCode != 0)
+            {
+                Console.WriteLine($"FFmpeg falló con código {process.ExitCode}. Detalle: {errors}");
+            }
             return process.ExitCode == 0;
         }
-        catch
+        catch (Exception ex)
         {
+            Console.WriteLine($"Excepción al ejecutar FFmpeg: {ex.Message}");
             return false;
         }
     }

@@ -1,4 +1,6 @@
 using System;
+using System.IO;
+using System.Drawing;
 
 namespace ExploradorArchivos.Mp3;
 
@@ -10,7 +12,7 @@ public static class MetadataService
 {
     /// <summary>
     /// Guarda los cambios de metadatos en el archivo de audio.
-    /// Persiste Título, Artista, Álbum y Año.
+    /// Persiste Título, Artista, Álbum, Año y Foto de Portada.
     /// </summary>
     public static bool GuardarCambios(Cancion cancion)
     {
@@ -27,6 +29,25 @@ public static class MetadataService
             if (!string.IsNullOrEmpty(cancion.Letra))
                 archivo.Tag.Lyrics = cancion.Letra;
 
+            // Guardar portada si existe
+            if (cancion.Portada != null)
+            {
+                using (var ms = new MemoryStream())
+                {
+                    cancion.Portada.Save(ms, System.Drawing.Imaging.ImageFormat.Jpeg);
+                    var pic = new TagLib.Picture(new TagLib.ByteVector(ms.ToArray()))
+                    {
+                        Type = TagLib.PictureType.FrontCover,
+                        MimeType = "image/jpeg"
+                    };
+                    archivo.Tag.Pictures = new TagLib.IPicture[] { pic };
+                }
+            }
+            else
+            {
+                archivo.Tag.Pictures = Array.Empty<TagLib.IPicture>();
+            }
+
             archivo.Save();
             return true;
         }
@@ -36,3 +57,4 @@ public static class MetadataService
         }
     }
 }
+

@@ -27,7 +27,7 @@ El proyecto nació como un explorador de archivos tradicional y evolucionó hast
 | Tipo de archivo | Módulo que lo maneja | Qué puedes hacer |
 |---|---|---|
 | `.jpg`, `.png`, `.bmp` | **AppFoto** | Filtros (BN, Sepia, Soft), ajuste de brillo/contraste/saturación, dibujo libre, recorte, lectura y escritura de coordenadas GPS (EXIF), visualización en mapa |
-| `.mp3`, `.wav` | **Mp3** | Reproducción con cola, carátulas ID3, búsqueda automática de letras por internet, barra de progreso personalizada |
+| `.mp3`, `.wav` | **Mp3** | Reproducción con cola, carátulas ID3, búsqueda automática de letras por internet, barra de progreso personalizada, **edición y persistencia de metadatos (título, artista y foto de portada)** |
 | `.mp4`, `.avi`, `.mkv` | **AppVideo** | Reproducción con LibVLC, extracción de audio a MP3, silenciado de video, extracción de fotogramas — todo vía FFmpeg |
 | `.csv`, `.json`, `.xml`, `.txt` | **AppDataFusion** | Lectura inteligente sin esquema fijo, grilla virtualizada, ordenamiento (QuickSort) y filtrado avanzado (búsqueda exacta con `""` y geolocalización), exportación a `.docx`/`.xlsx`/correo, migración a PostgreSQL o MariaDB |
 | Cámara web | **AppCamara** | Captura de video en vivo desde la webcam usando P/Invoke nativo a `avicap32.dll` |
@@ -189,7 +189,7 @@ Motor de procesamiento de imágenes que trabaja directamente con la API gráfica
 
 - **Motor de audio:** Usa `NAudio` (`WaveOutEvent` + `AudioFileReader`) para comunicarse directamente con los drivers de audio del sistema operativo (WASAPI/DirectSound), sin depender de `MediaPlayer`.
 - **Letras automáticas:** Hace una petición HTTP `async` a `api.lyrics.ovh` y parsea la respuesta JSON con `System.Text.Json` sin crear clases modelo.
-- **Carátulas:** Extrae las imágenes embebidas en los tags ID3 del MP3 usando `TagLibSharp`.
+- **Carátulas y Edición de Metadatos:** Extrae las imágenes embebidas en los tags ID3 del MP3 usando `TagLibSharp`. Permite **editar y guardar directamente en el archivo físico el título, artista y portada** (usando `MetadataEditorForm`), liberando y reanudando de forma automática el lector de audio para evadir bloqueos de acceso de NAudio.
 
 ### 🎥 AppVideo — Reproductor y procesador de video
 

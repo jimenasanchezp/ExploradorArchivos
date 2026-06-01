@@ -24,7 +24,7 @@ El proyecto ha crecido mucho más allá de un simple explorador de archivos trad
 
 ### Nivel 2: Productividad y Multimedia
 *   **Fotografías (`.jpg`, `.png`):** Se abrirán en el `AppFotoForm`. Puedes aplicar filtros retro (Blanco y Negro, Sepia), alterar contraste/brillo, dibujar firmas y exportar las imágenes. Si la foto fue tomada con un celular, mostrará su ubicación GPS en un mapa interactivo.
-*   **Música (`.mp3`, `.wav`):** Se abrirá el `MusicPlayerForm`. Soporta listas de reproducción, muestra las carátulas incrustadas en los archivos y descarga la letra de la canción desde internet automáticamente.
+*   **Música (`.mp3`, `.wav`):** Se abrirá el `MusicPlayerForm`. Soporta listas de reproducción, muestra las carátulas incrustadas, descarga la letra de la canción de internet automáticamente y **permite editar el título, artista y foto de portada (cover)** haciendo click en el botón ✏️ o mediante click derecho en cualquier elemento de la cola.
 *   **Video (`.mp4`, `.avi`):** Se reproducirán de forma nativa. Incluye herramientas avanzadas para silenciar el video, extraer su pista de audio como MP3, o extraer una ráfaga de imágenes (Frames).
 
 ### Nivel 3: Herramientas Avanzadas (Data Science & OS)
@@ -111,8 +111,9 @@ Esta sección documenta **todas las clases** y funciones de los módulos del sis
 *   `AppVideoProcessor`: Envuelve binarios de FFmpeg y el parser binario de geolocalización. Expone `ExtraerAudio()`, `SilenciarVideo()`, `ExtraerFrames()`, `ConvertirAviAMp4()` y el motor híbrido `ExtractGpsFromMp4()` (que soporta los formatos de Android `©xyz` e iOS `com.apple.quicktime.location.ISO6709`).
 
 ### 🎵 Mp3 (Motor de Audio y REST)
-*   `MusicPlayerForm`: Administra la lista de reproducción y la interfaz fluida del reproductor.
-*   `GestorReproduccion`: Instancia un `WaveOutEvent` y `AudioFileReader` de NAudio. Controla la memoria binaria (PCM).
+*   `MusicPlayerForm`: Administra la lista de reproducción, la interfaz con tema visual rosa pastel y los disparadores de edición de metadatos.
+*   `GestorReproduccion`: Instancia un `WaveOutEvent` y `AudioFileReader` de NAudio. Controla el flujo de audio en memoria y provee la función de liberación temporal de archivos para permitir la edición de metadatos en pistas activas.
+*   `MetadataEditorForm`: Diálogo que permite modificar interactivamente el título, artista y cambiar o eliminar la portada de un archivo de audio.
 *   `LyricsService`: Usa `HttpClient` y `JsonDocument` para hacer llamadas asíncronas REST a `api.lyrics.ovh`.
 
 ### 🎙️ AppGrabadora (Microfonía en Crudo)
@@ -142,8 +143,8 @@ Esta sección documenta **todas las clases** y funciones de los módulos del sis
 
 A continuación se incluyen pedazos de código clave del sistema que sustentan las explicaciones dadas anteriormente. Se omiten interfaces visuales repetitivas y se enfoca estrictamente en la lógica nativa y algoritmos de alto rendimiento.
 
-### 🎵 7.1 Motor de Audio: `GestorReproduccion.cs`
-Este archivo es el núcleo de control multihilo para la reproducción de MP3. Utiliza la librería de bajo nivel `NAudio` para interactuar con los canales PCM de Windows.
+### 🎵 7.1 Motor de Audio y Edición de Metadatos: `GestorReproduccion.cs`
+Este archivo es el núcleo de control multihilo para la reproducción de MP3. Utiliza la librería de bajo nivel `NAudio` para interactuar con los canales PCM de Windows y gestiona la liberación temporal de descriptores de archivo para posibilitar el guardado de metadatos físicos.
 
 ```csharp
 using NAudio.Wave;
@@ -169,10 +170,38 @@ public class GestorReproduccion : IDisposable {
         }
     }
 
-    private void OnPlaybackStopped(object sender, StoppedEventArgs e) {
-        // Evento disparado por NAudio en un hilo secundario cuando el buffer se vacía
-        // Se requiere un delegado asíncrono para no bloquear la UI.
-        Task.Run(() => AvanzarCancionPendiente());
+    /// <summary>
+    /// Guarda metadatos físicos en el archivo de audio.
+    /// Detiene y libera temporalmente el archivo en NAudio para evadir excepciones de proceso ocupado.
+    /// </summary>
+    public bool GuardarMetadatos(Cancion cancion, string nuevoTitulo, string nuevoArtista, Image? nuevaPortada) {
+        bool esCancionActual = (cancion == CancionActual);
+        bool estabaReproduciendo = false;
+        TimeSpan posicionActual = TimeSpan.Zero;
+
+        if (esCancionActual) {
+            estabaReproduciendo = EstaReproduciendo;
+            if (_audioReader != null) posicionActual = _audioReader.CurrentTime;
+            DetenerInterno(); // Cierra el AudioFileReader y libera el handle del archivo
+        }
+
+        cancion.Titulo = nuevoTitulo;
+        cancion.Artista = nuevoArtista;
+        cancion.Portada = nuevaPortada != null ? (Image)nuevaPortada.Clone() : null;
+
+        // Persistencia física vía TagLibSharp
+        bool guardado = MetadataService.GuardarCambios(cancion);
+
+        if (esCancionActual) {
+            // Recargar el archivo y restaurar segundo y estado exacto de reproducción
+            _audioReader = new AudioFileReader(cancion.RutaArchivo) { Volume = _volumen };
+            _audioReader.CurrentTime = posicionActual;
+            _waveOut = new WaveOutEvent();
+            _waveOut.Init(_audioReader);
+            _waveOut.PlaybackStopped += OnPlaybackStopped;
+            if (estabaReproduciendo) _waveOut.Play();
+        }
+        return guardado;
     }
 }
 ```
