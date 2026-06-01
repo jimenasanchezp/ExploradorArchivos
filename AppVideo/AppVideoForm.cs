@@ -43,8 +43,8 @@ public partial class AppVideoForm : Form
     {
         _rutaVideo = ruta;
         InitializeCustomComponents();
-        InicializarVLC();
         CargarMetadatos();
+        InicializarVLC();
     }
 
     /// <summary>
@@ -165,7 +165,16 @@ public partial class AppVideoForm : Form
             ForeColor = Color.White,
             Visible = false
         };
-        btnSetLocation.Click += (s, e) => ActivarModoMapaPicker();
+        btnSetLocation.Click += (s, e) => {
+            if (btnSetLocation.Text == "📍 Registrar Ubicación")
+            {
+                ActivarModoMapaPicker();
+            }
+            else
+            {
+                ConfirmarUbicacionManual(s, e);
+            }
+        };
 
         pnlSidebar.Controls.Add(webMap);
         pnlSidebar.Controls.Add(btnSetLocation);
@@ -342,8 +351,6 @@ public partial class AppVideoForm : Form
         btnSetLocation.Text = "✅ Guardar Ubicación";
         btnSetLocation.BackColor = Color.LightGreen;
         btnSetLocation.ForeColor = Color.Black;
-        btnSetLocation.Click -= ConfirmarUbicacionManual;
-        btnSetLocation.Click += ConfirmarUbicacionManual;
     }
 
     private void ConfirmarUbicacionManual(object? sender, EventArgs e)
@@ -351,7 +358,6 @@ public partial class AppVideoForm : Form
         btnSetLocation.Text = "📍 Registrar Ubicación";
         btnSetLocation.BackColor = ThemeRenderer.Accent;
         btnSetLocation.ForeColor = Color.White;
-        btnSetLocation.Click -= ConfirmarUbicacionManual;
         
         ActualizarInfoMetadata();
         if (_metadata.TieneUbicacion)

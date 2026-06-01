@@ -106,9 +106,9 @@ Esta sección documenta **todas las clases** y funciones de los módulos del sis
 *   `AppFotoMetadata`: Usa `TagLib.Image.File` para extraer la latitud y longitud. Convierte fracciones sexagesimales a decimales.
 *   `AppFotoMapService`: Retorna strings HTML que inyectan `Leaflet.js` dentro del `WebView2` para trazar los mapas base de OpenStreetMap.
 
-### 🎥 AppVideo (Visualización y FFmpeg)
-*   `AppVideoForm`: Usa el control `WindowsMediaPlayer` COM incrustado.
-*   `AppVideoProcessor`: Envuelve binarios de FFmpeg. Expone `ExtraerAudio()`, `SilenciarVideo()`, y `ExtraerFrames()` orquestando el `System.Diagnostics.Process`.
+### 🎥 AppVideo (Visualización y Procesamiento)
+*   `AppVideoForm`: Usa el control `LibVLCSharp` embebido para reproducir de forma nativa e independiente, renderizando metadatos y un mapa dinámico con `WebView2`.
+*   `AppVideoProcessor`: Envuelve binarios de FFmpeg y el parser binario de geolocalización. Expone `ExtraerAudio()`, `SilenciarVideo()`, `ExtraerFrames()`, `ConvertirAviAMp4()` y el motor híbrido `ExtractGpsFromMp4()` (que soporta los formatos de Android `©xyz` e iOS `com.apple.quicktime.location.ISO6709`).
 
 ### 🎵 Mp3 (Motor de Audio y REST)
 *   `MusicPlayerForm`: Administra la lista de reproducción y la interfaz fluida del reproductor.
@@ -206,11 +206,12 @@ public static class LyricsService {
 }
 ```
 
-### 🎥 7.3 Codificación de Video Oculta: `AppVideoProcessor.cs`
-La edición de video nativa es lenta. El sistema usa CLI inter-procesos, comunicándose invisiblemente con `FFmpeg`.
+### 🎥 7.3 Codificación de Video y Geolocalización Híbrida: `AppVideoProcessor.cs`
+La edición de video nativa es lenta, por lo que el sistema usa CLI inter-procesos para comunicarse invisiblemente con `FFmpeg`. Asimismo, implementa un parser binario de alto rendimiento para extraer geolocalización tanto en dispositivos Android (caja `©xyz`) como iOS/iPhone (caja de metadatos `com.apple.quicktime.location.ISO6709` mediante búsqueda indexada inversa).
 
 ```csharp
 using System.Diagnostics;
+using System.IO;
 
 public static class AppVideoProcessor {
     public static async Task ExtraerAudio(string rutaEntrada, string rutaSalida) {
@@ -234,6 +235,22 @@ public static class AppVideoProcessor {
 
         proceso.Start();
         await tcs.Task;
+    }
+
+    // Despachador híbrido de GPS (Android + iOS)
+    private static (double? lat, double? lon) ExtractGpsFromMp4(string filePath) {
+        try {
+            using (var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read)) {
+                // 1. Intentamos extraer via ©xyz (típico de Android y algunos iOS)
+                var (lat, lon) = ExtractGpsFromLegacyXyz(stream);
+                if (lat.HasValue && lon.HasValue) return (lat, lon);
+
+                // 2. Si falla, intentamos extraer via Apple QuickTime metadata (keys/ilst)
+                return ExtractGpsFromAppleMetadata(stream);
+            }
+        } catch {
+            return (null, null);
+        }
     }
 }
 ```

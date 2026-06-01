@@ -195,6 +195,7 @@ Motor de procesamiento de imágenes que trabaja directamente con la API gráfica
 
 - **Reproducción:** Usa `LibVLCSharp` (el motor de VLC Media Player) embebido nativamente en el formulario.
 - **Procesamiento vía FFmpeg:** Invoca el binario de FFmpeg como un proceso hijo invisible (`CreateNoWindow = true`). Para convertir el evento `Process.Exited` en una promesa `async/await`, utiliza el patrón `TaskCompletionSource<bool>`.
+- **Geolocalización Híbrida y Metadatos (Android + iOS):** Extrae de forma autónoma metadatos técnicos (duración, resolución, codec) usando `TagLibSharp`. Adicionalmente, cuenta con un parser binario nativo que extrae la geolocalización desde videos grabados por dispositivos **Android** (caja `©xyz`) y **iOS/iPhone** (resolviendo el árbol de átomos `keys` e `ilst` para la clave `com.apple.quicktime.location.ISO6709`), cargando automáticamente la ubicación en un mapa interactivo (Leaflet.js/WebView2).
 
 ### 📊 AppDataFusion — Suite de ciencia de datos
 
