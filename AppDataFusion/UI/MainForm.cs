@@ -626,22 +626,21 @@ public partial class MainForm : Form
         ActualizarEstadoBarra($"Preparando archivo para enviar por correo...");
         await Task.Run(() => FileExportService.ExportarCsv(tempFile, datos, columnas, mapeo));
 
-        string subject = Uri.EscapeDataString("Datos exportados de Data Fusion Arena");
-        string body = Uri.EscapeDataString($"Hola,\n\nSe han exportado {datos.Count} registros. " +
-            $"El archivo se ha guardado temporalmente en:\n{tempFile}\n\nPor favor adjúntelo a este correo.");
-
         try
         {
-            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            using var dlg = new FormEnviarCorreoSmtp(tempFile, datos.Count);
+            if (dlg.ShowDialog() == DialogResult.OK)
             {
-                FileName = $"mailto:?subject={subject}&body={body}",
-                UseShellExecute = true
-            });
-            ActualizarEstadoBarra("Cliente de correo abierto.");
+                ActualizarEstadoBarra("Correo enviado con éxito.");
+            }
+            else
+            {
+                ActualizarEstadoBarra("Envío de correo cancelado.");
+            }
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"No se pudo abrir el cliente de correo.\n\nEl archivo exportado estÃ¡ en:\n{tempFile}\n\nDetalle: {ex.Message}", 
+            MessageBox.Show($"Error al abrir el formulario de envío:\n\n{ex.Message}", 
                 "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
     }
