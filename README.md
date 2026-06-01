@@ -96,7 +96,7 @@ ExploradorArchivos/
 │   ├── FileService.cs            #   Copiar, mover, eliminar (async)
 │   ├── FileConverterService.cs   #   Exportar a .docx / .xlsx sin Office (OpenXML + ClosedXML)
 │   ├── CsvIndexer.cs             #   Genera índice CSV del directorio actual
-│   ├── EmailService.cs           #   Envío de correos vía SMTP
+│   ├── EmailService.cs           #   Compartir archivos vía MAPI / mailto nativo
 │   └── RecentFilesService.cs     #   Historial de archivos recientes
 │
 ├── UI/                           # 🎨 Componentes visuales reutilizables
@@ -106,7 +106,7 @@ ExploradorArchivos/
 │   ├── QuickLookForm.cs          #   Vista previa rápida (estilo macOS)
 │   ├── ListViewSorter.cs         #   Ordenamiento por columnas en el ListView
 │   ├── InputDialog.cs            #   Diálogo de entrada de texto reutilizable
-│   ├── SendMailForm.cs           #   Formulario de envío de correo con adjuntos
+│   ├── SendMailForm.cs           #   Formulario de envío directo de correo (SMTP)
 │   └── ClassicDesignHelper.cs    #   Utilidades de estilo visual
 │
 ├── AppFoto/                      # 🖼️ Editor fotográfico completo
@@ -214,6 +214,12 @@ Usa **P/Invoke** a `avicap32.dll` (API de Windows para captura de video) para ab
 ### 🎙️ AppGrabadora — Grabación de audio
 
 Captura audio del micrófono usando `NAudio` (`WaveInEvent`) y lo escribe directamente a un archivo `.wav` en disco en tiempo real, byte por byte, usando `WaveFileWriter`.
+
+### ✉️ Envío de Correos y Cliente SMTP
+
+El sistema provee dos mecanismos para compartir y enviar archivos por correo electrónico:
+- **Envío Directo SMTP (`SendMailForm`):** Disponible mediante clic derecho en cualquier archivo del explorador -> "Enviar por correo". Levanta una interfaz clásica que implementa un cliente SMTP autónomo usando `System.Net.Mail.SmtpClient`. Permite configurar el servidor de salida, puerto (STARTTLS/SSL) y credenciales. Almacena la configuración en un archivo local `smtp_config.json` en `%APPDATA%` y realiza el envío de forma asíncrona (`Task.Run`). Por motivos de seguridad modernos de proveedores (como Gmail u Outlook), requiere el uso de una **Contraseña de Aplicación** (App Token) en lugar del password normal. Limita el tamaño de adjuntos a un máximo de **25 MB**.
+- **Compartición Nativa MAPI / mailto (`EmailService` / `AppDataFusion`):** La exportación rápida en DataFusion y el servicio `EmailService` sirven como fallbacks rápidos. Utilizan llamadas a `Mapi32.dll` o al esquema URI `mailto:` para lanzar el cliente nativo del sistema operativo (Outlook, Thunderbird, etc.), delegando la transferencia al software de correo local del usuario.
 
 ### 🔎 QuickLook — Vista previa rápida (Estilo macOS)
 

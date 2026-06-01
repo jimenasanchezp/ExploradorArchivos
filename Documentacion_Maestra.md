@@ -90,6 +90,14 @@ graph TD
 2. **Comparación Case-Insensitive:** La coincidencia se realiza comparando la cadena normalizada en minúsculas. Si la búsqueda es exacta, se evalúa la igualdad estricta (`==`); si no lo es, se busca la coincidencia parcial (`Contains`).
 3. **Campos Especiales (Coordenadas):** Si el campo a filtrar es `latitude` o `longitude`, el procesador realiza una comparación con el formato de coma flotante de alta precisión (`F6`). En el ordenamiento (`DataProcessor.CompararCampo`), se realiza una conversión a valores numéricos `double` para ordenar los registros con base en su posición geográfica real, evitando la ordenación alfabética errónea de números decimales.
 
+### E) Flujo de Envío de Archivos por Correo (Protocolo SMTP)
+El explorador permite enviar cualquier archivo adjunto directamente desde su interfaz sin depender de un cliente de correo local, utilizando el protocolo de red estándar **SMTP** (Simple Mail Transfer Protocol).
+1. **Validación de Tamaño:** Antes de iniciar la conexión, el sistema comprueba el tamaño del archivo mediante `FileInfo.Length`. Si supera los **25 MB** (límite estándar para adjuntos en proveedores comunes como Gmail u Outlook), se cancela la operación informando al usuario para prevenir fallos en la transferencia SMTP.
+2. **Carga y Almacenamiento de Configuración:** Las opciones de configuración del servidor SMTP se guardan localmente en `smtp_config.json` dentro del directorio `%APPDATA%\ExploradorArchivos`. En cada envío, el sistema lee este archivo JSON para prellenar el formulario y, si el envío tiene éxito, lo actualiza para futuras sesiones.
+3. **Autenticación SMTP:** Para enviar correos, la aplicación requiere de credenciales (`NetworkCredential`) del remitente. Debido a los protocolos de seguridad modernos (como MFA y el fin del soporte a autenticación básica de Google/Microsoft), se requiere y advierte al usuario que debe utilizar una **Contraseña de Aplicación** (App Token) configurada en su proveedor, en lugar de su contraseña habitual.
+4. **Envío Asíncrono en Segundo Plano:** El proceso de envío se ejecuta de forma asíncrona mediante `Task.Run` llamando al método `EnviarCorreoAsync()`. Esto mantiene la interfaz de usuario receptiva y previene bloqueos en la UI de Windows Forms mientras se establece el canal con el servidor SMTP.
+5. **Establecimiento de Sesión y Envío:** Se inicializan las instancias de `MailMessage` (para definir remitente, destinatario, asunto, cuerpo y adjuntar el archivo vía `new Attachment(filePath)`) y `SmtpClient`. Se configura el host, el puerto (normalmente `587` para STARTTLS o `465` para SSL explícito), las credenciales de red y la habilitación de SSL/TLS (`EnableSsl = true`). Finalmente, se ejecuta `SmtpClient.Send` enviando el paquete del correo.
+
 ---
 
 ## 📚 6. Referencia Exhaustiva y Diccionario Completo de Clases
@@ -134,6 +142,8 @@ Esta sección documenta **todas las clases** y funciones de los módulos del sis
 ### ⚙️ Services y UI
 *   `FileOperationsService`: Wrapper de `System.IO` para copias, eliminaciones y movimientos asíncronos.
 *   `FileConverterService`: OpenXML SDK para transformar archivos a formatos ofimáticos `.docx` y `.xlsx`.
+*   `EmailService`: Componente auxiliar de compartición de archivos. Utiliza llamadas nativas MAPI (`Mapi32.dll` -> `MAPISendMail`) para abrir el cliente de correo por defecto del sistema operativo con el archivo adjunto pre-cargado. Incluye fallbacks de ejecución de procesos para lanzar Outlook y Thunderbird vía CLI, u abrir un enlace con esquema `mailto:` en caso de error.
+*   `SendMailForm`: Formulario clásico e interfaz de usuario para el envío directo y autónomo de archivos adjuntos mediante el protocolo SMTP. Utiliza las clases `SmtpClient` y `MailMessage` de .NET de manera asíncrona y persiste la configuración local en formato JSON.
 *   `ThemeRenderer`: Sobrescribe los eventos de pintado (`OnPaint`) de los controles de Windows para aplicar paletas oscuras (Dark Mode) esquivando el estilo obsoleto por defecto.
 *   `QuickLookForm`: Formulario sin bordes nativos que previsualiza archivos rápidamente. Implementa una barra de título personalizada para arrastrar la ventana, botones "semáforo" (Cerrar, Minimizar, Maximizar) pintados con GDI+ y lógica persistente al desactivarse. Soporta carga de texto extendida, imágenes, PDFs y WebView2.
 
@@ -444,5 +454,80 @@ private Button CrearBotonSemaforo(Color color, int x, Color backColor)
     };
     return b;
 }
+
+### ✉️ 7.9 Envío Directo de Correo Electrónico y Protocolo SMTP: `SendMailForm.cs`
+A continuación se detalla el bloque de código encargado del envío de archivos de manera directa utilizando el protocolo SMTP. Este método se ejecuta en un hilo secundario para no congelar la interfaz gráfica clásica y utiliza SSL/TLS para asegurar la sesión de red.
+
+```csharp
+private async Task EnviarCorreoAsync()
+{
+    // ... Validaciones de campos (destinatario, credenciales) ...
+    string recipient = txtTo.Text.Trim();
+    string subject = txtSubject.Text.Trim();
+    string body = txtBody.Text;
+
+    // Validación física del tamaño del archivo adjunto (25 MB de límite)
+    var fileInfo = new FileInfo(_filePath);
+    if (fileInfo.Length > 25 * 1024 * 1024)
+    {
+        MessageBox.Show("El archivo seleccionado supera el límite de 25 MB permitido...");
+        return;
+    }
+
+    // Configuración SMTP y persistencia local
+    _config.Server = txtSmtpServer.Text.Trim();
+    _config.Port = port;
+    _config.EnableSsl = chkSsl.Checked;
+    _config.SenderEmail = txtSenderEmail.Text.Trim();
+    _config.SenderPassword = txtSenderPassword.Text;
+
+    GuardarConfiguracion(); // Serializa a JSON en %APPDATA%
+
+    // Cambiar estado visual del formulario a "Enviando"
+    btnEnviar.Enabled = false;
+    btnCancelar.Enabled = false;
+    btnEnviar.Text = "Enviando...";
+    this.Cursor = Cursors.WaitCursor;
+
+    try
+    {
+        // Ejecución en segundo plano (asíncrona)
+        await Task.Run(() =>
+        {
+            using var mail = new MailMessage();
+            mail.From = new MailAddress(_config.SenderEmail);
+            mail.To.Add(recipient);
+            mail.Subject = subject;
+            mail.Body = body;
+
+            // Vincular archivo adjunto
+            var attachment = new Attachment(_filePath);
+            mail.Attachments.Add(attachment);
+
+            // Cliente SMTP de .NET
+            using var smtp = new SmtpClient(_config.Server, _config.Port);
+            smtp.Credentials = new NetworkCredential(_config.SenderEmail, _config.SenderPassword);
+            smtp.EnableSsl = _config.EnableSsl;
+
+            // Envío por red usando comandos SMTP (EHLO, AUTH, MAIL FROM, RCPT TO, DATA)
+            smtp.Send(mail);
+        });
+
+        MessageBox.Show("¡El correo electrónico y el archivo adjunto se enviaron con éxito!", "Éxito");
+        this.Close();
+    }
+    catch (Exception ex)
+    {
+        MessageBox.Show($"Ocurrió un error al enviar el correo:\n{ex.InnerException?.Message ?? ex.Message}", "Error al Enviar");
+    }
+    finally
+    {
+        btnEnviar.Enabled = true;
+        btnCancelar.Enabled = true;
+        btnEnviar.Text = "✉️ Enviar";
+        this.Cursor = Cursors.Default;
+    }
+}
+```
 ```
 
