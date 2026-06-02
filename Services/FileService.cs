@@ -158,4 +158,61 @@ public static class FileService
         // Operación: Retorna el tamaño formateado con hasta dos posiciones decimales y la unidad
         return $"{tamañoConvertido:0.##} {sufijosUnidades[indiceUnidad]}";
     }
+
+    /// <summary>
+    /// Copia un directorio y todo su contenido de forma recursiva a un nuevo destino.
+    /// </summary>
+    public static void CopiarDirectorio(string origenDir, string destinoDir)
+    {
+        Directory.CreateDirectory(destinoDir);
+
+        foreach (string file in Directory.GetFiles(origenDir))
+        {
+            string destFile = Path.Combine(destinoDir, Path.GetFileName(file));
+            File.Copy(file, destFile, true);
+        }
+
+        foreach (string folder in Directory.GetDirectories(origenDir))
+        {
+            string destFolder = Path.Combine(destinoDir, Path.GetFileName(folder));
+            CopiarDirectorio(folder, destFolder);
+        }
+    }
+
+    /// <summary>
+    /// Genera una ruta de destino única para evitar colisiones agregando un sufijo numerado.
+    /// </summary>
+    public static string GenerarRutaUnica(string destinoDir, string nombreSinExt, string ext, string sufijoBase = "Copia")
+    {
+        string sufijoPart = string.IsNullOrEmpty(sufijoBase) ? "" : $" - {sufijoBase}";
+        string destino = Path.Combine(destinoDir, $"{nombreSinExt}{sufijoPart}{ext}");
+        int contador = 1;
+        while (File.Exists(destino) || Directory.Exists(destino))
+        {
+            string contadorPart = string.IsNullOrEmpty(sufijoBase) ? $" ({contador})" : $" - {sufijoBase} ({contador})";
+            destino = Path.Combine(destinoDir, $"{nombreSinExt}{contadorPart}{ext}");
+            contador++;
+        }
+        return destino;
+    }
+
+    // === METODOS ENCAPSULADOS PARA EVITAR ACOPLAMIENTO DIRECTO CON SYSTEM.IO ===
+
+    public static bool ExisteDirectorio(string ruta) => Directory.Exists(ruta);
+
+    public static bool ExisteArchivo(string ruta) => File.Exists(ruta);
+
+    public static void CrearDirectorio(string ruta) => Directory.CreateDirectory(ruta);
+
+    public static void EliminarDirectorio(string ruta, bool recursivo) => Directory.Delete(ruta, recursivo);
+
+    public static void EliminarArchivo(string ruta) => File.Delete(ruta);
+
+    public static void MoverDirectorio(string origen, string destino) => Directory.Move(origen, destino);
+
+    public static void MoverArchivo(string origen, string destino) => File.Move(origen, destino);
+
+    public static char[] ObtenerCaracteresInvalidosDeNombre() => Path.GetInvalidFileNameChars();
+
+    public static string CombinarRutas(string ruta1, string ruta2) => Path.Combine(ruta1, ruta2);
 }

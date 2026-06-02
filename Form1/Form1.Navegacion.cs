@@ -22,10 +22,7 @@ public partial class Form1
     /// <param name="guardarHistorial">Indica si se debe guardar la ruta actual en la pila de historial antes de navegar.</param>
     private async void CargarDirectorio(string ruta, bool guardarHistorial = true)
     {
-        if (guardarHistorial && !string.IsNullOrEmpty(_rutaActual) && _rutaActual != ruta)
-            _historial.Push(_rutaActual);
-
-        _rutaActual = ruta;
+        _navigationService.NavegarA(ruta, guardarHistorial);
 
         // Vista de Inicio (Dashboard)
         if (ruta == "Inicio")
@@ -223,7 +220,16 @@ public partial class Form1
         treeViewLateral.BeginUpdate();
         treeViewLateral.Nodes.Clear();
 
-        // 1. Elementos fijos del sistema y usuario ordenados exactamente
+        PoblarNodosFijosUsuario();
+        PoblarNodosAccesosDirectos();
+        PoblarNodosEsteEquipo();
+        PoblarNodosCarpetaActual();
+
+        treeViewLateral.EndUpdate();
+    }
+
+    private void PoblarNodosFijosUsuario()
+    {
         treeViewLateral.Nodes.Add(new TreeNode("Inicio") { Tag = "Inicio" });
         treeViewLateral.Nodes.Add(new TreeNode("Escritorio") { Tag = Environment.GetFolderPath(Environment.SpecialFolder.Desktop) });
         treeViewLateral.Nodes.Add(new TreeNode("Documentos") { Tag = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments) });
@@ -232,8 +238,10 @@ public partial class Form1
         treeViewLateral.Nodes.Add(new TreeNode("Imágenes") { Tag = Environment.GetFolderPath(Environment.SpecialFolder.MyPictures) });
         treeViewLateral.Nodes.Add(new TreeNode("Música") { Tag = Environment.GetFolderPath(Environment.SpecialFolder.MyMusic) });
         treeViewLateral.Nodes.Add(new TreeNode("Videos") { Tag = Environment.GetFolderPath(Environment.SpecialFolder.MyVideos) });
+    }
 
-        // 3. Elementos fijados individualmente por el usuario directos a la barra lateral izquierda
+    private void PoblarNodosAccesosDirectos()
+    {
         foreach (var path in _accesosDirectos)
         {
             if (Directory.Exists(path) || File.Exists(path))
@@ -241,31 +249,33 @@ public partial class Form1
                 treeViewLateral.Nodes.Add(new TreeNode(Path.GetFileName(path)) { Tag = path });
             }
         }
+    }
 
-        // 4. Este Equipo
+    private void PoblarNodosEsteEquipo()
+    {
         TreeNode nodoEquipo = new TreeNode("Este Equipo") { Tag = "EsteEquipo" };
-        foreach (var drive in DriveInfo.GetDrives()) //GetDrives() obtiene todas las unidades de disco disponibles en el sistema
+        foreach (var drive in DriveInfo.GetDrives())
         {
-            if (drive.IsReady) // si el disco esta listo, añade un nodo para este unidad mostrando su letra y nombre
+            if (drive.IsReady)
                 nodoEquipo.Nodes.Add(new TreeNode($"{drive.Name} ({drive.VolumeLabel})") { Tag = drive.Name });
         }
         treeViewLateral.Nodes.Add(nodoEquipo);
         nodoEquipo.Expand();
+    }
 
-        // 5. Carpeta actual (solo si estamos navegando en una ruta real)
+    private void PoblarNodosCarpetaActual()
+    {
         if (_rutaActual != "Inicio" && _rutaActual != "Favoritos" && _rutaActual != "EsteEquipo" && Directory.Exists(_rutaActual))
         {
             TreeNode nodoActual = new TreeNode($"Abierto: {new DirectoryInfo(_rutaActual).Name}");
-            var grupos = _itemsActuales.GroupBy(x => x.CategoriaVisual); // Agrupa los archivos y carpetas del directorio según su tipo visual 
+            var grupos = _itemsActuales.GroupBy(x => x.CategoriaVisual);
 
-            // Para cada grupo (Carpetas, Imágenes, Audio, etc.) se crea un nodo padre en el TreeView.
-            // Luego, se añaden como nodos hijos solo las carpetas de ese grupo 
             foreach (var grupo in grupos.OrderBy(g => g.Key))
             {
                 TreeNode nodoPadre = new TreeNode($"{grupo.Key} ({grupo.Count()})");
                 foreach (var item in grupo)
                 {
-                    if (item.EsCarpeta) // si es una carpeta, se añade como nodo hijo al nodo padre del grupo correspondiente con sus propiedades
+                    if (item.EsCarpeta)
                         nodoPadre.Nodes.Add(new TreeNode(item.Nombre) { Tag = item.RutaCompleta });
                 }
                 if (nodoPadre.Nodes.Count > 0)
@@ -274,8 +284,6 @@ public partial class Form1
             treeViewLateral.Nodes.Add(nodoActual);
             nodoActual.ExpandAll();
         }
-
-        treeViewLateral.EndUpdate();
     }
 
     /// <summary>

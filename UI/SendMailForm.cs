@@ -6,6 +6,7 @@ using System.Net.Mail;
 using System.Text.Json;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using ExploradorArchivos.Services;
 
 namespace ExploradorArchivos.UI;
 
@@ -38,25 +39,11 @@ public class SendMailForm : Form
     private Button btnEnviar = default!;
     private Button btnCancelar = default!;
 
-    private static readonly string ConfigFilePath = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-        "ExploradorArchivos",
-        "smtp_config.json"
-    );
-
-    public class SmtpConfig
-    {
-        public string Server { get; set; } = "smtp.gmail.com";
-        public int Port { get; set; } = 587;
-        public bool EnableSsl { get; set; } = true;
-        public string SenderEmail { get; set; } = "";
-        public string SenderPassword { get; set; } = "";
-    }
-
     public SendMailForm(string filePath)
     {
         _filePath = filePath;
-        CargarConfiguracion();
+        // Recupera la última configuración SMTP guardada delegando en el servicio SmtpMailService
+        _config = SmtpMailService.CargarConfiguracion();
         InitializeComponent();
         ThemeRenderer.ApplyTheme(this);
 
@@ -309,8 +296,8 @@ public class SendMailForm : Form
             return;
         }
 
-        // Guardar configuración para la próxima vez
-        GuardarConfiguracion();
+        // Guardar la configuración de manera persistente delegando en SmtpMailService
+        SmtpMailService.GuardarConfiguracion(_config);
 
         // Cambiar estado visual a "Enviando"
         btnEnviar.Enabled = false;
@@ -320,24 +307,8 @@ public class SendMailForm : Form
 
         try
         {
-            await Task.Run(() =>
-            {
-                using var mail = new MailMessage();
-                mail.From = new MailAddress(_config.SenderEmail);
-                mail.To.Add(recipient);
-                mail.Subject = subject;
-                mail.Body = body;
-
-                // Adjuntar el archivo seleccionado
-                var attachment = new Attachment(_filePath);
-                mail.Attachments.Add(attachment);
-
-                using var smtp = new SmtpClient(_config.Server, _config.Port);
-                smtp.Credentials = new NetworkCredential(_config.SenderEmail, _config.SenderPassword);
-                smtp.EnableSsl = _config.EnableSsl;
-
-                smtp.Send(mail);
-            });
+            // Ejecutar el envío asíncrono del correo con el adjunto delegando al SmtpMailService
+            await SmtpMailService.EnviarCorreoAsync(_config, recipient, subject, body, _filePath);
 
             MessageBox.Show("¡El correo electrónico y el archivo adjunto se enviaron con éxito!", "Éxito", MessageBoxButtons.OK, MessageBoxIcon.Information);
             this.Close();
@@ -353,37 +324,5 @@ public class SendMailForm : Form
             btnEnviar.Text = "✉️  Enviar";
             this.Cursor = Cursors.Default;
         }
-    }
-
-    private void CargarConfiguracion()
-    {
-        try
-        {
-            if (File.Exists(ConfigFilePath))
-            {
-                string json = File.ReadAllText(ConfigFilePath);
-                var loaded = JsonSerializer.Deserialize<SmtpConfig>(json);
-                if (loaded != null)
-                {
-                    _config = loaded;
-                }
-            }
-        }
-        catch { /* Ignorar errores al cargar */ }
-    }
-
-    private void GuardarConfiguracion()
-    {
-        try
-        {
-            string? directory = Path.GetDirectoryName(ConfigFilePath);
-            if (directory != null && !Directory.Exists(directory))
-            {
-                Directory.CreateDirectory(directory);
-            }
-            string json = JsonSerializer.Serialize(_config, new JsonSerializerOptions { WriteIndented = true });
-            File.WriteAllText(ConfigFilePath, json);
-        }
-        catch { /* Ignorar errores al guardar */ }
     }
 }

@@ -22,12 +22,20 @@ namespace ExploradorArchivos;
 public partial class Form1 : Form
 {
     // === Estado de navegación ===
-    private string _rutaActual = "Inicio"; // Ruta actual mostrada en el ListView
-    private Stack<string> _historial = new Stack<string>(); // Historial tipo pila LIFO para navegación hacia atrás
+    private readonly NavigationService _navigationService = new();
+    private string _rutaActual { get => _navigationService.RutaActual; set => _navigationService.NavegarA(value, false); }
     private List<FileSystemItem> _itemsActuales = new List<FileSystemItem>(); // Lista de items actualmente mostrados (para filtros y búsqueda)
     private string _filtroActivo = "Todos"; // filtro de visualización activo (Todos, Imágenes, Audio, Video, Texto/Código, Otros)
     private static readonly List<string> _accesosDirectos = new List<string>();
     private static readonly List<string> _elementosFavoritos = new List<string>();
+    
+    // === Categorías de extensiones de archivos ===
+    private static readonly string[] ImgExtensions = { ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp" };
+    private static readonly string[] MediaExtensions = { ".mp3", ".wav", ".flac", ".m4a", ".ogg", ".wma", ".aac" };
+    private static readonly string[] VideoExtensions = { ".mp4", ".mkv", ".avi", ".mov", ".webm", ".wmv", ".flv", ".m4v" };
+    private static readonly string[] TextExtensions = { ".cs", ".html", ".css", ".js", ".md", ".py", ".bat", ".cmd", ".dat" };
+    private static readonly string[] DataExtensions = { ".csv", ".json", ".xml", ".txt" };
+
     private static readonly string AccesosDirectosFilePath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
         "ExploradorArchivos",
@@ -45,35 +53,11 @@ public partial class Form1 : Form
     /// </summary>
     private void CargarDatosPersistentes()
     {
-        try
-        {
-            _accesosDirectos.Clear();
-            if (File.Exists(AccesosDirectosFilePath))
-            {
-                var lineas = File.ReadAllLines(AccesosDirectosFilePath);
-                foreach (var l in lineas)
-                {
-                    if (!string.IsNullOrWhiteSpace(l) && (Directory.Exists(l) || File.Exists(l)))
-                    {
-                        _accesosDirectos.Add(l);
-                    }
-                }
-            }
+        _accesosDirectos.Clear();
+        _accesosDirectos.AddRange(PersistenceService.CargarRutasExistentes(AccesosDirectosFilePath));
 
-            _elementosFavoritos.Clear();
-            if (File.Exists(ElementosFavoritosFilePath))
-            {
-                var lineas = File.ReadAllLines(ElementosFavoritosFilePath);
-                foreach (var l in lineas)
-                {
-                    if (!string.IsNullOrWhiteSpace(l) && (Directory.Exists(l) || File.Exists(l)))
-                    {
-                        _elementosFavoritos.Add(l);
-                    }
-                }
-            }
-        }
-        catch { }
+        _elementosFavoritos.Clear();
+        _elementosFavoritos.AddRange(PersistenceService.CargarRutasExistentes(ElementosFavoritosFilePath));
     }
 
     /// <summary>
@@ -82,17 +66,8 @@ public partial class Form1 : Form
     /// </summary>
     private void GuardarDatosPersistentes()
     {
-        try
-        {
-            string? dir = Path.GetDirectoryName(AccesosDirectosFilePath);
-            if (dir != null && !Directory.Exists(dir))
-            {
-                Directory.CreateDirectory(dir);
-            }
-            File.WriteAllLines(AccesosDirectosFilePath, _accesosDirectos);
-            File.WriteAllLines(ElementosFavoritosFilePath, _elementosFavoritos);
-        }
-        catch { }
+        PersistenceService.GuardarRutas(AccesosDirectosFilePath, _accesosDirectos);
+        PersistenceService.GuardarRutas(ElementosFavoritosFilePath, _elementosFavoritos);
     }
 
     // === Componentes de UI ===
@@ -119,51 +94,81 @@ public partial class Form1 : Form
     /// Construye dinámicamente el menú contextual de clic derecho (Abrir, QuickLook, Cortar, Copiar, Pegar, Eliminar, Propiedades)
     /// utilizando un renderizador personalizado de colores, y enlaza todos los eventos de interación.
     /// </summary>
+    private class ContextMenuComponents
+    {
+        public ToolStripMenuItem Abrir { get; } = new("📄  Abrir");
+        public ToolStripMenuItem AbrirCon { get; } = new("📁  Abrir con...");
+        public ToolStripMenuItem Copiar { get; } = new("📋  Copiar");
+        public ToolStripMenuItem Renombrar { get; } = new("✏️  Cambiar nombre");
+        public ToolStripMenuItem Eliminar { get; } = new("🗑️  Eliminar");
+        public ToolStripMenuItem EnviarCorreo { get; } = new("✉️  Enviar por correo");
+        public ToolStripMenuItem Propiedades { get; } = new("🛠️  Propiedades");
+        public ToolStripMenuItem AppVideo { get; } = new("🎬  App Video");
+        public ToolStripMenuItem AppFoto { get; } = new("🖼️  App Foto");
+        public ToolStripMenuItem Music { get; } = new("🎵  App Music");
+        public ToolStripMenuItem Texto { get; } = new("📝  Visor de Texto");
+        public ToolStripMenuItem Exportar { get; } = new("📤  Exportar a...");
+        public ToolStripMenuItem ExportarDocx { get; } = new("📄  .docx");
+        public ToolStripMenuItem ExportarPptx { get; } = new("🖥️  .pptx");
+        public ToolStripMenuItem ExportarXlsx { get; } = new("📊  .xlsx");
+        public ToolStripMenuItem ExportarPdf { get; } = new("📕  .pdf");
+        public ToolStripMenuItem Predeterminada { get; } = new("💻  Sistema (App Predeterminada)");
+        public ToolStripMenuItem Fijar { get; } = new("📌  Fijar a acceso directo");
+        public ToolStripMenuItem Favorito { get; } = new("⭐  Agregar a Favoritos");
+        public ToolStripMenuItem VaciarFavoritos { get; } = new("⭐  Vaciar Favoritos");
+        public ToolStripMenuItem Pegar { get; } = new("📋  Pegar");
+        public ToolStripMenuItem NuevaCarpeta { get; } = new("📁  Nueva carpeta");
+        public ToolStripMenuItem Actualizar { get; } = new("🔄  Actualizar");
+        public ToolStripSeparator Sep1 { get; } = new();
+        public ToolStripSeparator Sep2 { get; } = new();
+        public ToolStripSeparator Sep3 { get; } = new();
+    }
+
+    /// <summary>
+    /// Construye dinámicamente el menú contextual de clic derecho (Abrir, QuickLook, Cortar, Copiar, Pegar, Eliminar, Propiedades)
+    /// utilizando un renderizador personalizado de colores, y enlaza todos los eventos de interacción.
+    /// </summary>
     private void ConfigurarContextoMenu()
     {
-        ContextMenuStrip menu = new ContextMenuStrip();
-        menu.Renderer = new CustomMenuRenderer(); // Estilo clásico/limpio
+        ContextMenuStrip menu = new ContextMenuStrip { Renderer = new CustomMenuRenderer() };
+        ContextMenuComponents components = new ContextMenuComponents();
+
+        AsociarEventosMenuContextual(components);
+        EnsamblarMenuContextual(menu, components);
+        RegistrarConfiguracionMenu(menu, components);
+    }
+
+    private void AsociarEventosMenuContextual(ContextMenuComponents c)
+    {
+        c.Abrir.Click += (s, e) => ListViewPrincipal_DoubleClick(s, e); 
+        c.AppVideo.Click += (s, e) => AbrirCon(new AppVideoForm(GetSelectedPath()));
+        c.AppFoto.Click += (s, e) => AbrirCon(new AppFotoForm(GetSelectedPath()));
+        c.Music.Click += (s, e) => AbrirReproductor(new List<string> { GetSelectedPath() }, GetSelectedPath());
+        c.Texto.Click += (s, e) => AbrirCon(new FileViewerForm(GetSelectedPath()));
+        c.ExportarDocx.Click += (s, e) => ExportarArchivo(GetSelectedPath(), ".docx");
+        c.ExportarPptx.Click += (s, e) => ExportarArchivo(GetSelectedPath(), ".pptx");
+        c.ExportarXlsx.Click += (s, e) => ExportarArchivo(GetSelectedPath(), ".xlsx");
+        c.ExportarPdf.Click += (s, e) => ExportarArchivo(GetSelectedPath(), ".pdf");
+        c.Predeterminada.Click += (s, e) => AbrirConSistema(GetSelectedPath());
+        c.Pegar.Click += (s, e) => PegarArchivos();
+        c.NuevaCarpeta.Click += BtnNuevaCarpeta_Click;
+        c.Actualizar.Click += (s, e) => CargarDirectorio(_rutaActual, false);
+        c.Copiar.Click += (s, e) => CopiarSeleccionados();
+        c.Renombrar.Click += (s, e) => listViewPrincipal.SelectedItems[0].BeginEdit();
+        c.Eliminar.Click += (s, e) => EliminarArchivo(GetSelectedPath());
         
-        ToolStripMenuItem itemAbrir = new ToolStripMenuItem("📄  Abrir");
-        ToolStripMenuItem itemAbrirCon = new ToolStripMenuItem("📁  Abrir con...");
+        c.EnviarCorreo.Click += (s, e) => {
+            string ruta = GetSelectedPath();
+            if (!string.IsNullOrEmpty(ruta) && File.Exists(ruta))
+            {
+                using var frm = new SendMailForm(ruta);
+                frm.ShowDialog(this);
+            }
+        };
         
-        ToolStripMenuItem itemCopiar = new ToolStripMenuItem("📋  Copiar");
-        ToolStripMenuItem itemRenombrar = new ToolStripMenuItem("✏️  Cambiar nombre");
-        ToolStripMenuItem itemEliminar = new ToolStripMenuItem("🗑️  Eliminar");
-        ToolStripMenuItem itemEnviarCorreo = new ToolStripMenuItem("✉️  Enviar por correo");
-        ToolStripMenuItem itemPropiedades = new ToolStripMenuItem("🛠️  Propiedades");
+        c.Propiedades.Click += (s, e) => MostrarPropiedades(GetSelectedPath());
 
-        // Submenú Abrir con...
-        ToolStripMenuItem itemAppVideo = new ToolStripMenuItem("🎬  App Video");
-        ToolStripMenuItem itemAppFoto = new ToolStripMenuItem("🖼️  App Foto");
-        ToolStripMenuItem itemMusic = new ToolStripMenuItem("🎵  App Music");
-        ToolStripMenuItem itemTexto = new ToolStripMenuItem("📝  Visor de Texto");
-        ToolStripMenuItem itemExportar = new ToolStripMenuItem("📤  Exportar a...");
-        ToolStripMenuItem itemExportarDocx = new ToolStripMenuItem("📄  .docx");
-        ToolStripMenuItem itemExportarPptx = new ToolStripMenuItem("🖥️  .pptx");
-        ToolStripMenuItem itemExportarXlsx = new ToolStripMenuItem("📊  .xlsx");
-        ToolStripMenuItem itemExportarPdf = new ToolStripMenuItem("📕  .pdf");
-        itemExportar.DropDownItems.AddRange(new ToolStripItem[] {
-            itemExportarDocx, itemExportarPptx, itemExportarXlsx, itemExportarPdf
-        });
-
-        ToolStripMenuItem itemPredeterminada = new ToolStripMenuItem("💻  Sistema (App Predeterminada)");
-
-        // Eventos de apertura
-        itemAbrir.Click += (s, e) => ListViewPrincipal_DoubleClick(s, e); 
-        
-        itemAppVideo.Click += (s, e) => AbrirCon(new AppVideoForm(GetSelectedPath()));
-        itemAppFoto.Click += (s, e) => AbrirCon(new AppFotoForm(GetSelectedPath()));
-        itemMusic.Click += (s, e) => AbrirReproductor(new List<string> { GetSelectedPath() }, GetSelectedPath());
-        itemTexto.Click += (s, e) => AbrirCon(new FileViewerForm(GetSelectedPath()));
-        itemExportarDocx.Click += (s, e) => ExportarArchivo(GetSelectedPath(), ".docx");
-        itemExportarPptx.Click += (s, e) => ExportarArchivo(GetSelectedPath(), ".pptx");
-        itemExportarXlsx.Click += (s, e) => ExportarArchivo(GetSelectedPath(), ".xlsx");
-        itemExportarPdf.Click += (s, e) => ExportarArchivo(GetSelectedPath(), ".pdf");
-        itemPredeterminada.Click += (s, e) => AbrirConSistema(GetSelectedPath());
-
-        ToolStripMenuItem itemFijar = new ToolStripMenuItem("📌  Fijar a acceso directo");
-        itemFijar.Click += (s, e) => {
+        c.Fijar.Click += (s, e) => {
             string ruta = GetSelectedPath();
             if (string.IsNullOrEmpty(ruta)) return;
 
@@ -181,8 +186,7 @@ public partial class Form1 : Form
             PoblarTreeViewNormal();
         };
 
-        ToolStripMenuItem itemFavorito = new ToolStripMenuItem("⭐  Agregar a Favoritos");
-        itemFavorito.Click += (s, e) => {
+        c.Favorito.Click += (s, e) => {
             string ruta = GetSelectedPath();
             if (string.IsNullOrEmpty(ruta)) return;
 
@@ -204,8 +208,7 @@ public partial class Form1 : Form
             }
         };
 
-        ToolStripMenuItem itemVaciarFavoritos = new ToolStripMenuItem("⭐  Vaciar Favoritos");
-        itemVaciarFavoritos.Click += (s, e) => {
+        c.VaciarFavoritos.Click += (s, e) => {
             var confirm = MessageBox.Show(
                 "¿Estás seguro de que deseas quitar todos los elementos de la lista de Favoritos?\n\n(Esto NO eliminará ni alterará los archivos o carpetas reales en tu disco duro, solo limpiará tu lista de favoritos).",
                 "Vaciar Favoritos",
@@ -225,47 +228,29 @@ public partial class Form1 : Form
                 MessageBox.Show("La lista de Favoritos ha sido vaciada.", "Favoritos", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
         };
+    }
 
-        ToolStripMenuItem itemPegar = new ToolStripMenuItem("📋  Pegar");
-        itemPegar.Click += (s, e) => PegarArchivos();
-
-        ToolStripMenuItem itemNuevaCarpeta = new ToolStripMenuItem("📁  Nueva carpeta");
-        itemNuevaCarpeta.Click += BtnNuevaCarpeta_Click;
-
-        ToolStripMenuItem itemActualizar = new ToolStripMenuItem("🔄  Actualizar");
-        itemActualizar.Click += (s, e) => CargarDirectorio(_rutaActual, false);
-
-        // Eventos de archivo
-        itemCopiar.Click += (s, e) => CopiarSeleccionados();
-        itemRenombrar.Click += (s, e) => listViewPrincipal.SelectedItems[0].BeginEdit();
-        itemEliminar.Click += (s, e) => EliminarArchivo(GetSelectedPath());
-        itemEnviarCorreo.Click += (s, e) => {
-            string ruta = GetSelectedPath();
-            if (!string.IsNullOrEmpty(ruta) && File.Exists(ruta))
-            {
-                using var frm = new SendMailForm(ruta);
-                frm.ShowDialog(this);
-            }
-        };
-        itemPropiedades.Click += (s, e) => MostrarPropiedades(GetSelectedPath());
-
-        itemAbrirCon.DropDownItems.AddRange(new ToolStripItem[] {
-            itemAppVideo, itemAppFoto, itemMusic, itemTexto, new ToolStripSeparator(), itemPredeterminada
+    private void EnsamblarMenuContextual(ContextMenuStrip menu, ContextMenuComponents c)
+    {
+        c.Exportar.DropDownItems.AddRange(new ToolStripItem[] {
+            c.ExportarDocx, c.ExportarPptx, c.ExportarXlsx, c.ExportarPdf
         });
 
-        // Crear separadores explícitos
-        ToolStripSeparator sep1 = new ToolStripSeparator();
-        ToolStripSeparator sep2 = new ToolStripSeparator();
-        ToolStripSeparator sep3 = new ToolStripSeparator();
+        c.AbrirCon.DropDownItems.AddRange(new ToolStripItem[] {
+            c.AppVideo, c.AppFoto, c.Music, c.Texto, new ToolStripSeparator(), c.Predeterminada
+        });
 
         menu.Items.AddRange(new ToolStripItem[] {
-            itemAbrir, itemAbrirCon, itemExportar, sep1,
-            itemCopiar, itemPegar, itemRenombrar, itemEliminar, sep2,
-            itemEnviarCorreo, itemFijar, itemFavorito, itemVaciarFavoritos, sep3,
-            itemNuevaCarpeta, itemActualizar,
-            itemPropiedades
+            c.Abrir, c.AbrirCon, c.Exportar, c.Sep1,
+            c.Copiar, c.Pegar, c.Renombrar, c.Eliminar, c.Sep2,
+            c.EnviarCorreo, c.Fijar, c.Favorito, c.VaciarFavoritos, c.Sep3,
+            c.NuevaCarpeta, c.Actualizar,
+            c.Propiedades
         });
+    }
 
+    private void RegistrarConfiguracionMenu(ContextMenuStrip menu, ContextMenuComponents c)
+    {
         listViewPrincipal.ContextMenuStrip = menu;
         listViewPrincipal.LabelEdit = true;
         listViewPrincipal.AfterLabelEdit += (s, e) => {
@@ -277,68 +262,48 @@ public partial class Form1 : Form
         menu.Opening += (s, e) => {
             bool algunItemSeleccionado = listViewPrincipal.SelectedItems.Count > 0;
             
-            // Mostrar/ocultar según selección
-            itemAbrir.Visible = algunItemSeleccionado;
-            itemAbrirCon.Visible = algunItemSeleccionado;
-            itemExportar.Visible = algunItemSeleccionado;
-            itemCopiar.Visible = algunItemSeleccionado;
-            itemRenombrar.Visible = algunItemSeleccionado;
-            itemEliminar.Visible = algunItemSeleccionado;
-            itemFijar.Visible = algunItemSeleccionado;
-            itemFavorito.Visible = algunItemSeleccionado;
-            itemEnviarCorreo.Visible = algunItemSeleccionado && File.Exists(GetSelectedPath());
-            itemPropiedades.Visible = algunItemSeleccionado;
+            c.Abrir.Visible = algunItemSeleccionado;
+            c.AbrirCon.Visible = algunItemSeleccionado;
+            c.Exportar.Visible = algunItemSeleccionado;
+            c.Copiar.Visible = algunItemSeleccionado;
+            c.Renombrar.Visible = algunItemSeleccionado;
+            c.Eliminar.Visible = algunItemSeleccionado;
+            c.Fijar.Visible = algunItemSeleccionado;
+            c.Favorito.Visible = algunItemSeleccionado;
+            c.EnviarCorreo.Visible = algunItemSeleccionado && File.Exists(GetSelectedPath());
+            c.Propiedades.Visible = algunItemSeleccionado;
 
-            // Mostrar "Vaciar Favoritos" si estamos dentro de la vista Favoritos, o si el elemento seleccionado es la carpeta Favoritos
             bool esFavoritosView = _rutaActual == "Favoritos";
             bool esFavoritosItem = algunItemSeleccionado && listViewPrincipal.SelectedItems[0].Tag?.ToString() == "Favoritos";
-            itemVaciarFavoritos.Visible = esFavoritosView || esFavoritosItem;
+            c.VaciarFavoritos.Visible = esFavoritosView || esFavoritosItem;
 
-            sep1.Visible = algunItemSeleccionado;
-            sep2.Visible = algunItemSeleccionado;
-            sep3.Visible = true;
+            c.Sep1.Visible = algunItemSeleccionado;
+            c.Sep2.Visible = algunItemSeleccionado;
+            c.Sep3.Visible = true;
 
-            // Habilitar pegar si el clipboard tiene archivos y estamos en una ruta física real
             bool puedePegar = Clipboard.ContainsFileDropList() &&
                               _rutaActual != "Inicio" &&
                               _rutaActual != "Favoritos" &&
                               _rutaActual != "EsteEquipo" &&
                               Directory.Exists(_rutaActual);
-            itemPegar.Enabled = puedePegar;
+            c.Pegar.Enabled = puedePegar;
 
             if (algunItemSeleccionado)
             {
                 string ruta = GetSelectedPath();
-                
-                if (_accesosDirectos.Contains(ruta))
-                {
-                    itemFijar.Text = "📌  Desanclar de acceso directo";
-                }
-                else
-                {
-                    itemFijar.Text = "📌  Fijar a acceso directo";
-                }
-
-                if (_elementosFavoritos.Contains(ruta))
-                {
-                    itemFavorito.Text = "⭐  Quitar de Favoritos";
-                }
-                else
-                {
-                    itemFavorito.Text = "⭐  Agregar a Favoritos";
-                }
+                c.Fijar.Text = _accesosDirectos.Contains(ruta) ? "📌  Desanclar de acceso directo" : "📌  Fijar a acceso directo";
+                c.Favorito.Text = _elementosFavoritos.Contains(ruta) ? "⭐  Quitar de Favoritos" : "⭐  Agregar a Favoritos";
 
                 string ext = Path.GetExtension(ruta).ToLower();
-                
                 string[] imgExt = { ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp" };
                 string[] mediaExt = { ".mp3", ".wav", ".flac", ".m4a", ".ogg", ".wma", ".aac" };
                 string[] videoExt = { ".mp4", ".mkv", ".avi", ".mov", ".webm", ".wmv", ".flv", ".m4v" };
                 string[] dataExt = { ".csv", ".json", ".xml", ".txt" };
                 
-                itemAppVideo.Visible = videoExt.Contains(ext);
-                itemAppFoto.Visible = imgExt.Contains(ext);
-                itemMusic.Visible = mediaExt.Contains(ext);
-                itemTexto.Visible = dataExt.Contains(ext) || new[] { ".cs", ".html", ".css", ".js", ".md", ".py" }.Contains(ext);
+                c.AppVideo.Visible = videoExt.Contains(ext);
+                c.AppFoto.Visible = imgExt.Contains(ext);
+                c.Music.Visible = mediaExt.Contains(ext);
+                c.Texto.Visible = dataExt.Contains(ext) || new[] { ".cs", ".html", ".css", ".js", ".md", ".py" }.Contains(ext);
             }
         };
     }
@@ -486,13 +451,9 @@ public partial class Form1 : Form
 
             bool esMover = false;
             var dropEffect = Clipboard.GetData("Preferred DropEffect");
-            if (dropEffect != null)
+            if (dropEffect != null && (int)dropEffect == (int)DragDropEffects.Move)
             {
-                var effectValue = (int)dropEffect;
-                if (effectValue == (int)DragDropEffects.Move)
-                {
-                    esMover = true;
-                }
+                esMover = true;
             }
 
             foreach (string origen in paths)
@@ -506,12 +467,7 @@ public partial class Form1 : Form
                     if (esMover) continue;
                     string ext = Path.GetExtension(origen);
                     string nombreSinExt = Path.GetFileNameWithoutExtension(origen);
-                    int contador = 1;
-                    do
-                    {
-                        destino = Path.Combine(destinoDir, $"{nombreSinExt} - Copia ({contador}){ext}");
-                        contador++;
-                    } while (File.Exists(destino) || Directory.Exists(destino));
+                    destino = FileService.GenerarRutaUnica(destinoDir, nombreSinExt, ext);
                 }
 
                 if (Directory.Exists(origen))
@@ -527,7 +483,7 @@ public partial class Form1 : Form
                     }
                     else
                     {
-                        CopiarDirectorioRecursivo(origen, destino);
+                        FileService.CopiarDirectorio(origen, destino);
                     }
                 }
                 else if (File.Exists(origen))
@@ -546,12 +502,7 @@ public partial class Form1 : Form
                             {
                                 string ext = Path.GetExtension(origen);
                                 string nombreSinExt = Path.GetFileNameWithoutExtension(origen);
-                                int contador = 1;
-                                do
-                                {
-                                    destino = Path.Combine(destinoDir, $"{nombreSinExt} ({contador}){ext}");
-                                    contador++;
-                                } while (File.Exists(destino));
+                                destino = FileService.GenerarRutaUnica(destinoDir, nombreSinExt, ext, "");
                                 File.Move(origen, destino);
                             }
                             else
@@ -577,12 +528,7 @@ public partial class Form1 : Form
                             {
                                 string ext = Path.GetExtension(origen);
                                 string nombreSinExt = Path.GetFileNameWithoutExtension(origen);
-                                int contador = 1;
-                                do
-                                {
-                                    destino = Path.Combine(destinoDir, $"{nombreSinExt} ({contador}){ext}");
-                                    contador++;
-                                } while (File.Exists(destino));
+                                destino = FileService.GenerarRutaUnica(destinoDir, nombreSinExt, ext, "");
                                 File.Copy(origen, destino);
                             }
                             else
@@ -608,23 +554,6 @@ public partial class Form1 : Form
         catch (Exception ex)
         {
             MessageBox.Show($"Error al pegar elementos: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-        }
-    }
-
-    private void CopiarDirectorioRecursivo(string origenDir, string destinoDir)
-    {
-        Directory.CreateDirectory(destinoDir);
-
-        foreach (string file in Directory.GetFiles(origenDir))
-        {
-            string destFile = Path.Combine(destinoDir, Path.GetFileName(file));
-            File.Copy(file, destFile, true);
-        }
-
-        foreach (string folder in Directory.GetDirectories(origenDir))
-        {
-            string destFolder = Path.Combine(destinoDir, Path.GetFileName(folder));
-            CopiarDirectorioRecursivo(folder, destFolder);
         }
     }
 
@@ -707,6 +636,31 @@ public partial class Form1 : Form
         ThemeRenderer.ApplyTheme(this);
         ConfigurarSemaforos();
         this.BackColor = ThemeRenderer.MainBg;
+
+        ConfigurarListViewPrincipal();
+        ConfigurarPanelSuperior();
+        ConfigurarPanelLateral();
+        ConfigurarBarraFiltrosYDirecciones();
+        ConfigurarElementosDecorativosYEstado();
+
+        // --- Reordenar paneles ---
+        splitContainerMain.Panel1.Controls.Clear();
+        splitContainerMain.Panel2.Controls.Clear();
+
+        splitContainerMain.Panel1.Controls.Add(pnlSearch);
+        splitContainerMain.Panel1.Controls.Add(treeViewLateral);
+        
+        treeViewLateral.BringToFront();
+
+        splitContainerMain.Panel2.Controls.Add(listViewPrincipal);
+        splitContainerMain.Panel2.Controls.Add(_pnlFiltros);
+        listViewPrincipal.BringToFront(); // <-- CLAVE: listViewPrincipal debe estar al frente para que dockee al último y no quede bajo _pnlFiltros
+
+        splitContainerMain.SplitterDistance = 280; // Más espacio para el sidebar
+    }
+
+    private void ConfigurarListViewPrincipal()
+    {
         listViewPrincipal.BackColor = Color.White;
         listViewPrincipal.BorderStyle = BorderStyle.Fixed3D;
         treeViewLateral.BackColor = ThemeRenderer.SecondaryBg;
@@ -745,8 +699,10 @@ public partial class Form1 : Form
 
         treeViewLateral.DrawMode = TreeViewDrawMode.OwnerDrawAll;
         treeViewLateral.DrawNode += ThemeRenderer.DrawTreeNode;
+    }
 
-        // --- 1. REORGANIZACIÓN DE BARRA SUPERIOR (pnlTop) ---
+    private void ConfigurarPanelSuperior()
+    {
         pnlTop.BackColor = ThemeRenderer.SecondaryBg;
         pnlTop.Height = 80;
         pnlTop.Controls.Clear();
@@ -806,13 +762,17 @@ public partial class Form1 : Form
         pnlActions.Controls.Add(btnCamara); btnCamara.Location = new Point(190, 18); btnCamara.Size = new Size(35, 30);
 
         pnlTop.Controls.Add(pnlActions);
+    }
 
-        // --- 2. REFINAMIENTO DEL PANEL LATERAL (Sidebar) ---
+    private void ConfigurarPanelLateral()
+    {
         pnlSearch.BackColor = ThemeRenderer.SecondaryBg;
         pnlSearch.Height = 65;
         pnlSearch.Controls.Clear();
         pnlSearch.Paint += (s, e) => ThemeRenderer.DrawClassicBorder(e.Graphics, pnlSearch.ClientRectangle, true);
 
+        bool isDragging = false;
+        Point lastCursor = Point.Empty;
         pnlSearch.MouseDown += (s, e) => { if (e.Button == MouseButtons.Left) { isDragging = true; lastCursor = e.Location; } };
         pnlSearch.MouseMove += (s, e) => { if (isDragging) { this.Location = new Point(this.Location.X + (e.X - lastCursor.X), this.Location.Y + (e.Y - lastCursor.Y)); } };
         pnlSearch.MouseUp += (s, e) => { isDragging = false; };
@@ -842,8 +802,10 @@ public partial class Form1 : Form
 
         pnlSearchBorder.Controls.Add(txtBuscar);
         pnlSearchBorder.Controls.Add(btnBuscar);
+    }
 
-        // --- 3. BARRA DE FILTROS INTEGRADA ---
+    private void ConfigurarBarraFiltrosYDirecciones()
+    {
         _pnlFiltros.BackColor = ThemeRenderer.MainBg;
         _pnlFiltros.Height = 55;
         _pnlFiltros.Padding = new Padding(15, 12, 0, 0);
@@ -881,12 +843,13 @@ public partial class Form1 : Form
         txtDireccion.BackColor = Color.White;
         txtDireccion.Visible = false;
         txtDireccion.Leave += (s, e) => OcultarTextBoxDireccion();
+    }
 
-        // --- Elementos Decorativos y Barra de Estado ---
+    private void ConfigurarElementosDecorativosYEstado()
+    {
         pnlBottom.BackColor = ThemeRenderer.MainBg;
         pnlBottom.Paint += (s, e) => ThemeRenderer.DrawClassicBorder(e.Graphics, pnlBottom.ClientRectangle, true);
 
-        // --- Barra de Estado y Papelera ---
         lblStatus.ForeColor = ThemeRenderer.MainText;
         lblStatus.Font = new Font(this.Font.FontFamily, 8);
         lblStatus.AutoSize = false;
@@ -900,21 +863,6 @@ public partial class Form1 : Form
         };
         lblTrash.ForeColor = ThemeRenderer.MainText;
         lblTrash.Text = "🗑️ Papelera";
-
-        // --- Reordenar paneles ---
-        splitContainerMain.Panel1.Controls.Clear();
-        splitContainerMain.Panel2.Controls.Clear();
-
-        splitContainerMain.Panel1.Controls.Add(pnlSearch);
-        splitContainerMain.Panel1.Controls.Add(treeViewLateral);
-        
-        treeViewLateral.BringToFront();
-
-        splitContainerMain.Panel2.Controls.Add(listViewPrincipal);
-        splitContainerMain.Panel2.Controls.Add(_pnlFiltros);
-        listViewPrincipal.BringToFront(); // <-- CLAVE: listViewPrincipal debe estar al frente para que dockee al último y no quede bajo _pnlFiltros
-
-        splitContainerMain.SplitterDistance = 280; // Más espacio para el sidebar
     }
 
     private Panel CrearGrupoHerramientas(string titulo, int x, int y, int ancho)
@@ -986,7 +934,7 @@ public partial class Form1 : Form
     private void ConectarEventos()
     {
         // Navegación
-        btnAtras.Click += (s, e) => { if (_historial.Count > 0) CargarDirectorio(_historial.Pop(), false); };
+        btnAtras.Click += (s, e) => { if (_navigationService.PuedeRetroceder) CargarDirectorio(_navigationService.Retroceder(), false); };
         btnSubir.Click += (s, e) =>
         {
             var parent = Directory.GetParent(_rutaActual);

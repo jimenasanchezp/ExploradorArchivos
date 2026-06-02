@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text.Json;
 using System.Xml.Linq;
 using System.Windows.Forms;
+using ExploradorArchivos.Services;
 
 namespace ExploradorArchivos.UI;
 
@@ -322,66 +323,9 @@ public class FileViewerForm : Form
         try
         {
             _isLoading = true;
-            string content = File.ReadAllText(path);
-            string extension = Path.GetExtension(path).ToLower();
-
-            if (extension == ".json")
-            {
-                try
-                {
-                    using var doc = JsonDocument.Parse(content);
-                    content = JsonSerializer.Serialize(doc, new JsonSerializerOptions { WriteIndented = true });
-                    lblInfo.Text = $"{Path.GetFileName(_filePath)} [JSON Formateado]";
-                }
-                catch { /* fallback to plain text */ }
-            }
-            else if (extension == ".xml")
-            {
-                try
-                {
-                    var doc = XDocument.Parse(content);
-                    content = doc.ToString();
-                    lblInfo.Text = $"{Path.GetFileName(_filePath)} [XML Formateado]";
-                }
-                catch { /* fallback to plain text */ }
-            }
-            else if (extension == ".csv")
-            {
-                try
-                {
-                    var lines = content.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
-                    if (lines.Length > 0)
-                    {
-                        var maxLen = lines.Select(l => l.Split(',').Length).Max();
-                        var colsWidth = new int[maxLen];
-                        var grid = lines.Select(l => l.Split(',')).ToList();
-
-                        foreach (var row in grid)
-                            for (int i = 0; i < row.Length; i++)
-                                colsWidth[i] = Math.Max(colsWidth[i], row[i].Trim().Length);
-
-                        var sb = new System.Text.StringBuilder();
-                        foreach (var row in grid)
-                        {
-                            for (int i = 0; i < row.Length; i++)
-                                sb.Append(row[i].Trim().PadRight(colsWidth[i] + 4));
-                            sb.AppendLine();
-                        }
-                        content = sb.ToString();
-                        lblInfo.Text = $"{Path.GetFileName(_filePath)} [CSV Formateado]";
-                    }
-                }
-                catch { /* fallback to plain text */ }
-            }
-            else if (extension == ".md")
-            {
-                lblInfo.Text = $"{Path.GetFileName(_filePath)} [Markdown]";
-            }
-            else
-            {
-                lblInfo.Text = Path.GetFileName(_filePath);
-            }
-
+            // Delega la lectura física y el formateo (JSON, XML, CSV) al servicio especializado
+            string content = TextFileFormatterService.LeerYFormatear(path, out string infoVisual);
+            lblInfo.Text = infoVisual;
             _richTextBox.Text = content;
             _isLoading = false;
         }

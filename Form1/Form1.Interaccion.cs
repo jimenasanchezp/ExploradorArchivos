@@ -47,36 +47,31 @@ public partial class Form1
             RecentFilesService.RegistrarArchivoAbierto(ruta);
 
             string ext = Path.GetExtension(ruta).ToLower();
-            string[] imgExt = { ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp" };
-            string[] mediaExt = { ".mp3", ".wav", ".flac", ".m4a", ".ogg", ".wma", ".aac" };
-            string[] videoExt = { ".mp4", ".mkv", ".avi", ".mov", ".webm", ".wmv", ".flv", ".m4v" };
-            string[] txtExt = { ".cs", ".html", ".css", ".js", ".md", ".py", ".bat", ".cmd", ".dat" };
-            string[] dataExt = { ".csv", ".json", ".xml", ".txt" };
 
-            if (imgExt.Contains(ext))
+            if (ImgExtensions.Contains(ext))
             { new AppFotoForm(ruta).Show(); return; }
 
-            if (mediaExt.Contains(ext))
+            if (MediaExtensions.Contains(ext))
             {
                 var audioFiles = _itemsActuales
-                    .Where(x => !x.EsCarpeta && mediaExt.Contains(Path.GetExtension(x.RutaCompleta).ToLower()))
+                    .Where(x => !x.EsCarpeta && MediaExtensions.Contains(Path.GetExtension(x.RutaCompleta).ToLower()))
                     .Select(x => x.RutaCompleta).ToList();
                 if (audioFiles.Count == 0) audioFiles.Add(ruta);
                 AbrirReproductor(audioFiles, ruta);
                 return;
             }
 
-            if (videoExt.Contains(ext))
+            if (VideoExtensions.Contains(ext))
             { new AppVideoForm(ruta).Show(); return; }
 
-            if (dataExt.Contains(ext))
+            if (DataExtensions.Contains(ext))
             { 
                 var frm = new ExploradorArchivos.AppDataFusion.MainForm(ruta);
                 frm.Show();
                 return; 
             }
 
-            if (txtExt.Contains(ext))
+            if (TextExtensions.Contains(ext))
             { new FileViewerForm(ruta).Show(); return; }
 
             Process.Start(new ProcessStartInfo { FileName = ruta, UseShellExecute = true });
@@ -210,7 +205,7 @@ public partial class Form1
     /// </summary>
     private void BtnNuevaCarpeta_Click(object? sender, EventArgs e)
     {
-        if (_rutaActual == "Inicio" || _rutaActual == "EsteEquipo" || !Directory.Exists(_rutaActual))
+        if (_rutaActual == "Inicio" || _rutaActual == "EsteEquipo" || !FileService.ExisteDirectorio(_rutaActual))
         {
             MessageBox.Show("No se pueden crear carpetas en esta ubicación especial.", "Operación no válida", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             return;
@@ -227,15 +222,15 @@ public partial class Form1
         }
 
         // Validar caracteres prohibidos
-        char[] invalidChars = Path.GetInvalidFileNameChars();
+        char[] invalidChars = FileService.ObtenerCaracteresInvalidosDeNombre();
         if (nombre.Any(c => invalidChars.Contains(c)))
         {
             MessageBox.Show("El nombre contiene caracteres no válidos.", "Nombre inválido", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             return;
         }
 
-        string nuevaRuta = Path.Combine(_rutaActual, nombre);
-        if (Directory.Exists(nuevaRuta) || File.Exists(nuevaRuta))
+        string nuevaRuta = FileService.CombinarRutas(_rutaActual, nombre);
+        if (FileService.ExisteDirectorio(nuevaRuta) || FileService.ExisteArchivo(nuevaRuta))
         {
             MessageBox.Show("Ya existe un archivo o carpeta con el mismo nombre.", "Conflicto", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             return;
@@ -243,12 +238,13 @@ public partial class Form1
 
         try
         {
-            Directory.CreateDirectory(nuevaRuta);
+            FileService.CrearDirectorio(nuevaRuta);
             CargarDirectorio(_rutaActual, false);
             lblStatus.Text = $"Carpeta creada: {nombre}";
         }
         catch (Exception ex)
         {
+            LoggerService.LogError("No se pudo crear la carpeta: " + nuevaRuta, ex);
             MessageBox.Show("No se pudo crear la carpeta: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
     }
@@ -273,7 +269,7 @@ public partial class Form1
             {
                 string destDir = hoverItem.Tag.ToString()!;
                 // Solo si es una carpeta y no está seleccionada (para no mover a sí misma)
-                if (Directory.Exists(destDir) && !hoverItem.Selected)
+                if (FileService.ExisteDirectorio(destDir) && !hoverItem.Selected)
                 {
                     e.Effect = DragDropEffects.Move;
                     int idx = hoverItem.Index;
@@ -319,7 +315,7 @@ public partial class Form1
             if (hoverItem != null && hoverItem.Tag != null)
             {
                 string destDir = hoverItem.Tag.ToString()!;
-                if (Directory.Exists(destDir) && !hoverItem.Selected)
+                if (FileService.ExisteDirectorio(destDir) && !hoverItem.Selected)
                 {
                     MoverItems(items, destDir);
                 }
@@ -346,7 +342,7 @@ public partial class Form1
             if (hoverNode != null && hoverNode.Tag != null)
             {
                 string destDir = hoverNode.Tag.ToString()!;
-                if (Directory.Exists(destDir))
+                if (FileService.ExisteDirectorio(destDir))
                 {
                     e.Effect = DragDropEffects.Move;
                     treeViewLateral.SelectedNode = hoverNode; // Feedback visual al resaltar el nodo
@@ -367,7 +363,7 @@ public partial class Form1
             if (hoverNode != null && hoverNode.Tag != null)
             {
                 string destDir = hoverNode.Tag.ToString()!;
-                if (Directory.Exists(destDir))
+                if (FileService.ExisteDirectorio(destDir))
                 {
                     MoverItems(items, destDir);
                 }
@@ -392,7 +388,7 @@ public partial class Form1
                 if (string.IsNullOrEmpty(srcPath)) continue;
 
                 string name = Path.GetFileName(srcPath);
-                string destPath = Path.Combine(destDir, name);
+                string destPath = FileService.CombinarRutas(destDir, name);
 
                 // Evitar mover a sí mismo
                 if (Path.GetDirectoryName(srcPath) == destDir) continue;
@@ -404,54 +400,55 @@ public partial class Form1
                     continue;
                 }
 
-                bool esCarpeta = Directory.Exists(srcPath);
+                bool esCarpeta = FileService.ExisteDirectorio(srcPath);
 
                 if (esCarpeta)
                 {
-                    if (Directory.Exists(destPath))
+                    if (FileService.ExisteDirectorio(destPath))
                     {
                         var res = MessageBox.Show($"La carpeta '{name}' ya existe en el destino. ¿Deseas reemplazarla?", "Conflicto de Carpeta", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Question);
                         if (res == DialogResult.Cancel) break;
                         if (res == DialogResult.No) continue;
 
-                        Directory.Delete(destPath, true);
+                        FileService.EliminarDirectorio(destPath, true);
                     }
-                    else if (File.Exists(destPath))
+                    else if (FileService.ExisteArchivo(destPath))
                     {
                         var res = MessageBox.Show($"Ya existe un archivo con el nombre '{name}' en el destino. ¿Deseas reemplazarlo?", "Conflicto", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Question);
                         if (res == DialogResult.Cancel) break;
                         if (res == DialogResult.No) continue;
 
-                        File.Delete(destPath);
+                        FileService.EliminarArchivo(destPath);
                     }
-                    Directory.Move(srcPath, destPath);
+                    FileService.MoverDirectorio(srcPath, destPath);
                     algunaModificacion = true;
                 }
                 else
                 {
-                    if (File.Exists(destPath))
+                    if (FileService.ExisteArchivo(destPath))
                     {
                         var res = MessageBox.Show($"El archivo '{name}' ya existe en el destino. ¿Deseas reemplazarlo?", "Conflicto de Archivo", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Question);
                         if (res == DialogResult.Cancel) break;
                         if (res == DialogResult.No) continue;
 
-                        File.Delete(destPath);
+                        FileService.EliminarArchivo(destPath);
                     }
-                    else if (Directory.Exists(destPath))
+                    else if (FileService.ExisteDirectorio(destPath))
                     {
                         var res = MessageBox.Show($"Ya existe una carpeta con el nombre '{name}' en el destino. ¿Deseas reemplazarla?", "Conflicto", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Question);
                         if (res == DialogResult.Cancel) break;
                         if (res == DialogResult.No) continue;
 
-                        Directory.Delete(destPath, true);
+                        FileService.EliminarDirectorio(destPath, true);
                     }
-                    File.Move(srcPath, destPath);
+                    FileService.MoverArchivo(srcPath, destPath);
                     algunaModificacion = true;
                 }
             }
         }
         catch (Exception ex)
         {
+            LoggerService.LogError("Error al mover elementos a " + destDir, ex);
             MessageBox.Show($"Error al mover elementos: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
         finally

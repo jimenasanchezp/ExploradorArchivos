@@ -7,6 +7,7 @@ using AForge.Video;
 using AForge.Video.DirectShow;
 using ExploradorArchivos.AppVideo;
 using ExploradorArchivos.UI;
+using ExploradorArchivos.Services;
 
 namespace ExploradorArchivos.AppCamara;
 
@@ -300,7 +301,7 @@ public partial class AppCamaraForm : Form
     {
         try
         {
-            _dispositivosVideo = new FilterInfoCollection(FilterCategory.VideoInputDevice);
+            _dispositivosVideo = CameraCaptureService.ObtenerDispositivosCamara();
             if (_dispositivosVideo.Count == 0)
             {
                 MessageBox.Show("No se encontraron dispositivos de cámara.", "Aviso",
@@ -376,11 +377,8 @@ public partial class AppCamaraForm : Form
             // ── Escribir frame al archivo AVI si está grabando ────────────────
             if (_grabando && _grabador != null)
             {
-                lock (_grabador)
-                {
-                    TimeSpan elapsed = _grabacionStopwatch?.Elapsed ?? TimeSpan.Zero;
-                    _grabador.EscribirFrame(frame, elapsed);
-                }
+                TimeSpan elapsed = _grabacionStopwatch?.Elapsed ?? TimeSpan.Zero;
+                CameraCaptureService.EscribirFrame(_grabador, frame, elapsed);
             }
 
             // ── Actualizar la vista previa en el hilo UI ──────────────────────
@@ -453,14 +451,8 @@ public partial class AppCamaraForm : Form
             _frameWidth  = picPreview.Image.Width;
             _frameHeight = picPreview.Image.Height;
 
-            // Rutas: AVI temporal y MP4 final
-            string timestamp = DateTime.Now.ToString("yyyy-MM-dd_HHmmss");
-            _rutaAviTemporal = Path.Combine(_rutaDestino, $"Video_{timestamp}_tmp.avi");
-            _rutaMp4Final    = Path.Combine(_rutaDestino, $"Video_{timestamp}.mp4");
-
-            // Inicializar el grabador AVI nativo (30 fps)
-            _grabador = new AviGrabador();
-            _grabador.Abrir(_rutaAviTemporal, _frameWidth, _frameHeight, 30);
+            // Iniciar sesión de grabación delegando al servicio
+            _grabador = CameraCaptureService.IniciarGrabacion(_rutaDestino, _frameWidth, _frameHeight, out _rutaAviTemporal, out _rutaMp4Final);
 
             // Actualizar estado
             _grabando          = true;
@@ -508,23 +500,17 @@ public partial class AppCamaraForm : Form
         lblTimer.ForeColor  = Color.FromArgb(200, 150, 0);
         btnGrabar.Enabled   = false;
 
-        // ── Convertir AVI → MP4 usando ffmpeg.exe ────────────────────────────
-        bool convertido = false;
-        if (File.Exists(_rutaAviTemporal))
-        {
-            convertido = await AppVideoProcessor.ConvertirAviAMp4(_rutaAviTemporal, _rutaMp4Final);
+        // ── Convertir AVI → MP4 delegando al servicio de forma asíncrona ────────────────────────────
+        bool convertido = await CameraCaptureService.ConvertirAviAMp4Async(_rutaAviTemporal, _rutaMp4Final);
 
-            if (convertido)
-            {
-                // Borrar el AVI temporal
-                try { File.Delete(_rutaAviTemporal); } catch { }
-                RutaVideoGuardado = _rutaMp4Final;
-            }
-            else
-            {
-                // ffmpeg no disponible → conservar AVI
-                RutaVideoGuardado = _rutaAviTemporal;
-            }
+        if (convertido)
+        {
+            RutaVideoGuardado = _rutaMp4Final;
+        }
+        else
+        {
+            // ffmpeg no disponible o falló → conservar AVI
+            RutaVideoGuardado = _rutaAviTemporal;
         }
 
         // Restaurar UI tras conversión
@@ -560,13 +546,8 @@ public partial class AppCamaraForm : Form
     {
         if (_grabador != null)
         {
-            lock (_grabador)
-            {
-                try   { _grabador.Cerrar(); }
-                catch { }
-                _grabador.Dispose();
-                _grabador = null;
-            }
+            CameraCaptureService.DetenerGrabacion(_grabador);
+            _grabador = null;
         }
     }
 
@@ -602,14 +583,8 @@ public partial class AppCamaraForm : Form
 
         try
         {
-            string timestamp   = DateTime.Now.ToString("yyyy-MM-dd_HHmmss");
-            string rutaArchivo = Path.Combine(_rutaDestino, $"Foto_{timestamp}.jpg");
-
-            lock (picPreview)
-            {
-                using Bitmap captura = new Bitmap(picPreview.Image);
-                captura.Save(rutaArchivo, ImageFormat.Jpeg);
-            }
+            // Delegar el guardado de la fotografía al servicio
+            string rutaArchivo = CameraCaptureService.GuardarFoto(picPreview.Image, _rutaDestino);
 
             RutaFotoGuardada = rutaArchivo;
             DetenerCaptura();

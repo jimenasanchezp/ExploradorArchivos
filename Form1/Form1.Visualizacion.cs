@@ -180,10 +180,10 @@ public partial class Form1
     private async Task GenerarMiniaturasAsync()
     {
         if (!_imageListMiniaturas.Images.ContainsKey("folder"))
-            _imageListMiniaturas.Images.Add("folder", GenerarIconoBase("📁"));
+            _imageListMiniaturas.Images.Add("folder", ThumbnailService.GenerarIconoBase("📁", ThemeRenderer.MainBg));
 
         if (!_imageListMiniaturas.Images.ContainsKey("file"))
-            _imageListMiniaturas.Images.Add("file", GenerarIconoBase("📄"));
+            _imageListMiniaturas.Images.Add("file", ThumbnailService.GenerarIconoBase("📄", ThemeRenderer.MainBg));
 
         var imagenes = _itemsActuales.Where(x => x.CategoriaVisual == "Imágenes").ToList();
 
@@ -191,20 +191,7 @@ public partial class Form1
         {
             try
             {
-                Bitmap? miniatura = await Task.Run(() =>
-                {
-                    try
-                    {
-                        if (!File.Exists(img.RutaCompleta)) return null;
-
-                        // Leer todos los bytes en memoria para evitar bloquear el archivo físico
-                        byte[] bytes = File.ReadAllBytes(img.RutaCompleta);
-                        using var ms = new MemoryStream(bytes);
-                        using var original = Image.FromStream(ms);
-                        return new Bitmap(original, new Size(96, 96));
-                    }
-                    catch { return null; }
-                });
+                Bitmap? miniatura = await Task.Run(() => ThumbnailService.GenerarMiniatura(img.RutaCompleta));
 
                 if (miniatura != null)
                 {
@@ -216,22 +203,6 @@ public partial class Form1
             }
             catch { /* Ignorar si la imagen se elimina mientras cargaba */ }
         }
-    }
-
-    /// <summary>
-    /// Crea un ícono básico (Bitmap) incrustando un emoji como texto,
-    /// utilizado como "fallback" visual cuando un archivo no tiene miniatura disponible.
-    /// </summary>
-    private Bitmap GenerarIconoBase(string emoji)
-    {
-        Bitmap bmp = new Bitmap(96, 96);
-        using (Graphics g = Graphics.FromImage(bmp))
-        {
-            g.Clear(ThemeRenderer.MainBg);
-            using Font font = new Font("Segoe UI Emoji", 40);
-            g.DrawString(emoji, font, Brushes.Black, new PointF(10, 10));
-        }
-        return bmp;
     }
 
     // === ORDENAMIENTO POR COLUMNAS ===

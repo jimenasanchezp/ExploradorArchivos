@@ -114,12 +114,6 @@ namespace ExploradorArchivos.Mp3
 
             pnlTitleBar.Controls.AddRange(new Control[] { lblTitle, btnMin, btnMax, btnClose });
 
-            // === MENU BAR ===
-            MenuStrip menu = new MenuStrip { BackColor = GrisSuave, Dock = DockStyle.Top, Padding = new Padding(2,2,0,2) };
-            menu.Items.Add(new ToolStripMenuItem("Disc 💿"));
-            menu.Items.Add(new ToolStripMenuItem("View 🪟"));
-            menu.Items.Add(new ToolStripMenuItem("Options ⚙️"));
-            menu.Items.Add(new ToolStripMenuItem("Help ❓"));
 
             // === SIDEBAR ===
             Panel pnlSidebar = new Panel { Dock = DockStyle.Left, Width = 160, BackColor = GrisSuave, Padding = new Padding(10, 20, 10, 10) };
@@ -300,7 +294,6 @@ namespace ExploradorArchivos.Mp3
             this.Controls.Add(pnlMain);
             this.Controls.Add(pnlSidebar);
             this.Controls.Add(pnlBottom);
-            this.Controls.Add(menu);
             this.Controls.Add(pnlTitleBar);
 
             // Side Events
@@ -405,6 +398,7 @@ namespace ExploradorArchivos.Mp3
             _btnShuffle.Click += (s, e) => {
                 _gestor.ModoAleatorio = !_gestor.ModoAleatorio;
                 _btnShuffle.BackColor = _gestor.ModoAleatorio ? VerdeMenta : GrisSuave;
+                ActualizarCola();
             };
 
             _btnRepeat.Click += (s, e) => {
