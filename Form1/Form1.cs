@@ -136,8 +136,6 @@ public partial class Form1 : Form
         // Submenú Abrir con...
         ToolStripMenuItem itemAppVideo = new ToolStripMenuItem("🎬  App Video");
         ToolStripMenuItem itemAppFoto = new ToolStripMenuItem("🖼️  App Foto");
-        ToolStripMenuItem itemAppData = new ToolStripMenuItem("📊  App Data");
-        ToolStripMenuItem itemAppDataLimpio = new ToolStripMenuItem("📊  Abrir App Data");
         ToolStripMenuItem itemMusic = new ToolStripMenuItem("🎵  App Music");
         ToolStripMenuItem itemTexto = new ToolStripMenuItem("📝  Visor de Texto");
         ToolStripMenuItem itemExportar = new ToolStripMenuItem("📤  Exportar a...");
@@ -156,8 +154,6 @@ public partial class Form1 : Form
         
         itemAppVideo.Click += (s, e) => AbrirCon(new AppVideoForm(GetSelectedPath()));
         itemAppFoto.Click += (s, e) => AbrirCon(new AppFotoForm(GetSelectedPath()));
-        itemAppData.Click += (s, e) => AbrirCon(new ExploradorArchivos.AppDataFusion.MainForm(GetSelectedPath()));
-        itemAppDataLimpio.Click += (s, e) => AbrirCon(new ExploradorArchivos.AppDataFusion.MainForm(null));
         itemMusic.Click += (s, e) => AbrirReproductor(new List<string> { GetSelectedPath() }, GetSelectedPath());
         itemTexto.Click += (s, e) => AbrirCon(new FileViewerForm(GetSelectedPath()));
         itemExportarDocx.Click += (s, e) => ExportarArchivo(GetSelectedPath(), ".docx");
@@ -254,20 +250,19 @@ public partial class Form1 : Form
         itemPropiedades.Click += (s, e) => MostrarPropiedades(GetSelectedPath());
 
         itemAbrirCon.DropDownItems.AddRange(new ToolStripItem[] {
-            itemAppVideo, itemAppFoto, itemAppData, itemMusic, itemTexto, new ToolStripSeparator(), itemPredeterminada
+            itemAppVideo, itemAppFoto, itemMusic, itemTexto, new ToolStripSeparator(), itemPredeterminada
         });
 
         // Crear separadores explícitos
         ToolStripSeparator sep1 = new ToolStripSeparator();
         ToolStripSeparator sep2 = new ToolStripSeparator();
         ToolStripSeparator sep3 = new ToolStripSeparator();
-        ToolStripSeparator sep4 = new ToolStripSeparator();
 
         menu.Items.AddRange(new ToolStripItem[] {
             itemAbrir, itemAbrirCon, itemExportar, sep1,
             itemCopiar, itemPegar, itemRenombrar, itemEliminar, sep2,
             itemEnviarCorreo, itemFijar, itemFavorito, itemVaciarFavoritos, sep3,
-            itemNuevaCarpeta, itemActualizar, itemAppDataLimpio, sep4,
+            itemNuevaCarpeta, itemActualizar,
             itemPropiedades
         });
 
@@ -302,7 +297,6 @@ public partial class Form1 : Form
             sep1.Visible = algunItemSeleccionado;
             sep2.Visible = algunItemSeleccionado;
             sep3.Visible = true;
-            sep4.Visible = algunItemSeleccionado;
 
             // Habilitar pegar si el clipboard tiene archivos y estamos en una ruta física real
             bool puedePegar = Clipboard.ContainsFileDropList() &&
@@ -343,7 +337,6 @@ public partial class Form1 : Form
                 
                 itemAppVideo.Visible = videoExt.Contains(ext);
                 itemAppFoto.Visible = imgExt.Contains(ext);
-                itemAppData.Visible = dataExt.Contains(ext);
                 itemMusic.Visible = mediaExt.Contains(ext);
                 itemTexto.Visible = dataExt.Contains(ext) || new[] { ".cs", ".html", ".css", ".js", ".md", ".py" }.Contains(ext);
             }
@@ -1055,6 +1048,12 @@ public partial class Form1 : Form
 
         // Cámara
         btnCamara.Click += BtnCamara_Click;
+
+        // App Data Button click handler
+        _btnAppData.Click += (s, e) => {
+            string selectedPath = listViewPrincipal.SelectedItems.Count > 0 ? GetSelectedPath() : null;
+            AbrirCon(new ExploradorArchivos.AppDataFusion.MainForm(selectedPath));
+        };
     }
 
     private void BtnCamara_Click(object? sender, EventArgs e)
