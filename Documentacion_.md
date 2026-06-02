@@ -24,7 +24,7 @@ El proyecto ha crecido mucho más allá de un simple explorador de archivos trad
 
 ### Nivel 2: Productividad y Multimedia
 *   **Fotografías (`.jpg`, `.png`):** Se abrirán en el `AppFotoForm`. Puedes aplicar filtros retro (Blanco y Negro, Sepia), alterar contraste/brillo, dibujar firmas y exportar las imágenes. Si la foto fue tomada con un celular, mostrará su ubicación GPS en un mapa interactivo.
-*   **Música (`.mp3`, `.wav`):** Se abrirá el `MusicPlayerForm`. Soporta listas de reproducción, muestra las carátulas incrustadas, descarga la letra de la canción de internet automáticamente y **permite editar el título, artista y foto de portada (cover)** haciendo click en el botón ✏️ o mediante click derecho en cualquier elemento de la cola.
+*   **Música (`.mp3`, `.wav`):** Se abrirá el `MusicPlayerForm`. Soporta listas de reproducción, modo aleatorio (shuffle) con restauración al orden secuencial original al desactivarse, muestra las carátulas incrustadas, descarga la letra de la canción de internet automáticamente y **permite editar el título, artista y foto de portada (cover)** haciendo click en el botón ✏️ o mediante click derecho en cualquier elemento de la cola.
 *   **Video (`.mp4`, `.avi`):** Se reproducirán de forma nativa. Incluye herramientas avanzadas para silenciar el video, extraer su pista de audio como MP3, o extraer una ráfaga de imágenes (Frames).
 
 ### Nivel 3: Herramientas Avanzadas (Data Science & OS)
@@ -149,7 +149,11 @@ Esta sección documenta **todas las clases** y funciones de los módulos del sis
 *   `SystemIconManager`: P/Invoke a `Shell32.dll` (`SHGetFileInfo`) para extraer los íconos oficiales del Sistema Operativo por extensión en HD.
 
 ### ⚙️ Services y UI
-*   `FileOperationsService`: Wrapper de `System.IO` para copias, eliminaciones y movimientos asíncronos.
+*   `FileService`: Wrapper de `System.IO` para operaciones seguras (copias, movimientos, eliminación enviando a la Papelera de Reciclaje de Windows mediante P/Invoke a `shell32.dll`) ejecutadas de manera asíncrona.
+*   `LoggerService`: Servicio estructurado de registro de excepciones y logs locales en `app_errors.log` dentro de ApplicationData, eliminando bloques `catch` vacíos o silenciosos.
+*   `SmtpMailService`: Centraliza la lógica de envío asíncrono de correos electrónicos con archivos adjuntos usando credenciales de red, cifrado SSL/TLS, límite de tamaño físico (25 MB) y persistencia local de la configuración del servidor en `smtp_config.json`.
+*   `TextFileFormatterService`: Contiene las rutinas para la lectura y el formateo estético inteligente de archivos de texto estructurados (como JSON, XML, CSV).
+*   `CameraCaptureService`: Centraliza el listado de cámaras web conectadas, el flujo de previsualización de vídeo y el control de grabación o captura de imágenes.
 *   `FileConverterService`: Motor de conversión y exportación universal de archivos.
     *   `Convertir(string rutaOrigen, string formatoDestino)`: Orquesta el proceso principal de conversión. Cuenta con lógica para resolver nombres duplicados incrementando secuencialmente un número al final del nombre (ej., `documento (1).pdf`) si ya existe el archivo en la ruta destino.
     *   `BuscarSOffice()`: Escanea directorios de Windows para hallar el ejecutable de LibreOffice (`soffice.exe`).

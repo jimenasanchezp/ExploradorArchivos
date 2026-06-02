@@ -27,7 +27,7 @@ El proyecto nació como un explorador de archivos tradicional y evolucionó hast
 | Tipo de archivo | Módulo que lo maneja | Qué puedes hacer |
 |---|---|---|
 | `.jpg`, `.png`, `.bmp` | **AppFoto** | Filtros (BN, Sepia, Soft), ajuste de brillo/contraste/saturación, dibujo libre, recorte, lectura y escritura de coordenadas GPS (EXIF), visualización en mapa |
-| `.mp3`, `.wav` | **Mp3** | Reproducción con cola, carátulas ID3, búsqueda automática de letras por internet, barra de progreso personalizada, **edición y persistencia de metadatos (título, artista y foto de portada)** |
+| `.mp3`, `.wav` | **Mp3** | Reproducción con cola, modo aleatorio (shuffle) con restauración al orden secuencial original al desactivarse, carátulas ID3, búsqueda automática de letras por internet, barra de progreso personalizada, **edición y persistencia de metadatos (título, artista y foto de portada)** |
 | `.mp4`, `.avi`, `.mkv` | **AppVideo** | Reproducción con LibVLC, extracción de audio a MP3, silenciado de video, extracción de fotogramas — todo vía FFmpeg |
 | `.csv`, `.json`, `.xml`, `.txt` | **AppDataFusion** | Lectura inteligente sin esquema fijo, grilla virtualizada, ordenamiento (QuickSort) y filtrado avanzado (búsqueda exacta con `""` y geolocalización), exportación a `.docx`/`.xlsx`/correo, migración a PostgreSQL o MariaDB |
 | Cámara web | **AppCamara** | Captura de video en vivo desde la webcam usando P/Invoke nativo a `avicap32.dll` |
@@ -100,7 +100,11 @@ ExploradorArchivos/
 │   ├── FileConverterService.cs   #   Motor universal de conversión y exportación (con LibreOffice + fallbacks C#)
 │   ├── CsvIndexer.cs             #   Genera índice CSV del directorio actual
 │   ├── EmailService.cs           #   Compartir archivos vía MAPI / mailto nativo
-│   └── RecentFilesService.cs     #   Historial de archivos recientes
+│   ├── RecentFilesService.cs     #   Historial de archivos recientes
+│   ├── LoggerService.cs          #   Registro estructurado de logs y excepciones locales
+│   ├── SmtpMailService.cs        #   Envío de correos asíncronos mediante protocolo SMTP
+│   ├── TextFileFormatterService.cs # Formateo estético de archivos estructurados (JSON, XML, CSV)
+│   └── CameraCaptureService.cs   #   Interacción y captura de video/fotos desde webcam
 │
 ├── UI/                           # 🎨 Componentes visuales reutilizables
 │   ├── ThemeRenderer.cs          #   Sistema de temas (Dark Mode) con OwnerDraw
