@@ -48,6 +48,7 @@ El proyecto nació como un explorador de archivos tradicional y evolucionó hast
 - **Windows 10/11** (la aplicación usa Windows Forms y controles COM nativos)
 - **.NET 8.0 SDK** — [Descargar aquí](https://dotnet.microsoft.com/download/dotnet/8.0)
 - **FFmpeg** (opcional) — necesario solo si usas las funciones de extracción de audio/video. Debe estar accesible en el `PATH` del sistema o en la misma carpeta del ejecutable.
+- **LibreOffice** (opcional) — si está instalado en su ruta estándar de Windows, la aplicación lo detectará de forma automática para realizar conversiones de documentos (DOCX, XLSX, PPTX, TXT) a PDF y otros formatos con fidelidad del 100% usando su motor headless.
 - **PostgreSQL o MariaDB** (opcional) — solo si deseas usar la función de migración de datos de DataFusion.
 
 ---
@@ -77,6 +78,8 @@ También puedes abrir `ExploradorArchivos.slnx` directamente en **Visual Studio 
 
 La aplicación sigue un **patrón de enrutador centralizado**: `Form1` es el navegador de carpetas y el punto de decisión. Cuando el usuario hace doble clic en un archivo, `Form1` inspecciona la extensión y lanza el módulo correspondiente. Cada módulo es autónomo y no depende de los demás.
 
+El **FileConverterService** actúa como el motor de exportación y conversión universal del sistema. Si LibreOffice está instalado localmente, la aplicación delega la conversión a su binario headless (`soffice.exe`) para lograr la máxima fidelidad posible. Si no se detecta, se activa automáticamente un motor fallback interno desarrollado en C# que utiliza librerías Open-Source como `PdfSharpCore`, `ClosedXML` y `DocX` para reconstruir los documentos en memoria.
+
 ```
 ExploradorArchivos/
 │
@@ -94,7 +97,7 @@ ExploradorArchivos/
 │
 ├── Services/                     # ⚙️ Lógica de negocio transversal
 │   ├── FileService.cs            #   Copiar, mover, eliminar (async)
-│   ├── FileConverterService.cs   #   Exportar a .docx / .xlsx sin Office (OpenXML + ClosedXML)
+│   ├── FileConverterService.cs   #   Motor universal de conversión y exportación (con LibreOffice + fallbacks C#)
 │   ├── CsvIndexer.cs             #   Genera índice CSV del directorio actual
 │   ├── EmailService.cs           #   Compartir archivos vía MAPI / mailto nativo
 │   └── RecentFilesService.cs     #   Historial de archivos recientes
@@ -129,8 +132,7 @@ ExploradorArchivos/
 │   ├── LyricsService.cs          #   Búsqueda de letras vía API REST (lyrics.ovh)
 │   ├── PortadaService.cs         #   Extracción de carátulas embebidas
 │   ├── MetadataService.cs        #   Lectura de tags MP3 con TagLib
-│   ├── CustomTrackBar.cs         #   Barra de progreso dibujada a medida
-│   └── ImageHelper.cs            #   Utilidades de conversión de imagen
+│   └── CustomTrackBar.cs         #   Barra de progreso dibujada a medida
 │
 ├── AppCamara/                    # 📷 Captura de video desde webcam
 │   ├── AppCamaraForm.cs          #   Interfaz de cámara (preview en vivo)
@@ -250,8 +252,9 @@ Todas las dependencias se instalan automáticamente con `dotnet restore`. Están
 | `MySqlConnector` | 2.3.7 | Conector ADO.NET para MariaDB/MySQL |
 | `AForge.Video.DirectShow` | 2.2.5 | Acceso a dispositivos de captura de video |
 
-**Dependencia externa (no NuGet):**
+**Dependencias externas (no NuGet):**
 - **FFmpeg** — binario de línea de comandos para procesamiento de audio/video. Se invoca como proceso hijo.
+- **LibreOffice** — suite ofimática utilizada de forma automática (en modo headless) para la exportación y conversión de alta fidelidad de archivos a PDF y otros formatos.
 
 ---
 

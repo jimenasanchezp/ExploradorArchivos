@@ -15,42 +15,52 @@ public static class LyricsService
 
     static LyricsService()
     {
-        // Configurar User-Agent (buena práctica para APIs)
         _httpClient.DefaultRequestHeaders.Add("User-Agent", "ExploradorArchivos-Classic-Player/1.0");
     }
 
     /// <summary>
-    /// Busca la letra de una canción en internet.
+    /// Busca la letra de una canción en internet utilizando la API de LRCLIB.
     /// Prioriza letras sincronizadas (LRC) y luego letras planas.
     /// </summary>
+    /// <param name="artista">Nombre del artista intérprete.</param>
+    /// <param name="titulo">Título de la pista musical.</param>
+    /// <returns>La letra de la canción si se encuentra; de lo contrario, null.</returns>
     public static async Task<string?> BuscarLetraAsync(string artista, string titulo)
     {
         if (string.IsNullOrWhiteSpace(artista) || string.IsNullOrWhiteSpace(titulo))
+        {
             return null;
+        }
 
         try
         {
             string url = $"https://lrclib.net/api/get?artist_name={Uri.EscapeDataString(artista)}&track_name={Uri.EscapeDataString(titulo)}";
             
             var response = await _httpClient.GetAsync(url);
-            if (!response.IsSuccessStatusCode) return null;
+            if (!response.IsSuccessStatusCode) 
+            {
+                return null;
+            }
 
             var json = await response.Content.ReadAsStringAsync();
             using var doc = JsonDocument.Parse(json);
             
-            // 1. Intentar obtener letra sincronizada (más premium)
+            // 1. Intentar obtener letra sincronizada (.lrc)
             if (doc.RootElement.TryGetProperty("syncedLyrics", out var synced) && !string.IsNullOrWhiteSpace(synced.GetString()))
+            {
                 return synced.GetString();
+            }
             
-            // 2. Intentar obtener letra plana
+            // 2. Intentar obtener letra plana (.txt)
             if (doc.RootElement.TryGetProperty("plainLyrics", out var plain) && !string.IsNullOrWhiteSpace(plain.GetString()))
+            {
                 return plain.GetString();
+            }
 
             return null;
         }
         catch
         {
-            // Error de conexión o JSON inválido
             return null;
         }
     }

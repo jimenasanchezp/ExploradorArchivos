@@ -1,11 +1,14 @@
 using System;
 using System.IO;
+using System.Diagnostics;
+using System.Linq;
 using System.Collections.Generic;
 using Xceed.Document.NET;
 using Xceed.Words.NET;
 using ClosedXML.Excel;
 using PdfSharpCore.Pdf;
 using PdfSharpCore.Drawing;
+using PdfSharpCore.Fonts;
 using DocumentFormat.OpenXml;
 using DocumentFormat.OpenXml.Packaging;
 using DocumentFormat.OpenXml.Presentation;
@@ -20,352 +23,578 @@ namespace ExploradorArchivos.Services;
 public static class FileConverterService
 {
     /// <summary>
-    /// Convierte un archivo físico a otro formato según la extensión de destino.
-    /// Crea automáticamente nombres secuenciales si el archivo destino ya existe (ej. archivo (1).pdf).
+    /// Convierte un archivo físico de origen a otro formato de destino especificado (ej. de .txt a .pdf).
+    /// Si el archivo de destino ya existe, genera un nombre único secuencial agregando un número (ej. archivo (1).pdf).
     /// </summary>
-    /// <param name="rutaOrigen">Ruta absoluta del archivo original.</param>
-    /// <param name="formatoDestino">Extensión de destino (ej. ".pdf", ".docx").</param>
+    /// <param name="rutaOrigen">Ruta absoluta en el disco del archivo original que se quiere convertir.</param>
+    /// <param name="formatoDestino">Extensión final del archivo de salida (ej. ".pdf", ".docx", ".xlsx", ".pptx").</param>
     public static void Convertir(string rutaOrigen, string formatoDestino)
     {
-        string dir = Path.GetDirectoryName(rutaOrigen)!;
-        string nombreSinExt = Path.GetFileNameWithoutExtension(rutaOrigen);
-        string nuevaRuta = Path.Combine(dir, $"{nombreSinExt}{formatoDestino}");
+        // 1. Obtener la información básica del archivo original
+        string directorioDestino = Path.GetDirectoryName(rutaOrigen)!;
+        string nombreSinExtension = Path.GetFileNameWithoutExtension(rutaOrigen);
+        
+        // 2. Establecer la ruta destino inicial tentativa
+        string rutaArchivoDestino = Path.Combine(directorioDestino, $"{nombreSinExtension}{formatoDestino}");
 
-        int contador = 1;
-        while (File.Exists(nuevaRuta))
+        // 3. Si ya existe un archivo con ese nombre, buscamos un nombre secuencial libre
+        int numeroIntento = 1;
+        while (File.Exists(rutaArchivoDestino))
         {
-            nuevaRuta = Path.Combine(dir, $"{nombreSinExt} ({contador}){formatoDestino}");
-            contador++;
+            rutaArchivoDestino = Path.Combine(directorioDestino, $"{nombreSinExtension} ({numeroIntento}){formatoDestino}");
+            numeroIntento++;
         }
 
-        string extOrigen = Path.GetExtension(rutaOrigen).ToLower();
-        bool esImagen = extOrigen == ".jpg" || extOrigen == ".jpeg" || extOrigen == ".png" || extOrigen == ".bmp";
-        
+        // 4. Determinar si el archivo original es una imagen por su extensión
+        string extensionOrigen = Path.GetExtension(rutaOrigen).ToLower();
+        bool esArchivoImagen = extensionOrigen == ".jpg" ||
+                               extensionOrigen == ".jpeg" ||
+                               extensionOrigen == ".png"  ||
+                               extensionOrigen == ".bmp";
+
+        // 5. Si LibreOffice está instalado, usarlo para la conversión (máxima fidelidad).
+        //    LibreOffice headless soporta DOCX/XLSX/PPTX/TXT/imágenes → PDF y otros formatos.
+        //    Si no está disponible, se usa el motor interno de C# como fallback.
+        string? rutaSOffice = BuscarSOffice();
+        if (rutaSOffice != null && !esArchivoImagen)
+        {
+            ConvertirConLibreOffice(rutaSOffice, rutaOrigen, rutaArchivoDestino, formatoDestino, directorioDestino, nombreSinExtension);
+            return;
+        }
+
+        // 6. Fallback: motor interno C# (PdfSharpCore / DocX / ClosedXML / OpenXML)
         switch (formatoDestino.ToLower())
         {
             case ".docx":
-                ConvertirADocx(rutaOrigen, nuevaRuta, esImagen);
+                ConvertirADocx(rutaOrigen, rutaArchivoDestino, esArchivoImagen);
                 break;
             case ".xlsx":
-                ConvertirAXlsx(rutaOrigen, nuevaRuta, esImagen);
+                ConvertirAXlsx(rutaOrigen, rutaArchivoDestino, esArchivoImagen);
                 break;
             case ".pptx":
-                ConvertirAPptx(rutaOrigen, nuevaRuta, esImagen);
+                ConvertirAPptx(rutaOrigen, rutaArchivoDestino, esArchivoImagen);
                 break;
             case ".pdf":
-                ConvertirAPdf(rutaOrigen, nuevaRuta, esImagen);
+                ConvertirAPdf(rutaOrigen, rutaArchivoDestino, esArchivoImagen);
                 break;
             default:
-                throw new NotSupportedException($"El formato {formatoDestino} no está soportado.");
+                throw new NotSupportedException($"El formato de destino '{formatoDestino}' no está soportado.");
         }
     }
 
-    private static void ConvertirADocx(string rutaOrigen, string nuevaRuta, bool esImagen)
+    // =====================================================================
+    // LIBREOFFFICE HEADLESS
+    // =====================================================================
+
+    /// <summary>
+    /// Busca el ejecutable soffice.exe de LibreOffice en las rutas estándar de instalación de Windows.
+    /// Retorna la ruta completa si se encuentra, o null si LibreOffice no está instalado.
+    /// </summary>
+    private static string? BuscarSOffice()
     {
-        using (var doc = DocX.Create(nuevaRuta))
+        // Rutas estándar donde LibreOffice se instala en Windows (x64 y x86)
+        string[] rutasCandidatas =
         {
-            if (esImagen)
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),      @"LibreOffice\program\soffice.exe"),
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86),   @"LibreOffice\program\soffice.exe"),
+            // Instalaciones portables o alternativas
+            @"C:\LibreOffice\program\soffice.exe",
+            @"D:\LibreOffice\program\soffice.exe",
+        };
+        return rutasCandidatas.FirstOrDefault(File.Exists);
+    }
+
+    /// <summary>
+    /// Usa LibreOffice headless para convertir el archivo origen al formato destino con fidelidad total.
+    /// LibreOffice convierte --convert-to <ext> y guarda el archivo en el directorio especificado,
+    /// luego lo renombramos a la ruta destino definitiva (con numeración si ya existía).
+    /// </summary>
+    private static void ConvertirConLibreOffice(string rutaSOffice, string rutaOrigen,
+        string rutaArchivoDestino, string formatoDestino, string directorioDestino, string nombreSinExtension)
+    {
+        // LibreOffice siempre guarda en el mismo directorio que el archivo de origen con el
+        // nombre original + la extensión de destino (no permite especificar nombre de salida).
+        // Usamos un directorio temporal para evitar colisiones con archivos existentes.
+        string dirTemporal = Path.Combine(Path.GetTempPath(), $"lo_conv_{Guid.NewGuid():N}");
+        Directory.CreateDirectory(dirTemporal);
+
+        try
+        {
+            // Determinar el filtro de conversión según el formato de destino
+            string filtro = formatoDestino.ToLower() switch
             {
-                var img = doc.AddImage(rutaOrigen);
-                var picture = img.CreatePicture();
-                var p = doc.InsertParagraph();
-                p.AppendPicture(picture);
+                ".pdf"  => "pdf",
+                ".docx" => "docx",
+                ".xlsx" => "xlsx",
+                ".pptx" => "pptx",
+                ".txt"  => "txt",
+                _       => throw new NotSupportedException($"LibreOffice no puede convertir a '{formatoDestino}'.")
+            };
+
+            // Ejecutar LibreOffice en modo headless (sin interfaz gráfica)
+            var psi = new ProcessStartInfo
+            {
+                FileName               = rutaSOffice,
+                Arguments              = $"--headless --convert-to {filtro} \"{rutaOrigen}\" --outdir \"{dirTemporal}\"",
+                UseShellExecute        = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError  = true,
+                CreateNoWindow         = true
+            };
+
+            using var proceso = Process.Start(psi)
+                ?? throw new InvalidOperationException("No se pudo iniciar el proceso de LibreOffice.");
+
+            // Tiempo máximo de espera: 3 minutos (documentos grandes pueden tardar)
+            bool termino = proceso.WaitForExit(180_000);
+            if (!termino)
+            {
+                proceso.Kill();
+                throw new TimeoutException("LibreOffice tardó demasiado en convertir el archivo.");
+            }
+
+            if (proceso.ExitCode != 0)
+            {
+                string stderr = proceso.StandardError.ReadToEnd();
+                throw new InvalidOperationException($"LibreOffice falló (código {proceso.ExitCode}): {stderr}");
+            }
+
+            // LibreOffice genera el archivo con el nombre original + extensión destino
+            string archivoGenerado = Path.Combine(dirTemporal,
+                Path.GetFileNameWithoutExtension(rutaOrigen) + formatoDestino);
+
+            if (!File.Exists(archivoGenerado))
+                throw new FileNotFoundException("LibreOffice no generó el archivo de salida esperado.", archivoGenerado);
+
+            // Mover el archivo generado a la ruta destino definitiva
+            File.Move(archivoGenerado, rutaArchivoDestino);
+        }
+        finally
+        {
+            // Limpiar el directorio temporal siempre, aunque haya error
+            if (Directory.Exists(dirTemporal))
+                Directory.Delete(dirTemporal, recursive: true);
+        }
+    }
+
+    /// <summary>
+    /// Convierte el archivo origen a un documento de Microsoft Word (.docx).
+    /// </summary>
+    private static void ConvertirADocx(string rutaOrigen, string rutaArchivoDestino, bool esArchivoImagen)
+    {
+        // Creamos e inicializamos el archivo Word usando la librería DocX
+        using (DocX documentoWord = DocX.Create(rutaArchivoDestino))
+        {
+            if (esArchivoImagen)
+            {
+                // Si es imagen, la agregamos directamente dentro del documento Word
+                Xceed.Document.NET.Image imagenDocx = documentoWord.AddImage(rutaOrigen);
+                Xceed.Document.NET.Picture contenedorImagen = imagenDocx.CreatePicture();
+                Paragraph parrafoWord = documentoWord.InsertParagraph();
+                
+                parrafoWord.AppendPicture(contenedorImagen);
             }
             else
             {
-                var p = doc.InsertParagraph();
-                int contador = 0;
-                int maxLineasPermitidas = 50000; // Límite de seguridad para evitar que DocX reviente la memoria RAM
+                // Si es texto, leemos el archivo línea por línea y las insertamos en párrafos
+                Paragraph parrafoWord = documentoWord.InsertParagraph();
+                int lineasProcesadas = 0;
+                int limiteMaximoLineas = 50000; // Límite de seguridad para evitar consumo excesivo de memoria RAM
                 
-                foreach (var linea in ExtraerLineas(rutaOrigen))
+                foreach (string lineaTexto in ExtraerLineas(rutaOrigen))
                 {
-                    if (contador > maxLineasPermitidas)
+                    // Si excede el límite seguro, truncamos la conversión y avisamos en el archivo
+                    if (lineasProcesadas > limiteMaximoLineas)
                     {
-                        p = doc.InsertParagraph("\n[... CONTENIDO TRUNCADO POR LÍMITE DE TAMAÑO ...]");
+                        parrafoWord = documentoWord.InsertParagraph("\n[... CONTENIDO TRUNCADO DEBIDO A SU GRAN TAMAÑO ...]");
                         break;
                     }
 
-                    p.Append(linea).AppendLine();
-                    contador++;
+                    parrafoWord.Append(lineaTexto).AppendLine();
+                    lineasProcesadas++;
 
-                    // Crear un nuevo párrafo cada 100 líneas para no ahogar un solo nodo del DOM
-                    if (contador % 100 == 0)
+                    // Para mantener el rendimiento óptimo del DOM del archivo Word, creamos un párrafo nuevo cada 100 líneas
+                    if (lineasProcesadas % 100 == 0)
                     {
-                        p = doc.InsertParagraph();
+                        parrafoWord = documentoWord.InsertParagraph();
                     }
                 }
             }
-            doc.Save();
+
+            // Guardamos físicamente los cambios realizados en el archivo Word
+            documentoWord.Save();
         }
     }
 
-    private static void ConvertirAXlsx(string rutaOrigen, string nuevaRuta, bool esImagen)
+    /// <summary>
+    /// Convierte el archivo origen a un libro de hojas de cálculo de Microsoft Excel (.xlsx).
+    /// </summary>
+    private static void ConvertirAXlsx(string rutaOrigen, string rutaArchivoDestino, bool esArchivoImagen)
     {
-        using (var workbook = new XLWorkbook())
+        // Creamos un nuevo libro de trabajo de Excel utilizando ClosedXML
+        using (XLWorkbook libroExcel = new XLWorkbook())
         {
-            if (esImagen)
+            if (esArchivoImagen)
             {
-                var worksheet = workbook.Worksheets.Add("Hoja1");
-                worksheet.AddPicture(rutaOrigen).MoveTo(worksheet.Cell(1, 1));
+                // Si es imagen, creamos una hoja de cálculo e insertamos la imagen a partir de la celda A1 (1,1)
+                IXLWorksheet hojaExcel = libroExcel.Worksheets.Add("Hoja de Imagen");
+                hojaExcel.AddPicture(rutaOrigen).MoveTo(hojaExcel.Cell(1, 1));
             }
             else
             {
-                int hojaActual = 1;
-                int filaActual = 1;
-                var worksheet = workbook.Worksheets.Add($"Hoja{hojaActual}");
-                string extension = Path.GetExtension(rutaOrigen).ToLower();
-                bool esCsvOTxt = extension == ".csv" || extension == ".txt";
+                // Si es texto, determinamos si tiene formato separado por comas o tabulador (.csv / .txt)
+                int indiceHoja = 1;
+                int filaActualExcel = 1;
+                IXLWorksheet hojaExcel = libroExcel.Worksheets.Add($"Hoja {indiceHoja}");
+                
+                string extensionOrigen = Path.GetExtension(rutaOrigen).ToLower();
+                bool esArchivoDelimitado = extensionOrigen == ".csv" || extensionOrigen == ".txt";
 
-                foreach (var linea in ExtraerLineas(rutaOrigen))
+                // Leemos línea a línea los datos e insertamos filas en la hoja de cálculo
+                foreach (string lineaTexto in ExtraerLineas(rutaOrigen))
                 {
-                    if (filaActual > 1000000) // Límite de seguridad para Excel
+                    // Excel soporta un máximo de 1,048,576 filas por hoja. Si nos acercamos al millón, creamos una nueva hoja
+                    if (filaActualExcel > 1000000)
                     {
-                        hojaActual++;
-                        worksheet = workbook.Worksheets.Add($"Hoja{hojaActual}");
-                        filaActual = 1;
+                        indiceHoja++;
+                        hojaExcel = libroExcel.Worksheets.Add($"Hoja {indiceHoja}");
+                        filaActualExcel = 1;
                     }
 
-                    if (esCsvOTxt)
+                    if (esArchivoDelimitado)
                     {
-                        var delimitador = linea.Contains('\t') ? '\t' : ',';
-                        var columnas = linea.Split(delimitador);
-                        for (int col = 0; col < columnas.Length; col++)
+                        // Si es archivo delimitado, determinamos si usa tabulador o coma para separar las columnas
+                        char caracterDelimitador = lineaTexto.Contains('\t') ? '\t' : ',';
+                        string[] columnasTexto = lineaTexto.Split(caracterDelimitador);
+
+                        // Escribimos cada columna en celdas consecutivas de la fila actual
+                        for (int indiceColumna = 0; indiceColumna < columnasTexto.Length; indiceColumna++)
                         {
-                            worksheet.Cell(filaActual, col + 1).Value = columnas[col].Trim();
+                            hojaExcel.Cell(filaActualExcel, indiceColumna + 1).Value = columnasTexto[indiceColumna].Trim();
                         }
                     }
                     else
                     {
-                        worksheet.Cell(filaActual, 1).Value = linea;
+                        // Si es texto plano sin separadores, volcamos toda la línea directamente en la celda de la columna A
+                        hojaExcel.Cell(filaActualExcel, 1).Value = lineaTexto;
                     }
                     
-                    filaActual++;
+                    filaActualExcel++;
                 }
             }
-            workbook.SaveAs(nuevaRuta);
+
+            // Almacenamos el libro completo en el archivo XLSX
+            libroExcel.SaveAs(rutaArchivoDestino);
         }
     }
 
-    private static void ConvertirAPdf(string rutaOrigen, string nuevaRuta, bool esImagen)
+    /// <summary>
+    /// Convierte el archivo origen a un documento portátil PDF (.pdf) dibujando texto o ajustando imágenes.
+    /// </summary>
+    private static void ConvertirAPdf(string rutaOrigen, string rutaArchivoDestino, bool esArchivoImagen)
     {
-        var pdf = new PdfDocument();
+        // Registrar el font resolver de sistema de Windows antes de crear cualquier documento PDF.
+        // Sin esto, PdfSharpCore en .NET 8 no puede encontrar fuentes como "Arial" y DrawString
+        // no dibuja nada, dejando el PDF completamente en blanco.
+        if (GlobalFontSettings.FontResolver == null)
+            GlobalFontSettings.FontResolver = new PdfSharpCore.Utils.FontResolver();
+
+        // Instanciamos el documento PDF destino usando PdfSharpCore
+        PdfDocument documentoPdf = new PdfDocument();
         
-        if (esImagen)
+        if (esArchivoImagen)
         {
-            var page = pdf.AddPage();
-            using (var gfx = XGraphics.FromPdfPage(page))
-            using (var image = XImage.FromFile(rutaOrigen))
+            // Creamos una nueva página del PDF y dibujamos la imagen ajustando su escala proporcionalmente
+            PdfPage paginaPdf = documentoPdf.AddPage();
+            using (XGraphics graficosPdf = XGraphics.FromPdfPage(paginaPdf))
+            using (XImage imagenPdf = XImage.FromFile(rutaOrigen))
             {
-                double ratio = Math.Min(page.Width / image.PixelWidth, page.Height / image.PixelHeight);
-                gfx.DrawImage(image, 0, 0, image.PixelWidth * ratio, image.PixelHeight * ratio);
+                double escalaProporcional = Math.Min(paginaPdf.Width / imagenPdf.PixelWidth, paginaPdf.Height / imagenPdf.PixelHeight);
+                graficosPdf.DrawImage(imagenPdf, 0, 0, imagenPdf.PixelWidth * escalaProporcional, imagenPdf.PixelHeight * escalaProporcional);
             }
         }
         else
         {
-            var font = new XFont("Arial", 11, XFontStyle.Regular);
-            var page = pdf.AddPage();
-            var gfx = XGraphics.FromPdfPage(page);
+            // Para archivos de texto, configuramos márgenes, tipo de letra Arial 11 y área disponible
+            XFont fuenteArial = new XFont("Arial", 11, XFontStyle.Regular);
+            PdfPage paginaPdf = documentoPdf.AddPage();
+            XGraphics graficosPdf = XGraphics.FromPdfPage(paginaPdf);
             
-            double margen = 40;
-            double yPos = margen;
-            double xPos = margen;
-            double lineHeight = font.GetHeight();
-            double maxWidth = page.Width - (margen * 2);
+            double margenPagina = 40;
+            double posicionY = margenPagina;
+            double posicionX = margenPagina;
+            double altoLinea = fuenteArial.GetHeight();
+            double anchoDisponible = paginaPdf.Width - (margenPagina * 2);
 
-            foreach (var linea in ExtraerLineas(rutaOrigen))
+            // Leemos y dibujamos línea por línea en el lienzo del PDF
+            foreach (string lineaTexto in ExtraerLineas(rutaOrigen))
             {
-                var lineasEnvueltas = DividirTextoEnLineasCortas(gfx, linea, font, maxWidth);
+                // Si una línea es más ancha que el papel, la dividimos en líneas más cortas que quepan
+                IEnumerable<string> lineasFragmentadas = DividirTextoEnLineasCortas(graficosPdf, lineaTexto, fuenteArial, anchoDisponible);
                 
-                foreach (var textToDraw in lineasEnvueltas)
+                foreach (string lineaAjustada in lineasFragmentadas)
                 {
-                    if (yPos + lineHeight > page.Height - margen)
+                    // Si el texto llega al final de la página (margen inferior), creamos una página nueva
+                    if (posicionY + altoLinea > paginaPdf.Height - margenPagina)
                     {
-                        gfx.Dispose();
-                        page = pdf.AddPage();
-                        gfx = XGraphics.FromPdfPage(page);
-                        yPos = margen;
+                        graficosPdf.Dispose();
+                        paginaPdf = documentoPdf.AddPage();
+                        graficosPdf = XGraphics.FromPdfPage(paginaPdf);
+                        posicionY = margenPagina;
                     }
                     
-                    gfx.DrawString(textToDraw, font, XBrushes.Black, new XRect(xPos, yPos, maxWidth, lineHeight), XStringFormats.TopLeft);
-                    yPos += lineHeight;
+                    // Dibujamos el texto actual en las coordenadas especificadas
+                    graficosPdf.DrawString(lineaAjustada, fuenteArial, XBrushes.Black, new XRect(posicionX, posicionY, anchoDisponible, altoLinea), XStringFormats.TopLeft);
+                    posicionY += altoLinea;
                 }
             }
-            gfx.Dispose();
+            graficosPdf.Dispose();
         }
-        pdf.Save(nuevaRuta);
+
+        // Guardamos y finalizamos la escritura del archivo PDF
+        documentoPdf.Save(rutaArchivoDestino);
     }
 
-    private static IEnumerable<string> DividirTextoEnLineasCortas(XGraphics gfx, string texto, XFont font, double maxWidth)
+    /// <summary>
+    /// Divide un texto largo en palabras y genera sub-líneas que no excedan el ancho máximo especificado.
+    /// </summary>
+    private static IEnumerable<string> DividirTextoEnLineasCortas(XGraphics graficosPdf, string textoCompleto, XFont fuenteArial, double anchoMaximo)
     {
-        if (string.IsNullOrWhiteSpace(texto))
+        if (string.IsNullOrWhiteSpace(textoCompleto))
         {
-            yield return texto;
+            yield return textoCompleto;
             yield break;
         }
 
-        var palabras = texto.Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+        // Separa el texto en palabras individuales
+        string[] palabras = textoCompleto.Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
         
         if (palabras.Length == 0)
         {
-            yield return texto;
+            yield return textoCompleto;
             yield break;
         }
 
-        string lineaActual = "";
-        foreach (var palabra in palabras)
-        {
-            string prueba = string.IsNullOrEmpty(lineaActual) ? palabra : lineaActual + " " + palabra;
-            var size = gfx.MeasureString(prueba, font);
+        string lineaActualAcumulada = "";
 
-            if (size.Width > maxWidth && !string.IsNullOrEmpty(lineaActual))
+        // Evaluamos palabra por palabra si sobrepasa el ancho máximo permitido
+        foreach (string palabra in palabras)
+        {
+            string lineaPrueba = string.IsNullOrEmpty(lineaActualAcumulada) ? palabra : lineaActualAcumulada + " " + palabra;
+            XSize tamañoTexto = graficosPdf.MeasureString(lineaPrueba, fuenteArial);
+
+            if (tamañoTexto.Width > anchoMaximo && !string.IsNullOrEmpty(lineaActualAcumulada))
             {
-                yield return lineaActual;
-                lineaActual = palabra;
+                // Si la línea de prueba se pasa del límite, enviamos la línea acumulada anterior y empezamos una nueva
+                yield return lineaActualAcumulada;
+                lineaActualAcumulada = palabra;
             }
             else
             {
-                lineaActual = prueba;
+                // Si cabe, seguimos agregando palabras a la línea actual
+                lineaActualAcumulada = lineaPrueba;
             }
         }
 
-        if (!string.IsNullOrEmpty(lineaActual))
+        if (!string.IsNullOrEmpty(lineaActualAcumulada))
         {
-            yield return lineaActual;
+            yield return lineaActualAcumulada;
         }
     }
 
-    private static void ConvertirAPptx(string rutaOrigen, string nuevaRuta, bool esImagen)
+    /// <summary>
+    /// Convierte el archivo original de texto a una presentación de diapositivas de Microsoft PowerPoint (.pptx).
+    /// </summary>
+    private static void ConvertirAPptx(string rutaOrigen, string rutaArchivoDestino, bool esArchivoImagen)
     {
-        using (PresentationDocument presentationDoc = PresentationDocument.Create(nuevaRuta, PresentationDocumentType.Presentation))
+        // Inicializamos la estructura de la presentación PowerPoint usando DocumentFormat.OpenXml
+        using (PresentationDocument presentacionPowerPoint = PresentationDocument.Create(rutaArchivoDestino, PresentationDocumentType.Presentation))
         {
-            PresentationPart presentationPart = presentationDoc.AddPresentationPart();
-            presentationPart.Presentation = new Presentation();
+            PresentationPart partePresentacion = presentacionPowerPoint.AddPresentationPart();
+            partePresentacion.Presentation = new Presentation();
 
-            SlideMasterIdList slideMasterIdList = new SlideMasterIdList(new SlideMasterId() { Id = (UInt32Value)2147483648U, RelationshipId = "rId1" });
-            SlideIdList slideIdList = new SlideIdList();
-            
-            presentationPart.Presentation.Append(slideMasterIdList, slideIdList);
+            SlideMasterPart parteMaestraDiapositiva = partePresentacion.AddNewPart<SlideMasterPart>("rId1");
+            parteMaestraDiapositiva.SlideMaster = new SlideMaster(new CommonSlideData(new ShapeTree()));
 
-            SlideLayoutPart slideLayoutPart = presentationPart.AddNewPart<SlideLayoutPart>("rId1");
-            slideLayoutPart.SlideLayout = new SlideLayout(new CommonSlideData(new ShapeTree()));
+            SlideLayoutPart parteDiseñoDiapositiva = parteMaestraDiapositiva.AddNewPart<SlideLayoutPart>("rId2");
+            parteDiseñoDiapositiva.SlideLayout = new SlideLayout(new CommonSlideData(new ShapeTree()));
             
-            SlideMasterPart slideMasterPart = slideLayoutPart.AddNewPart<SlideMasterPart>("rId3");
-            slideMasterPart.SlideMaster = new SlideMaster(new CommonSlideData(new ShapeTree()));
-            
-            ThemePart themePart = slideMasterPart.AddNewPart<ThemePart>("rId4");
-            themePart.Theme = new D.Theme() { Name = "Office Theme" };
+            ThemePart parteTemaPresentacion = parteMaestraDiapositiva.AddNewPart<ThemePart>("rId3");
+            parteTemaPresentacion.Theme = new D.Theme() { Name = "Office Theme" };
 
-            if (!esImagen)
+            SlideMasterIdList listaDiapositivasMaestras = new SlideMasterIdList(new SlideMasterId() { Id = (UInt32Value)2147483648U, RelationshipId = "rId1" });
+            SlideIdList listaIdDiapositivas = new SlideIdList();
+            
+            partePresentacion.Presentation.Append(listaDiapositivasMaestras, listaIdDiapositivas);
+
+            if (!esArchivoImagen)
             {
-                int lineCount = 0;
-                string currentSlideText = "";
-                uint slideIdIndex = 256;
+                // Leemos las líneas y creamos diapositivas. Cada una albergará unas 22 líneas de texto aprox.
+                int contadorLineasDiapositiva = 0;
+                string textoAcumuladoDiapositiva = "";
+                uint indiceIdDiapositiva = 256;
 
-                foreach (var linea in ExtraerLineas(rutaOrigen))
+                foreach (string lineaTexto in ExtraerLineas(rutaOrigen))
                 {
-                    currentSlideText += linea + "\n";
-                    lineCount++;
+                    textoAcumuladoDiapositiva += lineaTexto + "\n";
+                    contadorLineasDiapositiva++;
 
-                    if (lineCount >= 22) // Aproximadamente 22 líneas por diapositiva
+                    if (contadorLineasDiapositiva >= 22)
                     {
-                        AddSlideToPresentation(presentationPart, slideIdList, slideIdIndex, currentSlideText, slideLayoutPart);
-                        slideIdIndex++;
-                        lineCount = 0;
-                        currentSlideText = "";
+                        AgregarDiapositivaAPresentacion(partePresentacion, listaIdDiapositivas, indiceIdDiapositiva, textoAcumuladoDiapositiva, parteDiseñoDiapositiva);
+                        indiceIdDiapositiva++;
+                        contadorLineasDiapositiva = 0;
+                        textoAcumuladoDiapositiva = "";
                     }
                 }
 
-                if (!string.IsNullOrEmpty(currentSlideText))
+                // Generar una última diapositiva si quedó texto remanente
+                if (!string.IsNullOrEmpty(textoAcumuladoDiapositiva))
                 {
-                    AddSlideToPresentation(presentationPart, slideIdList, slideIdIndex, currentSlideText, slideLayoutPart);
+                    AgregarDiapositivaAPresentacion(partePresentacion, listaIdDiapositivas, indiceIdDiapositiva, textoAcumuladoDiapositiva, parteDiseñoDiapositiva);
                 }
             }
             else
             {
-                // Just create one empty slide for now for images
-                AddSlideToPresentation(presentationPart, slideIdList, 256, "Imagen (soporte de imagen en PPTX no implementado completamente)", slideLayoutPart);
+                // Mensaje informativo por defecto si intentan convertir una imagen a PowerPoint (no implementado en OpenXML)
+                AgregarDiapositivaAPresentacion(partePresentacion, listaIdDiapositivas, 256, "Imagen (soporte de imagen en PPTX no implementado completamente)", parteDiseñoDiapositiva);
             }
             
-            presentationPart.Presentation.Save();
+            partePresentacion.Presentation.Save();
         }
     }
 
-    private static void AddSlideToPresentation(PresentationPart presentationPart, SlideIdList slideIdList, uint slideIdIndex, string text, SlideLayoutPart slideLayoutPart)
+    /// <summary>
+    /// Agrega una diapositiva física a la estructura y le introduce un contenedor de caja de texto.
+    /// </summary>
+    private static void AgregarDiapositivaAPresentacion(PresentationPart partePresentacion, SlideIdList listaIdDiapositivas, uint indiceIdDiapositiva, string textoDiapositiva, SlideLayoutPart parteDiseñoDiapositiva)
     {
-        SlidePart slidePart = presentationPart.AddNewPart<SlidePart>($"rId{slideIdIndex + 100}");
-        slidePart.Slide = new Slide(new CommonSlideData(new ShapeTree()));
+        SlidePart parteDiapositiva = partePresentacion.AddNewPart<SlidePart>($"rId{indiceIdDiapositiva + 100}");
+        parteDiapositiva.Slide = new Slide(new CommonSlideData(new ShapeTree()));
 
-        ShapeTree shapeTree = slidePart.Slide.CommonSlideData!.ShapeTree!;
-        var shape = new Shape();
-        shape.NonVisualShapeProperties = new NonVisualShapeProperties(
+        ShapeTree arbolFormas = parteDiapositiva.Slide.CommonSlideData!.ShapeTree!;
+        
+        // Creamos la forma de la caja de texto
+        Shape cajaDeTexto = new Shape();
+        cajaDeTexto.NonVisualShapeProperties = new NonVisualShapeProperties(
             new NonVisualDrawingProperties() { Id = 2, Name = "TextBox" },
             new NonVisualShapeDrawingProperties(),
             new ApplicationNonVisualDrawingProperties());
         
-        shape.ShapeProperties = new ShapeProperties(
+        // Configuramos la posición física y dimensiones dentro de la diapositiva
+        cajaDeTexto.ShapeProperties = new ShapeProperties(
             new D.Transform2D(
                 new D.Offset() { X = 500000L, Y = 500000L },
                 new D.Extents() { Cx = 8000000L, Cy = 6000000L }),
             new D.PresetGeometry(new D.AdjustValueList()) { Preset = D.ShapeTypeValues.Rectangle });
         
-        shape.TextBody = new TextBody(
+        // Asignamos el cuerpo del texto a la forma geométrica.
+        // Sanitizamos el texto para eliminar caracteres de control inválidos en XML (ej. 0x17)
+        // que pueden provenir de archivos PPTX creados con software externo.
+        cajaDeTexto.TextBody = new TextBody(
             new D.BodyProperties(),
             new D.ListStyle(),
-            new D.Paragraph(new D.Run(new D.Text(text))));
+            new D.Paragraph(new D.Run(new D.Text(SanitizarTextoXml(textoDiapositiva)))));
 
-        shapeTree.AppendChild(shape);
-        slidePart.AddPart(slideLayoutPart);
+        arbolFormas.AppendChild(cajaDeTexto);
+        parteDiapositiva.AddPart(parteDiseñoDiapositiva);
 
-        slideIdList.Append(new SlideId() { Id = slideIdIndex, RelationshipId = presentationPart.GetIdOfPart(slidePart) });
+        // Añadimos el ID a la lista general de diapositivas
+        listaIdDiapositivas.Append(new SlideId() { Id = indiceIdDiapositiva, RelationshipId = partePresentacion.GetIdOfPart(parteDiapositiva) });
     }
 
-    private static IEnumerable<string> ExtraerLineas(string ruta)
+    /// <summary>
+    /// Elimina caracteres de control que son inválidos en XML (0x00–0x08, 0x0B, 0x0C, 0x0E–0x1F).
+    /// Los caracteres de tabulación (0x09), salto de línea (0x0A) y retorno de carro (0x0D) son válidos en XML y se conservan.
+    /// Esto previene System.ArgumentException al escribir texto de documentos externos a formatos basados en XML.
+    /// </summary>
+    private static string SanitizarTextoXml(string texto)
     {
-        string ext = Path.GetExtension(ruta).ToLower();
-        
-        if (ext == ".docx")
+        if (string.IsNullOrEmpty(texto)) return texto;
+        var sb = new System.Text.StringBuilder(texto.Length);
+        foreach (char c in texto)
         {
-            using (var doc = DocX.Load(ruta))
+            // Caracteres XML válidos según la especificación: #x9 | #xA | #xD | [#x20-#xD7FF] | [#xE000-#xFFFD]
+            if (c == 0x09 || c == 0x0A || c == 0x0D || (c >= 0x20 && c <= 0xD7FF) || (c >= 0xE000 && c <= 0xFFFD))
+                sb.Append(c);
+            // Los demás (0x00-0x08, 0x0B, 0x0C, 0x0E-0x1F y surrogate pairs) se descartan silenciosamente
+        }
+        return sb.ToString();
+    }
+
+    /// <summary>
+    /// Lee secuencialmente las líneas de texto del archivo físico, detectando el formato del archivo de entrada (.docx, .xlsx, .pptx o texto plano).
+    /// </summary>
+    /// <param name="rutaArchivo">Ruta completa del archivo a leer.</param>
+    /// <returns>Flujo IEnumerable que retorna las líneas una a una.</returns>
+    private static IEnumerable<string> ExtraerLineas(string rutaArchivo)
+    {
+        string extension = Path.GetExtension(rutaArchivo).ToLower();
+        
+        if (extension == ".docx")
+        {
+            // Extraer líneas desde un archivo de Word
+            using (DocX documentoWord = DocX.Load(rutaArchivo))
             {
-                var lines = doc.Text.Split(new[] { '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries);
-                foreach (var l in lines) yield return l;
+                // Sanitizamos el texto del documento Word para eliminar caracteres de control inválidos en XML
+                // que pueden haberse incrustado por otros editores o macros de Office.
+                string[] lineasWord = SanitizarTextoXml(documentoWord.Text).Split(new[] { '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries);
+                foreach (string linea in lineasWord)
+                    yield return linea;
             }
         }
-        else if (ext == ".xlsx")
+        else if (extension == ".xlsx")
         {
-            using (var wb = new XLWorkbook(ruta))
+            // Extraer líneas desde una hoja de cálculo Excel
+            using (XLWorkbook libroExcel = new XLWorkbook(rutaArchivo))
             {
-                var ws = wb.Worksheet(1);
-                var lastCell = ws.LastCellUsed();
-                if (lastCell != null)
+                IXLWorksheet hojaExcel = libroExcel.Worksheet(1);
+                IXLCell ultimaCeldaUsada = hojaExcel.LastCellUsed();
+                if (ultimaCeldaUsada != null)
                 {
-                    for (int r = 1; r <= lastCell.Address.RowNumber; r++)
+                    // Recorremos las celdas fila por fila para unirlas con tabuladores
+                    for (int fila = 1; fila <= ultimaCeldaUsada.Address.RowNumber; fila++)
                     {
-                        var rowText = "";
-                        for (int c = 1; c <= lastCell.Address.ColumnNumber; c++)
-                        {
-                            rowText += ws.Cell(r, c).GetString() + "\t";
-                        }
-                        yield return rowText.TrimEnd('\t');
+                        string textoFila = "";
+                        for (int columna = 1; columna <= ultimaCeldaUsada.Address.ColumnNumber; columna++)
+                            textoFila += hojaExcel.Cell(fila, columna).GetString() + "\t";
+                        
+                        // Las celdas pueden contener caracteres de control si fueron importadas de fuentes externas
+                        yield return SanitizarTextoXml(textoFila.TrimEnd('\t'));
                     }
                 }
             }
         }
-        else if (ext == ".pptx")
+        else if (extension == ".pptx")
         {
-            using (PresentationDocument ppt = PresentationDocument.Open(ruta, false))
+            // Extraer texto desde una presentación PowerPoint diapositiva por diapositiva.
+            // IMPORTANTE: el texto de las formas de una diapositiva vive en <p:txBody>
+            // (Presentation.TextBody), NO en <a:txBody> (Drawing.TextBody). Buscar el tipo
+            // incorrecto retorna 0 resultados → el PDF resultante queda en blanco.
+            using (PresentationDocument presentacionPowerPoint = PresentationDocument.Open(rutaArchivo, false))
             {
-                if (ppt.PresentationPart?.Presentation?.SlideIdList != null)
+                if (presentacionPowerPoint.PresentationPart?.Presentation?.SlideIdList != null)
                 {
-                    foreach (var slideId in ppt.PresentationPart.Presentation.SlideIdList.Elements<SlideId>())
+                    foreach (SlideId idDiapositiva in presentacionPowerPoint.PresentationPart.Presentation.SlideIdList.Elements<SlideId>())
                     {
-                        var slidePart = (SlidePart)ppt.PresentationPart.GetPartById(slideId.RelationshipId!);
-                        if (slidePart.Slide != null)
+                        SlidePart parteDiapositiva = (SlidePart)presentacionPowerPoint.PresentationPart.GetPartById(idDiapositiva.RelationshipId!);
+                        if (parteDiapositiva.Slide == null) continue;
+
+                        // Usamos Presentation.TextBody (p:txBody) que es donde PowerPoint almacena
+                        // el texto de cada forma. Iteramos párrafo a párrafo (a:p → Drawing.Paragraph)
+                        // concatenando los runs (a:r → Drawing.Run) para preservar los saltos de línea.
+                        foreach (TextBody cuerpoTexto in parteDiapositiva.Slide.Descendants<TextBody>())
                         {
-                            foreach (var textBody in slidePart.Slide.Descendants<D.TextBody>())
+                            foreach (D.Paragraph parrafo in cuerpoTexto.Descendants<D.Paragraph>())
                             {
-                                var lines = textBody.InnerText.Split(new[] { '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries);
-                                foreach (var l in lines) yield return l;
+                                // Concatenar todos los runs del párrafo en una sola línea
+                                var sbLinea = new System.Text.StringBuilder();
+                                foreach (D.Run run in parrafo.Descendants<D.Run>())
+                                    sbLinea.Append(run.Text?.Text ?? "");
+
+                                string lineaParrafo = SanitizarTextoXml(sbLinea.ToString());
+                                if (!string.IsNullOrWhiteSpace(lineaParrafo))
+                                    yield return lineaParrafo;
                             }
                         }
                     }
@@ -374,15 +603,16 @@ public static class FileConverterService
         }
         else
         {
-            // Fallback para texto plano usando streaming directo
-            using (var stream = new FileStream(ruta, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
-            using (var reader = new StreamReader(stream))
+            // Lectura de flujo de texto plano (UTF-8, Csv, Txt, binarios, etc.).
+            // IMPORTANTE: SanitizarTextoXml es indispensable aquí: archivos binarios o con codificación
+            // inusual pueden producir null bytes (0x00) y otros caracteres de control que son inválidos
+            // en XML. Sin sanitización, DocX.Save() y los writers de OpenXML crashean con ArgumentException.
+            using (FileStream flujoArchivo = new FileStream(rutaArchivo, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+            using (StreamReader lectorFlujo = new StreamReader(flujoArchivo))
             {
-                string? line;
-                while ((line = reader.ReadLine()) != null)
-                {
-                    yield return line;
-                }
+                string? lineaTexto;
+                while ((lineaTexto = lectorFlujo.ReadLine()) != null)
+                    yield return SanitizarTextoXml(lineaTexto);
             }
         }
     }

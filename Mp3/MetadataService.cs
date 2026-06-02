@@ -1,19 +1,21 @@
 using System;
-using System.IO;
 using System.Drawing;
+using System.IO;
 
 namespace ExploradorArchivos.Mp3;
 
 /// <summary>
 /// Servicio para editar y persistir metadatos directamente en archivos de audio.
-/// Usa TagLibSharp para escribir los cambios en el archivo físico.
+/// Utiliza la biblioteca TagLib para realizar la escritura física de las etiquetas de audio.
 /// </summary>
 public static class MetadataService
 {
     /// <summary>
     /// Guarda los cambios de metadatos en el archivo de audio.
-    /// Persiste Título, Artista, Álbum, Año y Foto de Portada.
+    /// Persiste Título, Artista, Álbum, Año, Letra e Imagen de Portada.
     /// </summary>
+    /// <param name="cancion">El objeto de tipo Cancion cuyos metadatos se van a persistir.</param>
+    /// <returns>True si los metadatos se guardaron correctamente; de lo contrario, False.</returns>
     public static bool GuardarCambios(Cancion cancion)
     {
         try
@@ -25,23 +27,24 @@ public static class MetadataService
             archivo.Tag.Album = cancion.Album;
             archivo.Tag.Year = cancion.Anio;
 
-            // Guardar letra si existe
             if (!string.IsNullOrEmpty(cancion.Letra))
+            {
                 archivo.Tag.Lyrics = cancion.Letra;
+            }
 
-            // Guardar portada si existe
             if (cancion.Portada != null)
             {
-                using (var ms = new MemoryStream())
+                using var ms = new MemoryStream();
+                // Convierte la imagen al formato estándar JPEG para incrustarla en el archivo de audio
+                cancion.Portada.Save(ms, System.Drawing.Imaging.ImageFormat.Jpeg);
+                
+                var pic = new TagLib.Picture(new TagLib.ByteVector(ms.ToArray()))
                 {
-                    cancion.Portada.Save(ms, System.Drawing.Imaging.ImageFormat.Jpeg);
-                    var pic = new TagLib.Picture(new TagLib.ByteVector(ms.ToArray()))
-                    {
-                        Type = TagLib.PictureType.FrontCover,
-                        MimeType = "image/jpeg"
-                    };
-                    archivo.Tag.Pictures = new TagLib.IPicture[] { pic };
-                }
+                    Type = TagLib.PictureType.FrontCover,
+                    MimeType = "image/jpeg"
+                };
+                
+                archivo.Tag.Pictures = new TagLib.IPicture[] { pic };
             }
             else
             {
@@ -51,7 +54,7 @@ public static class MetadataService
             archivo.Save();
             return true;
         }
-        catch (Exception)
+        catch
         {
             return false;
         }

@@ -374,30 +374,37 @@ partial class MainForm
         tblHeader.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
         tblHeader.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
 
-        var pnlTitles = new Panel { Dock = DockStyle.Fill, BackColor = Color.Transparent };
+        var pnlTitles = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            BackColor = Color.Transparent,
+            FlowDirection = FlowDirection.TopDown,
+            WrapContents = false,
+            Padding = new Padding(0, 12, 0, 0)
+        };
         var lblDataset = new Label
         {
             Text = "DATA FUSION",
-            Location = new Point(0, 16),
             AutoSize = true,
             ForeColor = clrTextDim,
-            Font = new Font("Segoe UI", 14f, FontStyle.Bold)
+            Font = new Font("Segoe UI", 14f, FontStyle.Bold),
+            Margin = new Padding(0, 0, 0, 0)
         };
         var lblPrincipal = new Label
         {
             Text = "Panel de Control",
-            Location = new Point(-4, 42),
             AutoSize = true,
             ForeColor = clrAcento,
-            Font = new Font("Segoe UI", 36f, FontStyle.Bold)
+            Font = new Font("Segoe UI", 24f, FontStyle.Bold),
+            Margin = new Padding(-4, 0, 0, 0)
         };
         lblSubtext = new Label
         {
             Text = "Gestiona, exporta y analiza tus datos unificados",
-            Location = new Point(4, 108),
             AutoSize = true,
             ForeColor = clrText,
-            Font = new Font("Segoe UI", 11f)
+            Font = new Font("Segoe UI", 11f),
+            Margin = new Padding(4, 0, 0, 0)
         };
         pnlTitles.Controls.AddRange(new Control[] { lblDataset, lblPrincipal, lblSubtext });
 
@@ -429,12 +436,12 @@ partial class MainForm
             BackColor = Color.Transparent
         };
 
-        btnHdrEmail = HdrBtn("📧 Enviar", clrAcento, Color.White, BtnEnviarCorreo_Click!);
+        btnHdrEmail = HdrBtn("Enviar", clrAcento, Color.White, BtnEnviarCorreo_Click!);
         btnHdrExpCsv = HdrBtn("CSV", clrSurface2, clrTextDim, BtnExportarCsv_Click!);
         btnHdrExpJson = HdrBtn("JSON", clrSurface2, clrTextDim, BtnExportarJson_Click!);
         btnHdrExpXml = HdrBtn("XML", clrSurface2, clrTextDim, BtnExportarXml_Click!);
         btnHdrExpTxt = HdrBtn("TXT", clrSurface2, clrTextDim, BtnExportarTxt_Click!);
-        btnHdrLimpiar = HdrBtn("🧹 Limpiar", Color.White, clrRose, MenuLimpiarDatos_Click!);
+        btnHdrLimpiar = HdrBtn("Limpiar", Color.White, clrRose, MenuLimpiarDatos_Click!);
         btnHdrLimpiar.FlatAppearance.BorderSize = 1;
         btnHdrLimpiar.FlatAppearance.BorderColor = clrRose;
 
@@ -458,8 +465,8 @@ partial class MainForm
             SizeMode = TabSizeMode.Fixed
         };
 
-        tabTodos = new TabPage("📊 DataSet") { BackColor = clrBg, UseVisualStyleBackColor = false };
-        tabGraficas = new TabPage("📈 Gráfico") { BackColor = clrBg, UseVisualStyleBackColor = false };
+        tabTodos = new TabPage("DataSet") { BackColor = clrBg, UseVisualStyleBackColor = false };
+        tabGraficas = new TabPage("Gráfico") { BackColor = clrBg, UseVisualStyleBackColor = false };
 
 
         tabControl1.TabPages.AddRange(new[]

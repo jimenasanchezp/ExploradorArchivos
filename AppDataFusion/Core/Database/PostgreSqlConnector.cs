@@ -3,6 +3,11 @@ using ExploradorArchivos.AppDataFusion.Models;
 
 namespace ExploradorArchivos.AppDataFusion.Database;
 
+/// <summary>
+/// Conector para base de datos PostgreSQL.
+/// Se encarga de abrir conexiones, recuperar la metadata de columnas,
+/// buscar claves primarias y mapear filas a objetos DataItem.
+/// </summary>
 public class PostgreSqlConnector
 {
     public string CadenaConexion { get; set; } = "";
@@ -10,8 +15,7 @@ public class PostgreSqlConnector
     public int LimiteFilas { get; set; } = 0;
 
     public List<string> UltimasColumnas { get; private set; } = new();
-    public Dictionary<string, string> MapeoColumnas { get; private set; } =
-        new(StringComparer.OrdinalIgnoreCase);
+    public Dictionary<string, string> MapeoColumnas { get; private set; } = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
     /// Nombre real de la columna PRIMARY KEY en la tabla de la BD.
@@ -23,12 +27,16 @@ public class PostgreSqlConnector
 
     public PostgreSqlConnector() { }
     public PostgreSqlConnector(string cadenaConexion, string tabla)
-    { CadenaConexion = cadenaConexion; Tabla = tabla; }
+    { 
+        CadenaConexion = cadenaConexion; 
+        Tabla = tabla; 
+    }
 
-    // ── Paso 1: obtener nombres de columna (sin leer filas) ──────────
     /// <summary>
-    /// Ejecuta una consulta ligera (LIMIT 0) en PostgreSQL para extraer la metadata
-    /// estructural de la tabla y listar todas sus columnas disponibles.
+    /// Método: ObtenerNombresColumnas
+    /// - Inicializa: NpgsqlConnection y NpgsqlCommand.
+    /// - Objetos: NpgsqlDataReader (lector de esquema).
+    /// - Operación: Ejecuta SELECT con LIMIT 0 para recuperar rápidamente las columnas de la tabla y detecta la clave primaria.
     /// </summary>
     public List<string> ObtenerNombresColumnas()
     {
@@ -37,66 +45,62 @@ public class PostgreSqlConnector
         {
             using var conn = new NpgsqlConnection(CadenaConexion);
             conn.Open();
+            
             using var cmd = new NpgsqlCommand($"SELECT * FROM {Tabla} LIMIT 0", conn);
             using var r = cmd.ExecuteReader();
+            
             for (int i = 0; i < r.FieldCount; i++) cols.Add(r.GetName(i));
-            r.Close();
-            // Detectar clave primaria real desde information_schema
+            
             ColPrimaryKey = ObtenerPrimaryKeyColumna(conn);
         }
         catch (Exception ex)
-        { Console.WriteLine($"[PostgreSQL] ObtenerNombresColumnas: {ex.Message}"); }
+        {
+            Console.WriteLine($"[PostgreSQL] ObtenerNombresColumnas: {ex.Message}");
+        }
 
-        UltimasColumnas = new List<string>(cols);
+        UltimasColumnas = [..cols];
         ActualizarMapeoAutomatico(cols);
         _mapeoConfirmadoPorUsuario = false;
         return cols;
     }
 
-    /// <summary>Detecta la PRIMARY KEY real desde information_schema, con fallback a índice único y primera columna.</summary>
+    /// <summary>
+    /// Método: ObtenerPrimaryKeyColumna
+    /// - Inicializa: NpgsqlCommand.
+    /// - Operación: Consulta information_schema buscando constraints PRIMARY KEY o UNIQUE; retorna la primera columna de la tabla como fallback.
+    /// </summary>
     private string? ObtenerPrimaryKeyColumna(NpgsqlConnection conn)
     {
         try
         {
-            // Intento 1: PRIMARY KEY desde information_schema
-            string sql = @"SELECT kcu.column_name
-                FROM information_schema.table_constraints tc
-                JOIN information_schema.key_column_usage kcu
-                    ON tc.constraint_name = kcu.constraint_name
-                    AND tc.table_schema   = kcu.table_schema
-                WHERE tc.constraint_type = 'PRIMARY KEY'
-                  AND tc.table_name = @tabla
-                ORDER BY kcu.ordinal_position
-                LIMIT 1";
-            using var cmd = new NpgsqlCommand(sql, conn);
-            cmd.Parameters.AddWithValue("@tabla", Tabla.ToLowerInvariant());
-            var result = cmd.ExecuteScalar()?.ToString();
-            if (!string.IsNullOrEmpty(result))
+            string? GetColumn(string constraintType)
             {
-                Console.WriteLine($"[PostgreSQL] PK detectada (PRIMARY KEY): '{result}'");
-                return result;
+                string sql = $@"SELECT kcu.column_name
+                    FROM information_schema.table_constraints tc
+                    JOIN information_schema.key_column_usage kcu
+                        ON tc.constraint_name = kcu.constraint_name
+                        AND tc.table_schema   = kcu.table_schema
+                    WHERE tc.constraint_type = '{constraintType}'
+                      AND tc.table_name = @tabla
+                    ORDER BY kcu.ordinal_position
+                    LIMIT 1";
+                using var cmd = new NpgsqlCommand(sql, conn);
+                cmd.Parameters.AddWithValue("@tabla", Tabla.ToLowerInvariant());
+                return cmd.ExecuteScalar()?.ToString();
             }
 
-            // Intento 2: Índice UNIQUE
-            string sqlUnique = @"SELECT kcu.column_name
-                FROM information_schema.table_constraints tc
-                JOIN information_schema.key_column_usage kcu
-                    ON tc.constraint_name = kcu.constraint_name
-                    AND tc.table_schema   = kcu.table_schema
-                WHERE tc.constraint_type = 'UNIQUE'
-                  AND tc.table_name = @tabla2
-                ORDER BY kcu.ordinal_position
-                LIMIT 1";
-            using var cmd2 = new NpgsqlCommand(sqlUnique, conn);
-            cmd2.Parameters.AddWithValue("@tabla2", Tabla.ToLowerInvariant());
-            var result2 = cmd2.ExecuteScalar()?.ToString();
-            if (!string.IsNullOrEmpty(result2))
+            if (GetColumn("PRIMARY KEY") is { } pk && !string.IsNullOrEmpty(pk))
             {
-                Console.WriteLine($"[PostgreSQL] PK detectada (UNIQUE): '{result2}'");
-                return result2;
+                Console.WriteLine($"[PostgreSQL] PK detectada (PRIMARY KEY): '{pk}'");
+                return pk;
             }
 
-            // Intento 3: primera columna de la tabla
+            if (GetColumn("UNIQUE") is { } uq && !string.IsNullOrEmpty(uq))
+            {
+                Console.WriteLine($"[PostgreSQL] PK detectada (UNIQUE): '{uq}'");
+                return uq;
+            }
+
             if (UltimasColumnas.Count > 0)
             {
                 string firstCol = UltimasColumnas[0];
@@ -118,17 +122,15 @@ public class PostgreSqlConnector
         }
     }
 
-    // ── Paso 2: el usuario confirma el mapeo ─────────────────────
     /// <summary>
-    /// Permite al usuario sobreescribir la inferencia automática asignando manualmente 
-    /// los nombres de columnas a los roles principales de DataItem (id, categoría, valor, etc.).
+    /// Método: SobreescribirMapeo
+    /// - Operación: Mapea manualmente las columnas proporcionadas por el usuario a los campos estándar de DataItem.
     /// </summary>
     public void SobreescribirMapeo(
         string colId,
         string colCategoria, string colValor,
         string colNombre, string colFecha)
     {
-        // Si no se proporcionó un ID, intentar buscar uno automáticamente
         if (string.IsNullOrWhiteSpace(colId))
         {
             var aliases = new[] { "id", "_id", "codigo", "code", "num", "numero", "idx", "index", "rank", "no", "student_id", "car_id", "usedcarskuid", "sku_id", "sku" };
@@ -142,9 +144,6 @@ public class PostgreSqlConnector
         MapeoColumnas.Clear();
         if (!string.IsNullOrWhiteSpace(colId)) MapeoColumnas[colId] = "id";
 
-        // Evitar sobrescritura accidental cuando el usuario selecciona
-        // la misma columna para más de un rol (ej. categoría y nombre).
-        // El primer rol que llegue conserva prioridad.
         void Asignar(string? columna, string rol)
         {
             if (string.IsNullOrWhiteSpace(columna)) return;
@@ -159,10 +158,11 @@ public class PostgreSqlConnector
         _mapeoConfirmadoPorUsuario = true;
     }
 
-    // ── Paso 3: leer datos usando el mapeo vigente ───────────────
     /// <summary>
-    /// Conecta con PostgreSQL, lee todos los registros de la tabla y los transforma
-    /// dinámicamente en objetos <see cref="DataItem"/> aplicando el mapeo de columnas vigente.
+    /// Método: LeerDatos
+    /// - Inicializa: NpgsqlConnection y NpgsqlCommand.
+    /// - Objetos: NpgsqlDataReader (lector de registros).
+    /// - Operación: Obtiene los registros de PostgreSQL, valida que la tabla exista, mapea dinámicamente cada columna al DataItem y enriquece valores faltantes.
     /// </summary>
     public List<DataItem> LeerDatos()
     {
@@ -173,7 +173,6 @@ public class PostgreSqlConnector
             conn.Open();
             Console.WriteLine($"[PostgreSQL] ✓  Conectado a {conn.Database}");
 
-            // Verificar que la tabla existe
             var colsInfo = ObtenerColumnasInfo(conn, Tabla);
             if (colsInfo.Count == 0)
             {
@@ -181,7 +180,6 @@ public class PostgreSqlConnector
                 return lista;
             }
 
-            // Detectar PRIMARY KEY real antes de leer datos
             ColPrimaryKey = ObtenerPrimaryKeyColumna(conn);
 
             string sql = LimiteFilas > 0
@@ -196,11 +194,9 @@ public class PostgreSqlConnector
             for (int i = 0; i < reader.FieldCount; i++) mapa[reader.GetName(i)] = i;
             UltimasColumnas = mapa.Keys.ToList();
 
-            // SOLO aplicar auto-mapeo si el usuario NO confirmó manualmente
             if (!_mapeoConfirmadoPorUsuario)
                 ActualizarMapeoAutomatico(mapa.Keys);
 
-            // Si la PK fue detectada y no está en MapeoColumnas como "id", agregarla
             if (!string.IsNullOrEmpty(ColPrimaryKey) &&
                 !MapeoColumnas.ContainsKey(ColPrimaryKey))
             {
@@ -232,8 +228,6 @@ public class PostgreSqlConnector
 
                 item.Id = parsedOk ? idV : contador;
 
-                // IMPORTANTE: Siempre guardar el valor del identificador en CamposExtra
-                // aunque la columna esté mapeada a otro rol
                 if (colId != null)
                 {
                     if (string.IsNullOrEmpty(rawIdVal) && mapa.TryGetValue(colId, out int iId2) && !reader.IsDBNull(iId2))
@@ -262,6 +256,7 @@ public class PostgreSqlConnector
             }
             Console.WriteLine($"[PostgreSQL] ✓  {lista.Count} registros leídos. " +
                 $"Cat={colCat ?? "—"} Val={colVal ?? "—"} Nom={colNom ?? "—"}");
+            
             EnriquecerCamposFaltantes(lista, colCat, colVal, colNom);
         }
         catch (Exception ex) { Console.WriteLine($"[PostgreSQL] ✗  Error: {ex.Message}"); }
@@ -269,7 +264,9 @@ public class PostgreSqlConnector
     }
 
     /// <summary>
-    /// Valida rápidamente la conexión a la base de datos realizando un conteo total de filas (COUNT).
+    /// Método: ProbarConexion
+    /// - Inicializa: NpgsqlConnection y NpgsqlCommand.
+    /// - Operación: Ejecuta una consulta COUNT para validar la conexión y reportar el total de registros en la tabla.
     /// </summary>
     public bool ProbarConexion(out string mensaje)
     {
@@ -286,8 +283,9 @@ public class PostgreSqlConnector
     }
 
     /// <summary>
-    /// Consulta el diccionario de datos interno de PostgreSQL (information_schema)
-    /// para comprobar la existencia real de las columnas antes de operar.
+    /// Método: ObtenerColumnasInfo
+    /// - Inicializa: NpgsqlCommand.
+    /// - Operación: Consulta information_schema.columns para validar que las columnas existan en la tabla física.
     /// </summary>
     private List<string> ObtenerColumnasInfo(NpgsqlConnection conn, string tabla)
     {
@@ -305,28 +303,22 @@ public class PostgreSqlConnector
     }
 
     /// <summary>
-    /// Asigna roles (nombre, categoría, valor, fecha) buscando coincidencias semánticas
-    /// predefinidas en los nombres de las columnas usando expresiones regulares básicas.
+    /// Método: ActualizarMapeoAutomatico
+    /// - Operación: Mapea semánticamente columnas de base de datos a los roles estándar comparándolas con arreglos de alias.
     /// </summary>
     private void ActualizarMapeoAutomatico(IEnumerable<string>? cols = null)
     {
         var src = (cols ?? UltimasColumnas).ToList();
         MapeoColumnas.Clear();
 
-        string? Find(params string[] alias)
-        {
-            foreach (var a in alias)
-                foreach (var c in src)
-                    if (string.Equals(c, a, StringComparison.OrdinalIgnoreCase)) return c;
-            return null;
-        }
+        string? Find(params string[] aliases) =>
+            aliases.FirstOrDefault(alias => src.Any(col => string.Equals(col, alias, StringComparison.OrdinalIgnoreCase)));
 
-        string? c;
-        c = Find("id", "_id", "codigo", "code", "num", "numero", "idx", "index", "rank", "no", "student_id", "car_id", "usedcarskuid", "sku_id", "sku"); if (c != null) MapeoColumnas[c] = "id";
-        c = Find("nombre", "name", "titulo", "title", "pais", "country", "jugador", "player", "empleado", "employee", "producto", "item", "micrositio", "descripcion", "description", "persona", "person", "autor", "author", "atleta", "athlete", "brand", "marca", "model", "modelo"); if (c != null) MapeoColumnas[c] = "nombre";
-        c = Find("categoria", "category", "genero", "genre", "gender", "sexo", "sex", "region", "tipo", "type", "departamento", "department", "level", "nivel", "segmento", "segment", "grupo", "group_name", "group", "clasificacion", "clase", "class", "division"); if (c != null) MapeoColumnas[c] = "categoria";
-        c = Find("valor", "value", "precio", "price", "ventas_global", "ventas", "sales", "score", "puntos", "salario", "puntaje", "total", "monto", "amount", "importe", "cost", "costo", "revenue", "ingreso", "metrica", "Numero_de_notas_transmitidas", "salary", "points", "frec", "frecuencia", "frequency", "count", "cantidad", "edad_media", "edad", "age", "promedio", "avg"); if (c != null) MapeoColumnas[c] = "valor";
-        c = Find("fecha", "date", "fecha_lanzamiento", "anio", "year", "created_at", "updated_at", "timestamp", "fecha_registro", "fecha_reporte", "periodo", "fechaContratacion", "hireDate", "period"); if (c != null) MapeoColumnas[c] = "fecha";
+        if (Find("id", "_id", "codigo", "code", "num", "numero", "idx", "index", "rank", "no", "student_id", "car_id", "usedcarskuid", "sku_id", "sku") is { } cId) MapeoColumnas[cId] = "id";
+        if (Find("nombre", "name", "titulo", "title", "pais", "country", "jugador", "player", "empleado", "employee", "producto", "item", "micrositio", "descripcion", "description", "persona", "person", "autor", "author", "atleta", "athlete", "brand", "marca", "model", "modelo") is { } cNom) MapeoColumnas[cNom] = "nombre";
+        if (Find("categoria", "category", "genero", "genre", "gender", "sexo", "sex", "region", "tipo", "type", "departamento", "department", "level", "nivel", "segmento", "segment", "grupo", "group_name", "group", "clasificacion", "clase", "class", "division") is { } cCat) MapeoColumnas[cCat] = "categoria";
+        if (Find("valor", "value", "precio", "price", "ventas_global", "ventas", "sales", "score", "puntos", "salario", "puntaje", "total", "monto", "amount", "importe", "cost", "costo", "revenue", "ingreso", "metrica", "Numero_de_notas_transmitidas", "salary", "points", "frec", "frecuencia", "frequency", "count", "cantidad", "edad_media", "edad", "age", "promedio", "avg") is { } cVal) MapeoColumnas[cVal] = "valor";
+        if (Find("fecha", "date", "fecha_lanzamiento", "anio", "year", "created_at", "updated_at", "timestamp", "fecha_registro", "fecha_reporte", "periodo", "fechaContratacion", "hireDate", "period") is { } cFec) MapeoColumnas[cFec] = "fecha";
     }
 
     private static string? LeerStr(NpgsqlDataReader r, Dictionary<string, int> m, string? col)
@@ -351,18 +343,14 @@ public class PostgreSqlConnector
     }
 
     /// <summary>
-    /// Si el auto-mapeo falló o el usuario no seleccionó columnas, intenta inferir
-    /// los datos principales analizando los tipos y frecuencias de los valores reales almacenados.
+    /// Método: EnriquecerCamposFaltantes
+    /// - Operación: Autodetecta campos vacíos en el DataItem analizando las columnas de CamposExtra mediante heurísticas.
     /// </summary>
     private static void EnriquecerCamposFaltantes(
         List<DataItem> items, string? colCategoria, string? colValor, string? colNombre)
     {
         if (items.Count == 0) return;
 
-        // IMPORTANTE:
-        // Si el usuario seleccionó una columna manualmente en el diálogo,
-        // respetamos esa decisión y NO sobreescribimos con heurísticas.
-        // Solo inferimos cuando el mapeo quedó en "(ninguna)".
         bool faltaCategoria = string.IsNullOrWhiteSpace(colCategoria);
         bool faltaValor = string.IsNullOrWhiteSpace(colValor);
         bool faltaNombre = string.IsNullOrWhiteSpace(colNombre);
@@ -394,15 +382,15 @@ public class PostgreSqlConnector
     }
 
     /// <summary>
-    /// Heurística: Identifica qué columna extra dinámica podría actuar como una Categoría,
-    /// buscando columnas con un número moderado de textos repetitivos.
+    /// Método: BuscarMejorClaveCategoria
+    /// - Operación: Califica dinámicamente cada columna de CamposExtra buscando textos repetitivos idóneos para Categoría.
     /// </summary>
     private static string? BuscarMejorClaveCategoria(List<DataItem> items)
     {
         var candidatos = items.SelectMany(i => i.CamposExtra.Keys)
             .Distinct(StringComparer.OrdinalIgnoreCase);
 
-        string? mejor = null;
+        string? mejor = null; // variable para almacenar la mejor clave encontrada
         int mejorPuntaje = 0;
 
         foreach (var key in candidatos)
@@ -430,8 +418,8 @@ public class PostgreSqlConnector
     }
 
     /// <summary>
-    /// Heurística: Encuentra la columna adicional que albergue de forma más consistente datos 
-    /// que puedan interpretarse como números flotantes, usándola como el Valor principal.
+    /// Método: BuscarMejorClaveNumerica
+    /// - Operación: Encuentra la columna adicional que albergue la mayor cantidad de valores que se puedan convertir a números double.
     /// </summary>
     private static string? BuscarMejorClaveNumerica(List<DataItem> items)
     {
@@ -457,8 +445,8 @@ public class PostgreSqlConnector
     }
 
     /// <summary>
-    /// Heurística: Selecciona una columna de texto razonable para fungir como el Nombre del registro,
-    /// evitando elegir la columna que ya se usa para clasificar (Categoría).
+    /// Método: BuscarMejorClaveTexto
+    /// - Operación: Selecciona una columna de texto razonable para fungir como el Nombre del registro, evitando la de Categoría.
     /// </summary>
     private static string? BuscarMejorClaveTexto(List<DataItem> items, string? evitar)
     {
@@ -486,4 +474,3 @@ public class PostgreSqlConnector
         return mejor;
     }
 }
-

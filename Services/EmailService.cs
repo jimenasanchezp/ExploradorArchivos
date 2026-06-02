@@ -6,6 +6,9 @@ using System.Windows.Forms;
 
 namespace ExploradorArchivos.Services;
 
+/// <summary>
+/// Provee servicios para enviar correos electrónicos utilizando MAPI nativo o clientes de correo del sistema.
+/// </summary>
 public static class EmailService
 {
     // === IMPORTACIÓN DE MAPI32.DLL PARA ENVÍO DE CORREO CON ADJUNTOS ===
@@ -45,21 +48,25 @@ public static class EmailService
 
     /// <summary>
     /// Envía un archivo por correo utilizando el cliente predeterminado del sistema (MAPI).
-    /// Si falla (ej. no hay cliente MAPI configurado), hace fallback a una URI mailto:.
+    /// Si falla (ej. no hay cliente MAPI configurado), hace fallback a Outlook, Thunderbird o una URI mailto:.
     /// </summary>
+    /// <param name="hwndOwner">Identificador de la ventana propietaria para mostrar los diálogos.</param>
+    /// <param name="rutaArchivo">Ruta absoluta del archivo que se desea adjuntar.</param>
     public static void EnviarCorreoConAdjunto(IntPtr hwndOwner, string rutaArchivo)
     {
+        // Operación: Validar la existencia del archivo
         if (string.IsNullOrEmpty(rutaArchivo) || !File.Exists(rutaArchivo))
         {
             MessageBox.Show("El archivo seleccionado no es válido o no existe.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             return;
         }
 
-        IntPtr filePtr = IntPtr.Zero;
+        // Declaración: Reservar memoria para el puntero de archivo
+        IntPtr punteroArchivoMapi = IntPtr.Zero;
         try
         {
-            // Configurar la descripción del archivo adjunto
-            var fileDesc = new MapiFileDesc
+            // Inicialización: Estructura de descripción de archivo MAPI
+            MapiFileDesc descripcionArchivo = new MapiFileDesc
             {
                 reserved = 0,
                 flags = 0,
@@ -68,31 +75,31 @@ public static class EmailService
                 name = Path.GetFileName(rutaArchivo)
             };
 
-            // Reservar memoria no administrada para la estructura del archivo
-            filePtr = Marshal.AllocHGlobal(Marshal.SizeOf(fileDesc));
-            Marshal.StructureToPtr(fileDesc, filePtr, false);
+            // Operación: Reservar memoria no administrada y mapear la estructura a ella
+            punteroArchivoMapi = Marshal.AllocHGlobal(Marshal.SizeOf(descripcionArchivo));
+            Marshal.StructureToPtr(descripcionArchivo, punteroArchivoMapi, false);
 
-            // Configurar el mensaje
-            var message = new MapiMessage
+            // Inicialización: Estructura del mensaje MAPI
+            MapiMessage mensajeMapi = new MapiMessage
             {
                 subject = $"Archivo compartido: {Path.GetFileName(rutaArchivo)}",
                 noteText = "Hola, te comparto el archivo adjunto enviado desde el Explorador de Archivos.",
                 fileCount = 1,
-                files = filePtr
+                files = punteroArchivoMapi
             };
 
-            // Enviar mensaje abriendo la interfaz de diálogo del cliente de correo
-            int error = MAPISendMail(IntPtr.Zero, hwndOwner, message, MAPI_LOGON_UI | MAPI_DIALOG, 0);
+            // Operación: Enviar correo utilizando la API nativa de Windows MAPI
+            int codigoError = MAPISendMail(IntPtr.Zero, hwndOwner, mensajeMapi, MAPI_LOGON_UI | MAPI_DIALOG, 0);
 
-            // Códigos de error de MAPI (0 = Éxito, 1 = Cancelado por usuario)
-            if (error > 1)
+            // Operación: Validar si la API reportó algún código de error (0: éxito, 1: cancelado por usuario)
+            if (codigoError > 1)
             {
-                throw new Exception($"Código de error MAPI: {error}");
+                throw new Exception($"Código de error MAPI: {codigoError}");
             }
         }
         catch (Exception)
         {
-            // Fallback 1: Intentar lanzar Outlook directamente (soporta adjuntos vía línea de comandos)
+            // Fallback 1: Intentar iniciar Outlook directamente pasando la ruta del archivo adjunto
             try
             {
                 Process.Start(new ProcessStartInfo
@@ -103,9 +110,9 @@ public static class EmailService
                 });
                 return;
             }
-            catch { /* Ignorar si Outlook no está instalado o falla */ }
+            catch { /* Ignorar si falla */ }
 
-            // Fallback 2: Intentar lanzar Thunderbird directamente (soporta adjuntos vía línea de comandos)
+            // Fallback 2: Intentar lanzar Thunderbird directamente pasando la ruta del archivo adjunto
             try
             {
                 Process.Start(new ProcessStartInfo
@@ -116,18 +123,20 @@ public static class EmailService
                 });
                 return;
             }
-            catch { /* Ignorar si Thunderbird no está instalado o falla */ }
+            catch { /* Ignorar si falla */ }
 
-            // Fallback 3: Esquema mailto: normal (abre cualquier cliente, pero el usuario debe adjuntar el archivo manualmente)
+            // Fallback 3: Lanzar una URI mailto: como última alternativa
             try
             {
-                string subject = Uri.EscapeDataString($"Compartir archivo: {Path.GetFileName(rutaArchivo)}");
-                string body = Uri.EscapeDataString($"Te comparto la ruta del archivo: {rutaArchivo}\n\n(Adjunta el archivo manualmente si el cliente de correo no lo ha enlazado automáticamente).");
-                string mailtoUri = $"mailto:?subject={subject}&body={body}";
+                // Inicialización y Declaración: Prepara asunto y cuerpo codificados para la URL
+                string asuntoMail = Uri.EscapeDataString($"Compartir archivo: {Path.GetFileName(rutaArchivo)}");
+                string cuerpoMail = Uri.EscapeDataString($"Te comparto la ruta del archivo: {rutaArchivo}\n\n(Adjunta el archivo manualmente si el cliente de correo no lo ha enlazado automáticamente).");
+                string uriMailto = $"mailto:?subject={asuntoMail}&body={cuerpoMail}";
                 
+                // Operación: Lanzar el proceso de correo predeterminado del sistema operativo
                 Process.Start(new ProcessStartInfo
                 {
-                    FileName = mailtoUri,
+                    FileName = uriMailto,
                     UseShellExecute = true
                 });
             }
@@ -138,10 +147,10 @@ public static class EmailService
         }
         finally
         {
-            // Liberar memoria no administrada
-            if (filePtr != IntPtr.Zero)
+            // Operación: Liberar explícitamente la memoria no administrada para evitar fugas de memoria
+            if (punteroArchivoMapi != IntPtr.Zero)
             {
-                Marshal.FreeHGlobal(filePtr);
+                Marshal.FreeHGlobal(punteroArchivoMapi);
             }
         }
     }

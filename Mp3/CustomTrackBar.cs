@@ -6,18 +6,15 @@ using System.Windows.Forms;
 namespace ExploradorArchivos.Mp3;
 
 /// <summary>
-/// Control de barra de progreso 100% OwnerDraw.
-/// Dibuja un raíl delgado y un pulgar circular que reacciona a los eventos del mouse.
+/// Control de barra de progreso 100% dibujado a mano (OwnerDraw).
+/// Dibuja un riel delgado y un pulgar circular que reacciona a los eventos del ratón.
 /// </summary>
 public class CustomTrackBar : Control
 {
     // === Diseño ===
-    // Apple‑style colors
-    private readonly Color _trackBackground = Color.FromArgb(44, 44, 46); // dark rail
-    private readonly Color _progressColor = ColorTranslator.FromHtml("#FA2D48"); // Apple red
-    // Thumb will be white when hovering
-
-    private const int TRACK_HEIGHT = 2; // Ultra‑thin rail
+    private readonly Color _trackBackground = Color.FromArgb(44, 44, 46); // Gris oscuro estilo Apple
+    private readonly Color _progressColor = ColorTranslator.FromHtml("#FA2D48"); // Rojo estilo Apple Music
+    private const int TRACK_HEIGHT = 2;
     private const int THUMB_RADIUS = 7;
 
     // === Estado ===
@@ -27,10 +24,10 @@ public class CustomTrackBar : Control
 
     // === Eventos ===
     public event Action<double>? ValueChanged;
-    public event Action<double>? ValueChangedByUser;
+    public event Action<double>? ValueChangedByUser; // Disparado únicamente al interactuar con el mouse
 
     /// <summary>
-    /// Valor actual del trackbar (0.0 a 1.0).
+    /// Propiedad pública que encapsula el valor actual del progreso (rango: 0.0 a 1.0).
     /// </summary>
     public double Value
     {
@@ -38,6 +35,8 @@ public class CustomTrackBar : Control
         set
         {
             double newVal = Math.Clamp(value, 0.0, 1.0);
+
+            // Evitar redibujado redundante si la diferencia de valor es insignificante
             if (Math.Abs(newVal - _value) > 0.0001)
             {
                 _value = newVal;
@@ -47,8 +46,13 @@ public class CustomTrackBar : Control
         }
     }
 
+    /// <summary>
+    /// Constructor de la barra de progreso personalizada.
+    /// Configura los estilos de dibujo óptimos y establece dimensiones iniciales.
+    /// </summary>
     public CustomTrackBar()
     {
+        // Optimización del dibujado para evitar parpadeos
         SetStyle(ControlStyles.AllPaintingInWmPaint |
                  ControlStyles.UserPaint |
                  ControlStyles.OptimizedDoubleBuffer |
@@ -60,39 +64,47 @@ public class CustomTrackBar : Control
 
     /// <summary>
     /// Sobrescribe el renderizado por defecto para dibujar la barra de progreso utilizando GDI+.
-    /// Incluye suavizado (AntiAlias) y dibuja el raíl, el progreso y un pulgar dinámico en hover.
+    /// Incluye suavizado (AntiAlias) y dibuja el riel, el progreso y el pulgar dinámico.
     /// </summary>
+    /// <param name="e">Argumentos del evento Paint con el objeto Graphics asociado.</param>
     protected override void OnPaint(PaintEventArgs e)
     {
         var g = e.Graphics;
         g.SmoothingMode = SmoothingMode.AntiAlias;
 
+        // Margen para evitar que el pulgar circular se recorte al llegar a los extremos
         int margin = THUMB_RADIUS + 2;
         int trackWidth = this.Width - (margin * 2);
         int barTop = (Height - TRACK_HEIGHT) / 2;
         int progressWidth = (int)(_value * trackWidth);
 
-        // Rail (dark)
+        // 1. Dibujado del riel de fondo
         using var railBrush = new SolidBrush(_trackBackground);
         g.FillRectangle(railBrush, margin, barTop, trackWidth, TRACK_HEIGHT);
 
-        // Progress (Apple red)
+        // 2. Dibujado del riel de progreso activo
         if (progressWidth > 0)
         {
             using var progBrush = new SolidBrush(_progressColor);
             g.FillRectangle(progBrush, margin, barTop, progressWidth, TRACK_HEIGHT);
         }
 
-        // Thumb (white) only on hover
+        // 3. Dibujado del pulgar circular (sólo se visualiza con el puntero encima)
         if (_isHovering)
         {
             int thumbSize = 10;
-            Rectangle thumbRect = new Rectangle(margin + progressWidth - thumbSize/2, (Height - thumbSize)/2, thumbSize, thumbSize);
+            Rectangle thumbRect = new Rectangle(
+                margin + progressWidth - thumbSize / 2, 
+                (Height - thumbSize) / 2, 
+                thumbSize, 
+                thumbSize
+            );
+
             g.FillEllipse(Brushes.White, thumbRect);
         }
     }
 
-    // === Interacción ===
+    // === Interacción de Ratón ===
 
     protected override void OnMouseDown(MouseEventArgs e)
     {
@@ -107,7 +119,9 @@ public class CustomTrackBar : Control
     protected override void OnMouseMove(MouseEventArgs e)
     {
         if (_isDragging)
+        {
             UpdateValueFromMouse(e.X);
+        }
         base.OnMouseMove(e);
     }
 
@@ -132,37 +146,23 @@ public class CustomTrackBar : Control
     protected override void OnMouseLeave(EventArgs e)
     {
         _isHovering = false;
-        if (!_isDragging) Invalidate();
+        if (!_isDragging)
+        {
+            Invalidate();
+        }
         base.OnMouseLeave(e);
     }
 
     /// <summary>
-    /// Calcula el nuevo valor de progreso (0.0 a 1.0) basado en la posición en X del mouse
-    /// respecto a la anchura del control, respetando los márgenes.
+    /// Calcula e inicializa el nuevo valor de progreso proporcional de 0.0 a 1.0 basándose en la coordenada X del ratón.
     /// </summary>
-    /// <param name="mouseX">Posición X actual del puntero del ratón.</param>
+    /// <param name="mouseX">Posición X actual del puntero del ratón respecto al control.</param>
     private void UpdateValueFromMouse(int mouseX)
     {
         int margin = THUMB_RADIUS + 2;
         int trackWidth = this.Width - (margin * 2);
+
         double newValue = (double)(mouseX - margin) / trackWidth;
         Value = newValue;
-    }
-
-    // === Helper: Rectángulo redondeado ===
-    private static GraphicsPath CreateRoundedRect(RectangleF rect, float radius)
-    {
-        var path = new GraphicsPath();
-        float diameter = radius * 2;
-
-        if (rect.Width < diameter) rect.Width = diameter;
-        if (rect.Height < diameter) rect.Height = diameter;
-
-        path.AddArc(rect.X, rect.Y, diameter, diameter, 180, 90);
-        path.AddArc(rect.Right - diameter, rect.Y, diameter, diameter, 270, 90);
-        path.AddArc(rect.Right - diameter, rect.Bottom - diameter, diameter, diameter, 0, 90);
-        path.AddArc(rect.X, rect.Bottom - diameter, diameter, diameter, 90, 90);
-        path.CloseFigure();
-        return path;
     }
 }

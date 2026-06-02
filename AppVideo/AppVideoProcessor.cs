@@ -24,15 +24,13 @@ public static class AppVideoProcessor
     }
 
     /// <summary>
-    /// Recodifica el video aplicando un filtro de color de FFmpeg (ColorChannelMixer o Hue/Curves).
+    /// Recodifica el video aplicando el filtro de escala de grises (B&N) con FFmpeg.
     /// </summary>
     public static async Task<bool> AplicarFiltro(string input, string output, string filtro)
     {
         string videoFilter = filtro switch
         {
             "BN" => "colorchannelmixer=.3:.4:.3:0:.3:.4:.3:0:.3:.4:.3",
-            "Sepia" => "colorchannelmixer=.393:.769:.189:0:.349:.686:.168:0:.272:.534:.131",
-            "Soft" => "hue=s=0.8, curves=m='0/0.1 0.5/0.5 1/0.9'", // Algo similar a Soft/Estilizado
             _ => ""
         };
 
@@ -129,10 +127,13 @@ public static class AppVideoProcessor
                     metadata.Resolucion = $"{file.Properties.VideoWidth}x{file.Properties.VideoHeight}";
                 }
 
-                var codec = System.Linq.Enumerable.FirstOrDefault(file.Properties.Codecs, c => (c.MediaTypes & TagLib.MediaTypes.Video) != 0);
-                if (codec != null)
+                if (file.Properties.Codecs != null)
                 {
-                    metadata.Codec = codec.Description ?? "Desconocido";
+                    var codec = System.Linq.Enumerable.FirstOrDefault(file.Properties.Codecs, c => c != null && (c.MediaTypes & TagLib.MediaTypes.Video) != 0);
+                    if (codec != null)
+                    {
+                        metadata.Codec = codec.Description ?? "Desconocido";
+                    }
                 }
             }
         }

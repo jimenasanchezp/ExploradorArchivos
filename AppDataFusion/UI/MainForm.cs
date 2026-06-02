@@ -596,7 +596,7 @@ public partial class MainForm : Form
         await ActualizarTodoAsync();
         if (!silencioso)
             ActualizarEstadoBarra(
-                $"{nuevos.Count} registros cargados desde {Path.GetFileName(ruta)} â€” Total: {_datos.Count}");
+                $"{nuevos.Count} registros cargados desde {Path.GetFileName(ruta)} - Total: {_datos.Count}");
     }
 
 
@@ -710,7 +710,7 @@ public partial class MainForm : Form
                 $"Exportado correctamente\n\n" +
                 $"Formato:   {formato.ToUpper()}\n" +
                 $"Registros: {snapshot.Count:N0}\n" +
-                $"TamaÃ±o:    {size}\n\n" +
+                $"Tamaño:    {size}\n\n" +
                 $"{dlg.FileName}",
                 "Exportar", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
@@ -948,7 +948,7 @@ public partial class MainForm : Form
             (_lastPgConnector != null && _lastMdConnector == null) ? "postgresql" :
             (_lastMdConnector != null && _lastPgConnector == null) ? "mariadb" : "";
         await ActualizarTodoAsync();
-        ActualizarEstadoBarra($"Datos actualizados â€” Total: {_datos.Count}");
+        ActualizarEstadoBarra($"Datos actualizados - Total: {_datos.Count}");
     }
 
     // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
@@ -968,7 +968,7 @@ public partial class MainForm : Form
             ? new List<DataItem>(_datosBase)
             : await Task.Run(() => DataProcessor.Filtrar(_datosBase, clave, valor, true));
         await BindGridAsync(dgvTodos, _datosVista, lblContadorTodos);
-        ActualizarEstadoBarra($"Filtro '{display}' = '{valor}' â†’ {_datosVista.Count} resultados.");
+        ActualizarEstadoBarra($"Filtro '{display}' = '{valor}' -> {_datosVista.Count} resultados.");
     }
 
     /// <summary>
@@ -979,7 +979,7 @@ public partial class MainForm : Form
         txtBusqueda.Text = "";
         _datosVista = new List<DataItem>(_datosBase);
         await BindGridAsync(dgvTodos, _datosVista, lblContadorTodos);
-        ActualizarEstadoBarra($"Filtro limpiado â€” {_datosVista.Count} registros.");
+        ActualizarEstadoBarra($"Filtro limpiado - {_datosVista.Count} registros.");
     }
 
     /// <summary>
@@ -993,7 +993,7 @@ public partial class MainForm : Form
         ActualizarEstadoBarra("Ordenando con LINQ...");
         _datosVista = await Task.Run(() => DataProcessor.OrdenarLinq(_datosVista, clave, asc));
         await BindGridAsync(dgvTodos, _datosVista, lblContadorTodos);
-        ActualizarEstadoBarra($"LINQ: Ordenado por '{display}' {(asc ? "â†‘ Asc" : "â†“ Desc")} â€” {_datosVista.Count} registros.");
+        ActualizarEstadoBarra($"LINQ: Ordenado por '{display}' {(asc ? "Asc" : "Desc")} - {_datosVista.Count} registros.");
     }
 
     // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
@@ -1042,8 +1042,8 @@ public partial class MainForm : Form
     /// </summary>
     private async void BtnEliminarDuplicados_Click(object? sender, EventArgs e)
     {
-        if (MessageBox.Show("Â¿Eliminar duplicados? Esta acciÃ³n no se puede deshacer.",
-            "Confirmar eliminaciÃ³n", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes) return;
+        if (MessageBox.Show("¿Eliminar duplicados? Esta acción no se puede deshacer.",
+            "Confirmar eliminación", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes) return;
         int antes = _datos.Count;
         var limpia = await Task.Run(() => DataProcessor.EliminarDuplicados(_datos));
         _datos.Clear(); _datos.AddRange(limpia);
@@ -1085,7 +1085,7 @@ public partial class MainForm : Form
     /// </summary>
     private async void BtnLinqGroupBy_Click(object? sender, EventArgs e)
     {
-        ActualizarEstadoBarra("LINQ GroupBy (CategorÃ­a)...");
+        ActualizarEstadoBarra("LINQ GroupBy (Categoría)...");
         var res = await Task.Run(() => _datosBase.GroupBy(d => d.Categoria)
             .Select(g => new DataItem { 
                 Id = 0, 
@@ -1097,7 +1097,7 @@ public partial class MainForm : Form
             }).ToList());
             
         await BindGridAsync(dgvProcesamiento, res, null);
-        lblProcInfo.Text = $"LINQ .GroupBy(): {res.Count} grupos creados por CategorÃ­a.";
+        lblProcInfo.Text = $"LINQ .GroupBy(): {res.Count} grupos creados por Categoría.";
     }
 
     /// <summary>
@@ -1132,7 +1132,7 @@ public partial class MainForm : Form
     /// </summary>
     private async Task ActualizarTodoAsync()
     {
-        // El geocoding ahora solo se activa manualmente con el botÃ³n de la API para mayor velocidad de carga.
+        // El geocoding ahora solo se activa manualmente con el botón de la API para mayor velocidad de carga.
         // await GeocodingService.IdentificarCoordenadasAsync(_datos);
 
         _porCategoria = DataProcessor.AgruparPorCategoria(_datos);
@@ -1163,7 +1163,7 @@ public partial class MainForm : Form
     {
         int count = _datos.Count;
         int sources = _datos.Select(d => d.Fuente).Distinct().Count();
-        lblSubtext.Text = $"{count:N0} registros fusionados Â· {sources} fuente{(sources != 1 ? "s" : "")} activa{(sources != 1 ? "s" : "")}";
+        lblSubtext.Text = $"{count:N0} registros fusionados - {sources} fuente{(sources != 1 ? "s" : "")} activa{(sources != 1 ? "s" : "")}";
     }
 
     private List<DataItem> GetDatosBase()

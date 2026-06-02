@@ -1,346 +1,279 @@
-using System.Text.RegularExpressions;
-using System.Xml.Linq;
-using ExploradorArchivos.AppDataFusion.Models;
+using System;
+using System.IO;
+using System.Collections.Generic;
+using System.Linq; // Importa LINQ para realizar consultas sobre colecciones.
+using System.Xml.Linq; // Importa XDocument y XElement para manipular XML.
+using System.Text.RegularExpressions; // Importa soporte para expresiones regulares.
+using ExploradorArchivos.AppDataFusion.Models; // Importa el modelo DataItem.
 
 namespace ExploradorArchivos.AppDataFusion.Readers;
 
+/// <summary>
+/// Clase encargada de leer y procesar archivos de formato XML usando LINQ y mapeo semántico.
+/// </summary>
 public static class XmlDataReader
 {
-    public static List<string> UltimasColumnas { get; private set; } = new();
-    public static Dictionary<string, string> MapeoColumnas { get; private set; } =
-        new(StringComparer.OrdinalIgnoreCase);
+    // Almacena las columnas/nodos detectados en el último archivo XML analizado.
+    public static List<string> UltimasColumnas { get; private set; } = new List<string>();
 
-    private static readonly string[] _idAliases = {
-        "_id", "id", "Id", "ID", "codigo", "code", "num", "numero", "idx", "index", "rank", "no"
-    };
-    private static readonly string[] _nombreAliases = {
-        "micrositio", "nombre", "name", "titulo", "title", "descripcion", "description",
-        "jugador", "player", "empleado", "employee", "persona", "person",
-        "producto", "item", "autor", "author", "atleta", "athlete"
-    };
-    private static readonly string[] _categoriaAliases = {
-        "categoria", "category", "departamento", "department",
-        "genero", "gender", "sexo", "sex",
-        "tipo", "type", "clase", "class", "grupo", "group",
-        "region", "pais", "country", "nivel", "level",
-        "clasificacion", "division", "segmento", "segment"
-    };
-    private static readonly string[] _valorAliases = {
-        "Numero_de_notas_transmitidas",
-        "valor", "value", "salario", "salary", "precio", "price",
-        "score", "puntos", "points", "total", "monto", "amount",
-        "frec", "frecuencia", "frequency", "count", "cantidad",
-        "ventas", "sales", "edad_media", "edad", "age", "promedio", "avg"
-    };
-    private static readonly string[] _fechaAliases = {
-        "periodo", "fecha", "date", "fechaContratacion", "hireDate",
-        "anio", "year", "period",
-        "created_at", "updated_at", "timestamp", "fecha_registro"
-    };
+    // Guarda el mapeo de nombres de etiquetas XML a las propiedades estándar.
+    public static Dictionary<string, string> MapeoColumnas { get; private set; } = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
-    // Regex: captura tags cuyo nombre contiene espacios
-    // Ejemplo: <Numero de notas transmitidas> o </Numero de notas transmitidas>
-    private static readonly Regex _tagConEspacios = new(
-        @"<(/?)\s*([^>\s/""'=]+(?:\s+[^>=/\s""']+)+)\s*(/?)\s*>",
-        RegexOptions.Compiled);
+    // Listas de alias en minúsculas para asociar automáticamente las columnas a las propiedades del DataItem.
+    private static readonly string[] _idAliases = { "_id", "id", "Id", "ID", "codigo", "code", "num", "numero" };
+    private static readonly string[] _nombreAliases = { "nombre", "name", "titulo", "title", "descripcion", "description", "producto", "item" };
+    private static readonly string[] _categoriaAliases = { "categoria", "category", "departamento", "department", "tipo", "type", "grupo", "group" };
+    private static readonly string[] _valorAliases = { "valor", "value", "precio", "price", "total", "monto", "cantidad", "count", "Numero_de_notas_transmitidas" };
+    private static readonly string[] _fechaAliases = { "fecha", "date", "periodo", "period", "anio", "year", "timestamp" };
+
+    // Expresión regular para corregir nombres de etiquetas XML con espacios (ej. "<Numero de notas>" a "<Numero_de_notas>").
+    private static readonly Regex _tagConEspacios = new Regex(@"<(/?)\s*([^>\s/""'=]+(?:\s+[^>=/\s""']+)+)\s*(/?)\s*>", RegexOptions.Compiled);
 
     /// <summary>
-    /// Intenta parsear un documento XML complejo utilizando expresiones regulares
-    /// de pre-procesamiento para normalizar inconsistencias y leer la estructura iterativa.
+    /// Lee un archivo XML, procesa su contenido y devuelve una lista de objetos DataItem.
     /// </summary>
     public static List<DataItem> Leer(string rutaArchivo)
     {
+        // Instancia la lista que almacenará los registros resultantes.
         var lista = new List<DataItem>();
-        UltimasColumnas = new List<string>();
-        MapeoColumnas = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        // Limpia el historial de columnas detectadas anteriormente.
+        UltimasColumnas.Clear();
+        // Limpia el historial de mapeo de columnas anterior.
+        MapeoColumnas.Clear();
 
+        // Verifica si el archivo físico existe en la ruta proporcionada.
         if (!File.Exists(rutaArchivo))
         {
+            // Escribe en consola la advertencia del archivo no encontrado.
             Console.WriteLine($"[XML] Archivo no encontrado: {rutaArchivo}");
+            // Retorna la lista vacía de forma segura.
             return lista;
         }
 
         try
         {
-            // Nota: El reemplazo de tags con espacios requiere cargar el contenido en memoria
-            // para aplicar el Regex, a menos que se use un XmlReader personalizado.
-            // Para mantener la lógica de heurística y limpieza, usamos un StreamReader.
-            string contenido;
-            using (var sr = new StreamReader(File.OpenRead(rutaArchivo)))
-            {
-                contenido = sr.ReadToEnd();
-            }
+            // Lee todo el contenido de texto plano del archivo XML.
+            string contenido = File.ReadAllText(rutaArchivo);
 
-            // Reemplazar espacios en nombres de tags ANTES de parsear
+            // Reemplaza los espacios por guiones bajos en los nombres de las etiquetas.
             contenido = _tagConEspacios.Replace(contenido, m =>
             {
-                string slash1 = m.Groups[1].Value;          // "/" si es cierre
+                // Agrupa el carácter '/' de cierre si existe (ej. </tag>).
+                string slash1 = m.Groups[1].Value;
+                // Extrae el nombre del tag y cambia todos los espacios internos por guiones bajos.
                 string nombre = m.Groups[2].Value.Replace(" ", "_").Trim();
-                string selfClose = m.Groups[3].Value;        // "/" si es self-closing
+                // Agrupa el carácter '/' de auto-cierre si existe (ej. <tag/>).
+                string selfClose = m.Groups[3].Value;
+                // Retorna la etiqueta formateada correctamente.
                 return $"<{slash1}{nombre}{(selfClose == "/" ? "/" : "")}>";
             });
 
+            // Parsea la cadena de texto normalizada a una estructura XDocument en memoria.
             var doc = XDocument.Parse(contenido);
+            // Obtiene el nodo raíz del documento parseado.
             var root = doc.Root;
+            // Si el nodo raíz es nulo, retorna la lista vacía de inmediato.
             if (root == null) return lista;
 
+            // Busca los elementos del XML que representan los registros de datos reales.
             var elementos = ObtenerElementosDatos(root);
+            // Si no se encuentra ningún registro, retorna la lista vacía de inmediato.
+            if (elementos.Count == 0) return lista;
 
-            if (elementos.Count == 0)
-            {
-                Console.WriteLine($"[XML] No se encontraron elementos en {Path.GetFileName(rutaArchivo)}");
-                return lista;
-            }
-
+            // Detecta la estructura de campos y crea el mapeo automático usando el primer elemento.
             DetectarMetadatos(elementos[0]);
 
-            bool faltaCategoria = !MapeoColumnas.ContainsValue("categoria");
-            bool faltaValor = !MapeoColumnas.ContainsValue("valor");
-            bool faltaNombre = !MapeoColumnas.ContainsValue("nombre");
-
+            // Inicializa un contador para asignar IDs autoincrementables de respaldo.
             int contador = 1;
+            // Recorre cada uno de los elementos XML detectados como registros.
             foreach (var el in elementos)
             {
                 try
                 {
+                    // Instancia un nuevo objeto de tipo DataItem y asigna su fuente como XML.
                     var item = new DataItem { Fuente = "xml" };
 
-                    item.Id = LeerEnteroAtributoOHijo(el, _idAliases) ?? contador;
+                    // Mapea la propiedad ID usando aliases; si no existe, asigna el contador incremental.
+                    item.Id = LeerEntero(el, _idAliases) ?? contador;
+                    // Mapea la propiedad Nombre buscando coincidencias con sus alias.
                     item.Nombre = LeerCadena(el, _nombreAliases) ?? "";
+                    // Mapea la propiedad Categoría buscando coincidencias con sus alias.
                     item.Categoria = LeerCadena(el, _categoriaAliases) ?? "";
+                    // Mapea la propiedad Valor buscando coincidencias con sus alias; de lo contrario asigna 0.
                     item.Valor = LeerDouble(el, _valorAliases) ?? 0;
+                    // Mapea la propiedad Fecha buscando coincidencias con sus alias; si no hay, asigna la fecha actual.
                     item.Fecha = LeerFecha(el, _fechaAliases) ?? DateTime.Now;
 
-                    // Solo excluir los campos que realmente fueron mapeados a propiedades
-                    // estándar. No usar todos los aliases — si un campo coincide con un alias
-                    // pero otro campo ya tomó ese rol, el primero debe ir a CamposExtra.
-                    var mapeadas = new HashSet<string>(
-                        MapeoColumnas.Keys, StringComparer.OrdinalIgnoreCase);
+                    // Crea un conjunto hash con las columnas mapeadas para excluirlas de los campos adicionales.
+                    var mapeadas = new HashSet<string>(MapeoColumnas.Keys, StringComparer.OrdinalIgnoreCase);
 
-                    foreach (var attr in el.Attributes())
+                    // Agrega todos los atributos no mapeados al diccionario CamposExtra del DataItem usando LINQ.
+                    foreach (var attr in el.Attributes().Where(a => !mapeadas.Contains(a.Name.LocalName)))
                     {
-                        if (mapeadas.Contains(attr.Name.LocalName)) continue;
+                        // Guarda el atributo como un campo de texto adicional.
                         item.CamposExtra[attr.Name.LocalName] = attr.Value;
                     }
-                    foreach (var hijo in el.Elements())
+
+                    // Agrega todos los subelementos no mapeados al diccionario CamposExtra del DataItem usando LINQ.
+                    foreach (var hijo in el.Elements().Where(h => !mapeadas.Contains(h.Name.LocalName)))
                     {
-                        string localName = hijo.Name.LocalName;
-                        if (mapeadas.Contains(localName)) continue;
-                        item.CamposExtra[localName] = hijo.Value.Trim();
+                        // Guarda el subelemento limpio como un campo de texto adicional.
+                        item.CamposExtra[hijo.Name.LocalName] = hijo.Value.Trim();
                     }
 
+                    // Añade el registro mapeado a la lista de salida.
                     lista.Add(item);
+                    // Incrementa el contador de respaldo.
                     contador++;
                 }
                 catch (Exception ex)
                 {
+                    // Escribe en consola el error si falla el mapeo de un elemento específico.
                     Console.WriteLine($"[XML] Error en elemento #{contador}: {ex.Message}");
+                    // Incrementa el contador para mantener el índice de la siguiente fila correcto.
                     contador++;
                 }
             }
 
-            if (lista.Count > 0)
-            {
-                if (faltaCategoria) AplicarHeuristicaCategoria(lista);
-                if (faltaValor) AplicarHeuristicaValor(lista);
-                if (faltaNombre) AplicarHeuristicaNombre(lista);
-            }
-
-            Console.WriteLine($"[XML] {lista.Count} registros leidos desde {Path.GetFileName(rutaArchivo)}");
+            // Muestra en consola la cantidad de registros leídos satisfactoriamente.
+            Console.WriteLine($"[XML] {lista.Count} registros leídos desde {Path.GetFileName(rutaArchivo)}");
         }
         catch (Exception ex)
         {
+            // Registra en consola cualquier excepción ocurrida en el proceso principal.
             Console.WriteLine($"[XML] Error leyendo XML: {ex.Message}");
         }
 
+        // Retorna la lista resultante.
         return lista;
     }
 
-    // Obtiene el nivel correcto: <data><row> -> devuelve los <row>
     /// <summary>
-    /// Navega el árbol del documento (DOM) intentando adivinar de manera heurística 
-    /// en qué profundidad o nivel anidado se encuentra realmente la colección de registros (las filas).
+    /// Encuentra los elementos reales de datos, bajando de nivel si la estructura tiene contenedores intermediarios.
     /// </summary>
     private static List<XElement> ObtenerElementosDatos(XElement root)
     {
+        // Obtiene todos los elementos hijos del nodo raíz.
         var hijos = root.Elements().ToList();
+        // Si no existen hijos, retorna la lista vacía inmediatamente.
         if (hijos.Count == 0) return hijos;
 
+        // Si el primer hijo posee atributos o tiene a su vez elementos internos, es el nivel de datos correcto.
         if (hijos[0].Attributes().Any() || hijos[0].Elements().Any())
+        {
+            // Retorna los elementos secundarios.
             return hijos;
+        }
 
+        // Si es una envoltura sin datos directos, baja un nivel recolectando todos los nietos con LINQ.
         var nietos = hijos.SelectMany(h => h.Elements()).ToList();
+        // Si existen nietos y el primero de ellos tiene atributos o subelementos, este es el nivel correcto.
         if (nietos.Count > 0 && (nietos[0].Attributes().Any() || nietos[0].Elements().Any()))
+        {
+            // Retorna los elementos de tercer nivel.
             return nietos;
+        }
 
+        // Retorna los hijos si no se pudo profundizar más.
         return hijos;
     }
 
     /// <summary>
-    /// Toma el primer objeto del XML que se considera un registro de datos y analiza 
-    /// todos sus atributos e hijos para descubrir cómo mapear la información.
+    /// Detecta y mapea las columnas/etiquetas a sus roles según los aliases usando LINQ.
     /// </summary>
     private static void DetectarMetadatos(XElement primerElemento)
     {
-        var nombres = new List<string>();
-        foreach (var attr in primerElemento.Attributes())
-            nombres.Add(attr.Name.LocalName);
-        foreach (var hijo in primerElemento.Elements())
-            nombres.Add(hijo.Name.LocalName);
+        // Reúne los nombres de todos los atributos y elementos secundarios en una sola lista mediante LINQ.
+        var nombres = primerElemento.Attributes().Select(a => a.Name.LocalName)
+            .Concat(primerElemento.Elements().Select(e => e.Name.LocalName))
+            .ToList();
 
+        // Limpia el mapeo global previo.
         MapeoColumnas.Clear();
-        string? c;
-        c = BuscarEnLista(nombres, _idAliases); if (c != null) MapeoColumnas[c] = "id";
-        c = BuscarEnLista(nombres, _nombreAliases); if (c != null) MapeoColumnas[c] = "nombre";
-        c = BuscarEnLista(nombres, _categoriaAliases); if (c != null) MapeoColumnas[c] = "categoria";
-        c = BuscarEnLista(nombres, _valorAliases); if (c != null) MapeoColumnas[c] = "valor";
-        c = BuscarEnLista(nombres, _fechaAliases); if (c != null) MapeoColumnas[c] = "fecha";
 
-        UltimasColumnas = new List<string>(nombres);
+        // Busca y asigna la columna que representa el ID.
+        string? cId = BuscarEnLista(nombres, _idAliases);
+        if (cId != null) MapeoColumnas[cId] = "id";
+
+        // Busca y asigna la columna que representa el Nombre.
+        string? cNom = BuscarEnLista(nombres, _nombreAliases);
+        if (cNom != null) MapeoColumnas[cNom] = "nombre";
+
+        // Busca y asigna la columna que representa la Categoría.
+        string? cCat = BuscarEnLista(nombres, _categoriaAliases);
+        if (cCat != null) MapeoColumnas[cCat] = "categoria";
+
+        // Busca y asigna la columna que representa el Valor.
+        string? cVal = BuscarEnLista(nombres, _valorAliases);
+        if (cVal != null) MapeoColumnas[cVal] = "valor";
+
+        // Busca y asigna la columna que representa la Fecha.
+        string? cFec = BuscarEnLista(nombres, _fechaAliases);
+        if (cFec != null) MapeoColumnas[cFec] = "fecha";
+
+        // Almacena la lista de nombres de columnas detectados en la variable global.
+        UltimasColumnas = nombres;
     }
 
-    private static void AplicarHeuristicaCategoria(List<DataItem> items)
+    /// <summary>
+    /// Busca un valor de texto en los atributos o hijos del elemento usando LINQ.
+    /// </summary>
+    private static string? LeerCadena(XElement el, string[] aliases)
     {
-        string? k = BuscarMejorClaveCategoria(items);
-        if (k == null) return;
-        foreach (var item in items)
-            if (item.CamposExtra.TryGetValue(k, out var v) && !string.IsNullOrWhiteSpace(v))
-            { item.Categoria = v.Trim(); item.CamposExtra.Remove(k); }
-        MapeoColumnas[k] = "categoria";
-    }
-
-    private static void AplicarHeuristicaValor(List<DataItem> items)
-    {
-        string? k = BuscarMejorClaveNumerica(items);
-        if (k == null) return;
-        foreach (var item in items)
-            if (item.CamposExtra.TryGetValue(k, out var raw) &&
-                double.TryParse(raw, System.Globalization.NumberStyles.Any,
-                    System.Globalization.CultureInfo.InvariantCulture, out double v))
-            { item.Valor = v; item.CamposExtra.Remove(k); }
-        MapeoColumnas[k] = "valor";
-    }
-
-    private static void AplicarHeuristicaNombre(List<DataItem> items)
-    {
-        string? k = BuscarMejorClaveTexto(items, null);
-        if (k == null) return;
-        foreach (var item in items)
-            if (item.CamposExtra.TryGetValue(k, out var v) && !string.IsNullOrWhiteSpace(v) &&
-                item.Nombre.StartsWith("Item-", StringComparison.OrdinalIgnoreCase))
-            { item.Nombre = v.Trim(); item.CamposExtra.Remove(k); }
-        MapeoColumnas[k] = "nombre";
-    }
-
-    private static string? BuscarMejorClaveCategoria(List<DataItem> items)
-    {
-        var candidatos = items.SelectMany(i => i.CamposExtra.Keys)
-            .Distinct(StringComparer.OrdinalIgnoreCase).ToList();
-        string? mejor = null; int mejorPuntaje = 0;
-        foreach (var key in candidatos)
+        // Itera sobre cada alias de la lista de alias dada.
+        foreach (var alias in aliases)
         {
-            int noVacios = 0, noNumericos = 0;
-            var unicos = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            foreach (var item in items)
+            // Intenta encontrar el primer atributo que coincida de forma insensible con el alias.
+            var attr = el.Attributes().FirstOrDefault(a => string.Equals(a.Name.LocalName, alias, StringComparison.OrdinalIgnoreCase));
+            // Si el atributo existe y tiene valor, lo devuelve limpio.
+            if (attr != null && !string.IsNullOrWhiteSpace(attr.Value))
             {
-                if (!item.CamposExtra.TryGetValue(key, out var raw) || string.IsNullOrWhiteSpace(raw)) continue;
-                noVacios++; unicos.Add(raw.Trim());
-                if (!double.TryParse(raw, System.Globalization.NumberStyles.Any,
-                    System.Globalization.CultureInfo.InvariantCulture, out _)) noNumericos++;
+                return attr.Value.Trim();
             }
-            if (noVacios == 0 || noNumericos < Math.Max(2, noVacios / 2)) continue;
-            if (unicos.Count <= 1 || unicos.Count > Math.Max(2, items.Count / 2)) continue;
-            int puntaje = noVacios + Math.Min(unicos.Count * 2, 30);
-            if (puntaje > mejorPuntaje) { mejorPuntaje = puntaje; mejor = key; }
-        }
-        return mejor;
-    }
 
-    private static string? BuscarMejorClaveNumerica(List<DataItem> items)
-    {
-        var candidatos = items.SelectMany(i => i.CamposExtra.Keys)
-            .Distinct(StringComparer.OrdinalIgnoreCase).ToList();
-        string? mejor = null; int mejorPuntaje = 0;
-        foreach (var key in candidatos)
-        {
-            int numericos = 0;
-            foreach (var item in items)
-                if (item.CamposExtra.TryGetValue(key, out var raw) &&
-                    double.TryParse(raw, System.Globalization.NumberStyles.Any,
-                        System.Globalization.CultureInfo.InvariantCulture, out _))
-                    numericos++;
-            if (numericos < Math.Max(2, items.Count / 3)) continue;
-            if (numericos > mejorPuntaje) { mejorPuntaje = numericos; mejor = key; }
-        }
-        return mejor;
-    }
-
-    private static string? BuscarMejorClaveTexto(List<DataItem> items, string? evitar)
-    {
-        var candidatos = items.SelectMany(i => i.CamposExtra.Keys)
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .Where(k => !string.Equals(k, evitar, StringComparison.OrdinalIgnoreCase)).ToList();
-        string? mejor = null; int mejorPuntaje = 0;
-        foreach (var key in candidatos)
-        {
-            int noVacios = 0, noNumericos = 0;
-            foreach (var item in items)
+            // Intenta encontrar el primer subelemento que coincida de forma insensible con el alias.
+            var hijo = el.Elements().FirstOrDefault(h => string.Equals(h.Name.LocalName, alias, StringComparison.OrdinalIgnoreCase));
+            // Si el subelemento existe y contiene un texto válido, lo devuelve limpio.
+            if (hijo != null && !string.IsNullOrWhiteSpace(hijo.Value))
             {
-                if (!item.CamposExtra.TryGetValue(key, out var raw) || string.IsNullOrWhiteSpace(raw)) continue;
-                noVacios++;
-                if (!double.TryParse(raw, System.Globalization.NumberStyles.Any,
-                    System.Globalization.CultureInfo.InvariantCulture, out _)) noNumericos++;
+                return hijo.Value.Trim();
             }
-            if (noVacios == 0 || noNumericos < Math.Max(2, noVacios / 2)) continue;
-            if (noVacios > mejorPuntaje) { mejorPuntaje = noVacios; mejor = key; }
         }
-        return mejor;
-    }
-
-    private static string? LeerCadenaAtributoOHijo(XElement el, params string[] claves)
-    {
-        foreach (var c in claves)
-        {
-            var attr = el.Attributes()
-                .FirstOrDefault(a => string.Equals(a.Name.LocalName, c, StringComparison.OrdinalIgnoreCase));
-            if (attr != null && !string.IsNullOrWhiteSpace(attr.Value)) return attr.Value.Trim();
-
-            var hijo = el.Elements()
-                .FirstOrDefault(h => string.Equals(h.Name.LocalName, c, StringComparison.OrdinalIgnoreCase));
-            if (hijo != null && !string.IsNullOrWhiteSpace(hijo.Value)) return hijo.Value.Trim();
-        }
+        // Retorna null si el alias no fue localizado o estaba vacío.
         return null;
     }
 
-    private static int? LeerEnteroAtributoOHijo(XElement el, params string[] claves)
+    // Lee un número entero de un atributo o subelemento XML.
+    private static int? LeerEntero(XElement el, string[] aliases)
     {
-        var s = LeerCadenaAtributoOHijo(el, claves);
-        return s != null && int.TryParse(s, out int v) ? v : (int?)null;
+        // Llama a LeerCadena para obtener el valor del texto crudo.
+        string? texto = LeerCadena(el, aliases);
+        // Intenta parsear el texto a un tipo int de C# y lo retorna si es exitoso.
+        return (texto != null && int.TryParse(texto, out int valor)) ? valor : null;
     }
 
-    private static string? LeerCadena(XElement el, params string[] claves)
-        => LeerCadenaAtributoOHijo(el, claves);
-
-    private static double? LeerDouble(XElement el, params string[] claves)
+    // Lee un número decimal double de un atributo o subelemento XML.
+    private static double? LeerDouble(XElement el, string[] aliases)
     {
-        var s = LeerCadena(el, claves);
-        return s != null && double.TryParse(s, System.Globalization.NumberStyles.Any,
-            System.Globalization.CultureInfo.InvariantCulture, out double v) ? v : (double?)null;
+        // Llama a LeerCadena para obtener el valor del texto crudo.
+        string? texto = LeerCadena(el, aliases);
+        // Intenta parsear a double usando el formato de cultura Invariante (ej. separadores por punto).
+        return (texto != null && double.TryParse(texto, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out double valor)) ? valor : null;
     }
 
-    private static DateTime? LeerFecha(XElement el, params string[] claves)
+    // Lee un tipo DateTime de un atributo o subelemento XML.
+    private static DateTime? LeerFecha(XElement el, string[] aliases)
     {
-        var s = LeerCadena(el, claves);
-        return s != null && DateTime.TryParse(s, out DateTime d) ? d : (DateTime?)null;
+        // Llama a LeerCadena para obtener el valor del texto crudo.
+        string? texto = LeerCadena(el, aliases);
+        // Intenta parsear el texto a una estructura DateTime estándar de C#.
+        return (texto != null && DateTime.TryParse(texto, out DateTime valor)) ? valor : null;
     }
 
+    // Encuentra la primera coincidencia de alias dentro de una lista de nombres de columnas.
     private static string? BuscarEnLista(List<string> lista, string[] aliases)
     {
-        foreach (var alias in aliases)
-            foreach (var item in lista)
-                if (string.Equals(item, alias, StringComparison.OrdinalIgnoreCase))
-                    return item;
-        return null;
+        // Retorna el primer alias que coincida de forma insensible con algún elemento de la lista.
+        return aliases.FirstOrDefault(alias => lista.Any(item => string.Equals(item, alias, StringComparison.OrdinalIgnoreCase)));
     }
 }
-

@@ -84,11 +84,9 @@ public partial class AppVideoForm : Form
         // Botones de edición (startX relativo al padding si fuera un FlowPanel, pero aquí es absoluto)
         // Ajustamos startX para que no pise el título
         int startX = 280; 
-        AgregarBotonEditor("✨ Soft", startX, () => AplicarFiltro("Soft"));
-        AgregarBotonEditor("🎞️ Sepia", startX + 100, () => AplicarFiltro("Sepia"));
-        AgregarBotonEditor("🌑 B&N", startX + 200, () => AplicarFiltro("BN"));
-        AgregarBotonEditor("🎵 Audio", startX + 300, ExtraerAudio);
-        AgregarBotonEditor("↩️ Revertir", startX + 400, RevertirCambios);
+        AgregarBotonEditor("🌑 B&N", startX, () => AplicarFiltro("BN"));
+        AgregarBotonEditor("🎵 Audio", startX + 100, ExtraerAudio);
+        AgregarBotonEditor("↩️ Revertir", startX + 200, RevertirCambios);
 
         // Main Layout
         SplitContainer split = new SplitContainer { Dock = DockStyle.Fill, SplitterDistance = 800 };
@@ -432,9 +430,9 @@ public partial class AppVideoForm : Form
         
         lblMetaInfo.Text = "\nPROCESANDO FILTRO...\nPor favor espera.";
         
-        // Detener la reproducción para que VLC libere el descriptor del archivo original
+        // Detener la reproducción y destruir el MediaPlayer para que VLC libere el handle del archivo
         PrepararParaProcesar();
-        await Task.Delay(500); // Pequeña pausa para asegurar la liberación del archivo por parte de VLC
+        await Task.Delay(1500); // Pausa ampliada para garantizar la liberación del handle por parte de VLC
         
         bool ok = await AppVideoProcessor.AplicarFiltro(_rutaVideo, tempOutput, nombre);
         
@@ -442,11 +440,27 @@ public partial class AppVideoForm : Form
         {
             try
             {
-                // Reemplazar el archivo de video original con el filtrado
-                if (File.Exists(_rutaVideo))
+                // Esperar hasta que el archivo original esté libre (máximo 10 intentos de 1 segundo)
+                bool archivoLibre = false;
+                for (int intento = 0; intento < 10; intento++)
                 {
-                    File.Delete(_rutaVideo);
+                    try
+                    {
+                        using var fs = new FileStream(_rutaVideo, FileMode.Open, FileAccess.ReadWrite, FileShare.None);
+                        archivoLibre = true;
+                        break;
+                    }
+                    catch (IOException)
+                    {
+                        await Task.Delay(1000);
+                    }
                 }
+
+                if (!archivoLibre)
+                    throw new IOException("El archivo sigue siendo utilizado por otro proceso después de 10 segundos de espera.");
+
+                // Reemplazar el archivo de video original con el filtrado
+                File.Delete(_rutaVideo);
                 File.Move(tempOutput, _rutaVideo);
                 MessageBox.Show("Filtro aplicado con éxito sobre el mismo video.", "Filtro Aplicado", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
@@ -531,14 +545,21 @@ public partial class AppVideoForm : Form
     }
 
     /// <summary>
-    /// Frena la reproducción y elimina la asignación de memoria (media = null) para que VLC
-    /// suelte el archivo de disco, permitiendo que utilidades externas como FFmpeg puedan sobrescribir o leer.
+    /// Frena la reproducción y destruye completamente el MediaPlayer y su Media para que VLC
+    /// suelte el handle del archivo de disco, permitiendo que FFmpeg pueda sobrescribir o leer el archivo.
+    /// Se recrea el MediaPlayer vacío listo para ser reiniciado después.
     /// </summary>
     private void PrepararParaProcesar()
     {
+        _timerUI.Stop();
         _mediaPlayer.Stop();
-        // Forzamos a que VLC suelte el archivo asignando un medio nulo o vacío
         _mediaPlayer.Media = null;
+        // Desasociar el VideoView para que VLC libere completamente el handle del archivo
+        _videoView.MediaPlayer = null;
+        _mediaPlayer.Dispose();
+        // Recrear el MediaPlayer vacío (sin cargar ningún archivo aún)
+        _mediaPlayer = new LibVLCSharp.Shared.MediaPlayer(_libVLC);
+        _videoView.MediaPlayer = _mediaPlayer;
     }
 
     /// <summary>
@@ -547,6 +568,7 @@ public partial class AppVideoForm : Form
     /// </summary>
     private void ReiniciarReproductor()
     {
+        _timerUI.Start();
         using var media = new Media(_libVLC, _rutaVideo, FromType.FromPath);
         _mediaPlayer.Play(media);
     }
@@ -557,6 +579,21 @@ public partial class AppVideoForm : Form
         _mediaPlayer?.Stop();
         _mediaPlayer?.Dispose();
         _libVLC?.Dispose();
+
+        // Limpiar archivos temporales generados durante la sesión de edición
+        LimpiarArchivosTemporales();
+
         base.OnFormClosing(e);
+    }
+
+    /// <summary>
+    /// Elimina silenciosamente el archivo de copia de seguridad (.bak) y el companion
+    /// de metadatos (.meta.json) que se crean al aplicar filtros, para no dejar
+    /// archivos residuales en la carpeta del video original.
+    /// </summary>
+    private void LimpiarArchivosTemporales()
+    {
+        try { File.Delete(_rutaVideo + ".bak"); } catch { }
+        try { File.Delete(_rutaVideo + ".meta.json"); } catch { }
     }
 }

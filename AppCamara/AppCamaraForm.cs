@@ -30,6 +30,7 @@ public partial class AppCamaraForm : Form
     private int                   _frameHeight       = 480;
     private string                _rutaAviTemporal   = string.Empty;  // archivo intermedio
     private string                _rutaMp4Final      = string.Empty;  // archivo final MP4
+    private System.Diagnostics.Stopwatch? _grabacionStopwatch;
 
     // ─── Controles UI ────────────────────────────────────────────────────────
     private Panel      pnlTop      = default!;
@@ -351,6 +352,7 @@ public partial class AppCamaraForm : Form
                 string moniker = _dispositivosVideo[cbCamaras.SelectedIndex].MonikerString;
                 _fuenteVideo           = new VideoCaptureDevice(moniker);
                 _fuenteVideo.NewFrame += FuenteVideo_NewFrame;
+                _fuenteVideo.DesiredFrameRate = 30;
                 _fuenteVideo.Start();
             }
         }
@@ -376,7 +378,8 @@ public partial class AppCamaraForm : Form
             {
                 lock (_grabador)
                 {
-                    _grabador.EscribirFrame(frame);
+                    TimeSpan elapsed = _grabacionStopwatch?.Elapsed ?? TimeSpan.Zero;
+                    _grabador.EscribirFrame(frame, elapsed);
                 }
             }
 
@@ -462,6 +465,7 @@ public partial class AppCamaraForm : Form
             // Actualizar estado
             _grabando          = true;
             _segundosGrabacion = 0;
+            _grabacionStopwatch = System.Diagnostics.Stopwatch.StartNew();
 
             // Actualizar UI
             btnGrabar.Text      = "⏹ Detener";
@@ -488,6 +492,8 @@ public partial class AppCamaraForm : Form
     private async void DetenerGrabacion()
     {
         _timerGrabacion.Stop();
+        _grabacionStopwatch?.Stop();
+        _grabacionStopwatch = null;
         _grabando = false;
 
         LimpiarGrabador();   // cierra y libera el AVI

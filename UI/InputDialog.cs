@@ -41,29 +41,25 @@ public class InputDialog : Form
             BorderStyle = BorderStyle.FixedSingle
         };
 
-        btnOk = new Button
+        Button CrearBoton(string texto, Point ubicacion, DialogResult resultado)
         {
-            Text = "Aceptar",
-            Location = new Point(165, 85),
-            Size = new Size(95, 32),
-            DialogResult = DialogResult.OK,
-            FlatStyle = FlatStyle.Flat
-        };
-        btnOk.FlatAppearance.BorderSize = 0;
-        btnOk.Paint += (s, e) => ThemeRenderer.DrawClassicBorder(e.Graphics, btnOk.ClientRectangle, true);
+            var btn = new Button
+            {
+                Text = texto,
+                Location = ubicacion,
+                Size = new Size(95, 32),
+                DialogResult = resultado,
+                FlatStyle = FlatStyle.Flat
+            };
+            btn.FlatAppearance.BorderSize = 0;
+            btn.Paint += (s, e) => ThemeRenderer.DrawClassicBorder(e.Graphics, btn.ClientRectangle, true);
+            return btn;
+        }
 
-        btnCancel = new Button
-        {
-            Text = "Cancelar",
-            Location = new Point(270, 85),
-            Size = new Size(95, 32),
-            DialogResult = DialogResult.Cancel,
-            FlatStyle = FlatStyle.Flat
-        };
-        btnCancel.FlatAppearance.BorderSize = 0;
-        btnCancel.Paint += (s, e) => ThemeRenderer.DrawClassicBorder(e.Graphics, btnCancel.ClientRectangle, true);
+        btnOk = CrearBoton("Aceptar", new Point(165, 85), DialogResult.OK);
+        btnCancel = CrearBoton("Cancelar", new Point(270, 85), DialogResult.Cancel);
 
-        this.Controls.AddRange(new Control[] { lblPrompt, txtInput, btnOk, btnCancel });
+        this.Controls.AddRange([lblPrompt, txtInput, btnOk, btnCancel]);
         
         this.AcceptButton = btnOk;
         this.CancelButton = btnCancel;

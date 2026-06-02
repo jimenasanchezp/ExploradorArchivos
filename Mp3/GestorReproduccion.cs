@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 using NAudio.Wave;
 
@@ -11,7 +13,7 @@ public enum ModoRepetir { Desactivado, RepetirUno, RepetirTodos }
 
 /// <summary>
 /// Motor principal de audio que utiliza la biblioteca NAudio.
-/// Maneja la decodificación de streams, el dispositivo de salida <c>WaveOutEvent</c>,
+/// Maneja la decodificación de streams, el dispositivo de salida WaveOutEvent,
 /// colas de reproducción, orden aleatorio y sincronización con la UI.
 /// </summary>
 public class GestorReproduccion : IDisposable
@@ -19,7 +21,6 @@ public class GestorReproduccion : IDisposable
     private WaveOutEvent? _waveOut;
     private AudioFileReader? _audioReader;
     private readonly System.Windows.Forms.Timer _timerPosicion;
-
 
     private List<Cancion> _cola = new();
     private List<int> _ordenReproduccion = new();
@@ -34,6 +35,7 @@ public class GestorReproduccion : IDisposable
     public event Action<TimeSpan, TimeSpan>? PosicionActualizada;
     public event Action<bool>? EstadoCambiado;
     public event Action? ReproduccionTerminada;
+    
     public int IndiceCola => _indiceCola;
 
     public Cancion? CancionActual => _indiceCola >= 0 && _indiceCola < _ordenReproduccion.Count
@@ -45,7 +47,11 @@ public class GestorReproduccion : IDisposable
     public bool ModoAleatorio
     {
         get => _modoAleatorio;
-        set { _modoAleatorio = value; RegenerarOrden(); }
+        set 
+        { 
+            _modoAleatorio = value; 
+            RegenerarOrden(); 
+        }
     }
 
     public ModoRepetir ModoRepetir { get => _modoRepetir; set => _modoRepetir = value; }
@@ -56,34 +62,49 @@ public class GestorReproduccion : IDisposable
         set
         {
             _volumen = Math.Clamp(value, 0f, 1f);
-            if (_audioReader != null) _audioReader.Volume = _volumen;
+            if (_audioReader != null) 
+            {
+                _audioReader.Volume = _volumen;
+            }
         }
     }
 
+    /// <summary>
+    /// Inicializa una nueva instancia del gestor de reproducción y configura el temporizador de posición.
+    /// </summary>
     public GestorReproduccion()
     {
         _timerPosicion = new System.Windows.Forms.Timer { Interval = 250 };
         _timerPosicion.Tick += (s, e) =>
         {
             if (_audioReader != null && _waveOut?.PlaybackState == PlaybackState.Playing)
+            {
                 PosicionActualizada?.Invoke(_audioReader.CurrentTime, _audioReader.TotalTime);
+            }
         };
     }
 
     /// <summary>
-    /// Limpia la cola actual y encola de manera asíncrona una nueva lista de pistas.
-    /// Inicia la reproducción automáticamente con la primera canción o con la pista especificada.
+    /// Limpia la cola actual y carga una nueva lista de pistas.
+    /// Inicia la reproducción con la primera canción o una pista específica de forma predeterminada.
     /// </summary>
-    /// <param name="rutas">Lista de rutas físicas de archivos de audio.</param>
-    /// <param name="rutaInicial">Archivo por el que debe comenzar a reproducir (opcional).</param>
+    /// <param name="rutas">Lista de rutas de archivos de audio a encolar.</param>
+    /// <param name="rutaInicial">Ruta del archivo inicial por el que debe comenzar la reproducción.</param>
     public void CargarCola(List<string> rutas, string? rutaInicial = null)
     {
         DetenerInterno();
         _cola.Clear();
-        foreach (var ruta in rutas)
-        {
-            try { _cola.Add(new Cancion(ruta)); } catch { }
-        }
+
+        // Mapear rutas a objetos Cancion filtrando archivos corruptos o inaccesibles
+        var cancionesValidas = rutas
+            .Select(ruta => {
+                try { return new Cancion(ruta); }
+                catch { return null; }
+            })
+            .Where(c => c != null)
+            .Cast<Cancion>();
+
+        _cola.AddRange(cancionesValidas);
 
         if (_cola.Count == 0) return;
         RegenerarOrden();
@@ -93,18 +114,24 @@ public class GestorReproduccion : IDisposable
             int idxReal = _cola.FindIndex(c => c.RutaArchivo == rutaInicial);
             _indiceCola = idxReal >= 0 ? _ordenReproduccion.IndexOf(idxReal) : 0;
         }
-        else { _indiceCola = 0; }
+        else 
+        { 
+            _indiceCola = 0; 
+        }
 
         ReproducirActual();
     }
 
     /// <summary>
-    /// Inicia o reanuda la reproducción de la canción actual. Si no hay instancia activa, 
-    /// la crea invocando el motor de lectura interno.
+    /// Inicia o reanuda la reproducción.
     /// </summary>
     public void Play()
     {
-        if (_waveOut == null && CancionActual != null) { ReproducirActual(); return; }
+        if (_waveOut == null && CancionActual != null) 
+        { 
+            ReproducirActual(); 
+            return; 
+        }
         if (_waveOut?.PlaybackState == PlaybackState.Paused)
         {
             _waveOut.Play();
@@ -113,6 +140,9 @@ public class GestorReproduccion : IDisposable
         }
     }
 
+    /// <summary>
+    /// Pausa la reproducción del audio actual.
+    /// </summary>
     public void Pause()
     {
         if (_waveOut?.PlaybackState == PlaybackState.Playing)
@@ -123,13 +153,28 @@ public class GestorReproduccion : IDisposable
         }
     }
 
-    public void TogglePlayPause() { if (EstaReproduciendo) Pause(); else Play(); }
-
-    public void Stop() { DetenerInterno(); EstadoCambiado?.Invoke(false); }
+    /// <summary>
+    /// Alterna el estado de reproducción entre Reproducir y Pausar.
+    /// </summary>
+    public void TogglePlayPause() 
+    { 
+        if (EstaReproduciendo) 
+            Pause(); 
+        else 
+            Play(); 
+    }
 
     /// <summary>
-    /// Avanza a la siguiente pista de la cola. Su comportamiento difiere según el modo de repetición
-    /// (reproducir de nuevo la misma, seguir la cola aleatoria, o detenerse al final).
+    /// Detiene la reproducción y libera el stream de audio actual.
+    /// </summary>
+    public void Stop() 
+    { 
+        DetenerInterno(); 
+        EstadoCambiado?.Invoke(false); 
+    }
+
+    /// <summary>
+    /// Avanza a la siguiente pista de la cola respetando los modos de repetición y orden.
     /// </summary>
     public void Siguiente()
     {
@@ -155,12 +200,13 @@ public class GestorReproduccion : IDisposable
     }
 
     /// <summary>
-    /// Regresa a la pista anterior, o reinicia la canción actual si ya han pasado más de 3 segundos
-    /// de reproducción (comportamiento estándar de reproductores comerciales).
+    /// Retrocede a la pista anterior, o reinicia la canción actual si tiene más de 3 segundos reproducidos.
     /// </summary>
     public void Anterior()
     {
         if (_cola.Count == 0) return;
+        
+        // Comportamiento comercial: si se lleva más de 3 seg de reproducción, se reinicia la pista
         if (_audioReader != null && _audioReader.CurrentTime.TotalSeconds > 3)
         {
             _audioReader.CurrentTime = TimeSpan.Zero;
@@ -175,6 +221,10 @@ public class GestorReproduccion : IDisposable
         ReproducirActual();
     }
 
+    /// <summary>
+    /// Cambia la posición del cabezal de reproducción.
+    /// </summary>
+    /// <param name="porcentaje">Valor porcentual (0.0 a 1.0) al que se desea desplazar la reproducción.</param>
     public void Seek(double porcentaje)
     {
         if (_audioReader != null)
@@ -184,7 +234,10 @@ public class GestorReproduccion : IDisposable
         }
     }
 
-    // CORRECCIÓN: Ahora mapea correctamente el índice seleccionado en la UI
+    /// <summary>
+    /// Reproduce una canción específica de la lista ordenada por su índice físico real.
+    /// </summary>
+    /// <param name="indiceReal">Índice absoluto de la canción dentro de la lista.</param>
     public void ReproducirPorIndice(int indiceReal)
     {
         int idxEnCola = _ordenReproduccion.IndexOf(indiceReal);
@@ -196,9 +249,7 @@ public class GestorReproduccion : IDisposable
     }
 
     /// <summary>
-    /// Núcleo de la reproducción. Detiene el stream actual, libera buffers 
-    /// y carga asíncronamente el nuevo archivo en el hardware de audio,
-    /// disparando adicionalmente la búsqueda de letras por internet.
+    /// Inicializa y comienza la reproducción de la pista seleccionada liberando previamente los recursos activos.
     /// </summary>
     private void ReproducirActual()
     {
@@ -218,7 +269,7 @@ public class GestorReproduccion : IDisposable
             _waveOut.Play();
             _timerPosicion.Start();
 
-            // Buscar letra automáticamente si no tiene una local
+            // Buscar letras de canciones de forma asíncrona si no existen de forma local
             if (string.IsNullOrEmpty(cancion.Letra))
             {
                 _ = Task.Run(async () =>
@@ -235,32 +286,43 @@ public class GestorReproduccion : IDisposable
             CancionCambiada?.Invoke(cancion);
             EstadoCambiado?.Invoke(true);
         }
-        catch { }
+        catch
+        {
+            // Ignora errores si hay fallas de inicialización de hardware o formatos no soportados
+        }
         finally
         {
             _cambiando = false;
         }
     }
 
+    /// <summary>
+    /// Delegado para manejar el evento cuando el motor de audio detiene la reproducción.
+    /// </summary>
     private void OnPlaybackStopped(object? sender, StoppedEventArgs e)
     {
-        // OnPlaybackStopped se ejecuta en un hilo de NAudio.
-        // Despachamos la lógica al timer (hilo de UI) para evitar condiciones de carrera.
-        _timerPosicion.Tick -= AvanzarCancionPendiente; // evitar suscripciones duplicadas
+        // El fin del stream se ejecuta en un hilo secundario de NAudio.
+        // Se despacha al timer en el hilo de UI para evitar condiciones de carrera.
+        _timerPosicion.Tick -= AvanzarCancionPendiente;
         _timerPosicion.Tick += AvanzarCancionPendiente;
     }
 
+    /// <summary>
+    /// Lógica de transición de pista al finalizar la canción actual de forma natural.
+    /// </summary>
     private void AvanzarCancionPendiente(object? sender, EventArgs e)
     {
         _timerPosicion.Tick -= AvanzarCancionPendiente;
         
-        // Solo avanzamos si la canción terminó naturalmente (no por Stop() manual)
         if (_waveOut == null && _audioReader == null) return;
         if (_audioReader != null && _audioReader.CurrentTime < _audioReader.TotalTime - TimeSpan.FromMilliseconds(500)) return;
 
         if (_modoRepetir == ModoRepetir.RepetirUno)
         {
-            if (_audioReader != null) _audioReader.CurrentTime = TimeSpan.Zero;
+            if (_audioReader != null) 
+            {
+                _audioReader.CurrentTime = TimeSpan.Zero;
+            }
             _waveOut?.Play();
             EstadoCambiado?.Invoke(true);
         }
@@ -271,8 +333,7 @@ public class GestorReproduccion : IDisposable
     }
 
     /// <summary>
-    /// Libera los recursos de hardware (WaveOut) y los descriptores de archivo (AudioFileReader)
-    /// para evitar bloqueos del sistema o fugas de memoria al cambiar de pista.
+    /// Detiene y libera los descriptores de lectura de archivo y objetos de hardware.
     /// </summary>
     private void DetenerInterno()
     {
@@ -284,13 +345,15 @@ public class GestorReproduccion : IDisposable
             _waveOut.Dispose();
             _waveOut = null;
         }
-        if (_audioReader != null) { _audioReader.Dispose(); _audioReader = null; }
+        if (_audioReader != null) 
+        { 
+            _audioReader.Dispose(); 
+            _audioReader = null; 
+        }
     }
 
     /// <summary>
-    /// Reconstruye el orden interno de reproducción. Si el <c>ModoAleatorio</c> está activo, 
-    /// implementa un algoritmo de Fisher-Yates shuffle sobre la cola actual, manteniendo
-    /// la canción en reproducción en la posición 0.
+    /// Regenera la lista de orden de reproducción. En modo aleatorio baraja los índices mediante Fisher-Yates.
     /// </summary>
     private void RegenerarOrden()
     {
@@ -315,16 +378,20 @@ public class GestorReproduccion : IDisposable
                 _indiceCola = 0;
             }
         }
-        else if (cancionActualRealIdx >= 0) { _indiceCola = cancionActualRealIdx; }
+        else if (cancionActualRealIdx >= 0) 
+        { 
+            _indiceCola = cancionActualRealIdx; 
+        }
     }
 
+    /// <summary>
+    /// Obtiene la cola actual mapeada con sus índices físicos en la lista original.
+    /// </summary>
     public List<(int IndiceReal, Cancion Cancion)> ObtenerColaOrdenada() =>
         _ordenReproduccion.Select(idx => (idx, _cola[idx])).ToList();
 
     /// <summary>
-    /// Guarda los metadatos modificados de una canción en disco y actualiza el reproductor.
-    /// Si la canción es la que se reproduce actualmente, detiene temporalmente la reproducción
-    /// para liberar el bloqueo del archivo físico por NAudio, escribe el cambio y reanuda el audio.
+    /// Escribe los metadatos editados al archivo físico liberando temporalmente los descriptores si coincide con la pista actual.
     /// </summary>
     public bool GuardarMetadatos(Cancion cancion, string nuevoTitulo, string nuevoArtista, Image? nuevaPortada)
     {
@@ -342,39 +409,39 @@ public class GestorReproduccion : IDisposable
             DetenerInterno();
         }
 
-        // Respaldar metadatos anteriores para restaurar en caso de fallo
+        // Guardar respaldo de los metadatos originales en memoria en caso de que ocurra un error de escritura física
         string tituloOriginal = cancion.Titulo;
         string artistaOriginal = cancion.Artista;
         Image? portadaOriginal = cancion.Portada;
 
-        // Asignar nuevos valores
+        // Asignar temporalmente las nuevas propiedades al objeto de tipo Canción
         cancion.Titulo = nuevoTitulo;
         cancion.Artista = nuevoArtista;
         cancion.Portada = nuevaPortada != null ? (Image)nuevaPortada.Clone() : null;
 
-        // Intentar guardar físicamente
+        // Intentar escribir y persistir los cambios físicos en el archivo en disco
         bool guardado = MetadataService.GuardarCambios(cancion);
 
         if (!guardado)
         {
-            // Revertir cambios en memoria
+            // Revertir a los valores originales respaldados si la persistencia física en disco falló
             cancion.Titulo = tituloOriginal;
             cancion.Artista = artistaOriginal;
             cancion.Portada = portadaOriginal;
         }
         else
         {
-            // Si guardó con éxito, liberamos la portada vieja
+            // Liberar la instancia de la imagen de portada anterior si se guardó la nueva con éxito
             portadaOriginal?.Dispose();
         }
 
         if (esCancionActual)
         {
-            // Recargar la canción actual
             try
             {
                 if (System.IO.File.Exists(cancion.RutaArchivo))
                 {
+                    // Recrear los objetos lectores de flujo y dispositivo de salida para reanudar la reproducción
                     _audioReader = new AudioFileReader(cancion.RutaArchivo) { Volume = _volumen };
                     _audioReader.CurrentTime = posicionActual;
 
@@ -389,7 +456,10 @@ public class GestorReproduccion : IDisposable
                     }
                 }
             }
-            catch { }
+            catch 
+            {
+                // Maneja posibles errores al reconstruir el reproductor
+            }
 
             CancionCambiada?.Invoke(cancion);
             EstadoCambiado?.Invoke(estabaReproduciendo);
@@ -398,5 +468,9 @@ public class GestorReproduccion : IDisposable
         return guardado;
     }
 
-    public void Dispose() { DetenerInterno(); _timerPosicion.Dispose(); }
+    public void Dispose() 
+    { 
+        DetenerInterno(); 
+        _timerPosicion.Dispose(); 
+    }
 }

@@ -1,7 +1,6 @@
 using System;
 using System.Drawing;
 using System.IO;
-using System.Linq;
 using System.Net.Http;
 using System.Text.Json;
 using System.Threading.Tasks;
@@ -9,27 +8,27 @@ using System.Threading.Tasks;
 namespace ExploradorArchivos.Mp3;
 
 /// <summary>
-/// Servicio para buscar portadas de álbum con fallback en cascada:
-/// 1. Tag embebido (ya manejado en Cancion.cs)
-/// 2. Imagen local en la carpeta
-/// 3. API pública de iTunes (sin autenticación)
+/// Servicio para buscar portadas de álbum mediante llamadas HTTP externas.
 /// </summary>
 public static class PortadaService
 {
     private static readonly HttpClient _httpClient = new();
 
     /// <summary>
-    /// Busca una portada en la API de iTunes cuando no hay portada local.
-    /// Retorna null si no encuentra nada.
+    /// Busca la portada de un álbum en la API pública de iTunes cuando no está disponible de forma local.
     /// </summary>
+    /// <param name="artista">Nombre del artista intérprete.</param>
+    /// <param name="album">Nombre del álbum musical.</param>
+    /// <returns>La portada descargada como System.Drawing.Image si se encuentra; de lo contrario, null.</returns>
     public static async Task<Image?> BuscarPortadaEnWeb(string artista, string album)
     {
         try
         {
-            // Construir término de búsqueda
             string termino = $"{artista} {album}".Trim();
             if (string.IsNullOrWhiteSpace(termino) || termino == "Desconocido Desconocido")
+            {
                 return null;
+            }
 
             string url = $"https://itunes.apple.com/search?term={Uri.EscapeDataString(termino)}&entity=album&limit=1";
 
@@ -37,22 +36,26 @@ public static class PortadaService
             using var doc = JsonDocument.Parse(response);
 
             var results = doc.RootElement.GetProperty("results");
-            if (results.GetArrayLength() == 0) return null;
+            if (results.GetArrayLength() == 0)
+            {
+                return null;
+            }
 
-            // Obtener la URL del artwork y escalar a 600x600
-            // PortadaService.cs: Escalado de imagen para alta calidad
             string? artworkUrl = results[0].GetProperty("artworkUrl100").GetString();
-            if (artworkUrl == null) return null;
-            artworkUrl = artworkUrl.Replace("100x100", "600x600"); // Mejora la estética visual
+            if (artworkUrl == null)
+            {
+                return null;
+            }
+            
+            // iTunes retorna miniaturas de 100x100 por defecto. Cambiamos a 600x600 para obtener mayor calidad visual.
+            artworkUrl = artworkUrl.Replace("100x100", "600x600");
 
-            // Descargar la imagen
             var imageBytes = await _httpClient.GetByteArrayAsync(artworkUrl);
             using var ms = new MemoryStream(imageBytes);
             return Image.FromStream(ms);
         }
         catch
         {
-            // Sin conexión o API no disponible
             return null;
         }
     }

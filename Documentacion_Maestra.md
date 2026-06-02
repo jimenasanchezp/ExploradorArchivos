@@ -44,6 +44,7 @@ El sistema corre sobre **.NET 8.0 Windows Forms** utilizando un alto grado de as
 4.  **`Npgsql`:** Driver de ADO.NET para inyectar sentencias SQL hacia bases de datos PostgreSQL de forma transaccional.
 5.  **`DocumentFormat.OpenXml`:** SDK de Microsoft para generar archivos Word (`.docx`) y Excel (`.xlsx`) sin necesidad de tener Office instalado.
 6.  **`WebView2` (Edge Chromium):** Motor de renderizado web incrustado usado para visualizar PDF y renderizar los mapas interactivos de `Leaflet.js`.
+7.  **`LibreOffice` (Herramienta Externa):** Suite ofimática invocada en modo headless (`soffice.exe --headless`) para la conversión y exportación de documentos (DOCX, XLSX, PPTX, TXT) a PDF u otros formatos con fidelidad total del 100%.
 
 ---
 
@@ -98,6 +99,14 @@ El explorador permite enviar cualquier archivo adjunto directamente desde su int
 4. **Envío Asíncrono en Segundo Plano:** El proceso de envío se ejecuta de forma asíncrona mediante `Task.Run` llamando al método `EnviarCorreoAsync()`. Esto mantiene la interfaz de usuario receptiva y previene bloqueos en la UI de Windows Forms mientras se establece el canal con el servidor SMTP.
 5. **Establecimiento de Sesión y Envío:** Se inicializan las instancias de `MailMessage` (para definir remitente, destinatario, asunto, cuerpo y adjuntar el archivo vía `new Attachment(filePath)`) y `SmtpClient`. Se configura el host, el puerto (normalmente `587` para STARTTLS o `465` para SSL explícito), las credenciales de red y la habilitación de SSL/TLS (`EnableSsl = true`). Finalmente, se ejecuta `SmtpClient.Send` enviando el paquete del correo.
 
+### F) Flujo de Conversión de Documentos Híbrido (LibreOffice + Fallback Interno C#)
+La conversión de archivos (por ejemplo, al exportar o previsualizar documentos en formato PDF) se realiza a través de un flujo híbrido diseñado para garantizar tanto una alta fidelidad visual como la resiliencia del sistema:
+1. **Punto de decisión y búsqueda:** El método `FileConverterService.Convertir` recibe la ruta del archivo origen y el formato de destino (e.g., `.pdf`). Llama internamente a `BuscarSOffice()`, el cual escanea las rutas de instalación predeterminadas de LibreOffice en Windows.
+2. **Evaluación de condiciones:**
+   - **Caso A (LibreOffice instalado y no es imagen):** El sistema levanta el proceso asíncrono `soffice.exe` en modo headless (`--headless --convert-to [filtro]`). El archivo se genera en un directorio temporal único bajo `%TEMP%` para evitar colisiones y luego se mueve al destino final. Se cuenta con un control de tiempo de espera (`Timeout`) de 3 minutos para prevenir bloqueos por documentos corruptos.
+   - **Caso B (LibreOffice ausente o el archivo es una imagen):** Se redirige el flujo al motor fallback interno basado en C# (con `PdfSharpCore`, `ClosedXML` y `DocX`).
+3. **Procesamiento Fallback:** Las funciones de fallback manipulan el contenido a bajo nivel, procesando por ejemplo archivos de texto línea por línea (limitado a 50,000 líneas en Word por consumo de RAM), particionando líneas de texto que exceden el ancho de la página en PDF, o aplanando tablas de Excel y distribuyéndolas en múltiples hojas si sobrepasan el límite de 1,000,000 de filas.
+
 ---
 
 ## 📚 6. Referencia Exhaustiva y Diccionario Completo de Clases
@@ -141,7 +150,11 @@ Esta sección documenta **todas las clases** y funciones de los módulos del sis
 
 ### ⚙️ Services y UI
 *   `FileOperationsService`: Wrapper de `System.IO` para copias, eliminaciones y movimientos asíncronos.
-*   `FileConverterService`: OpenXML SDK para transformar archivos a formatos ofimáticos `.docx` y `.xlsx`.
+*   `FileConverterService`: Motor de conversión y exportación universal de archivos.
+    *   `Convertir(string rutaOrigen, string formatoDestino)`: Orquesta el proceso principal de conversión. Cuenta con lógica para resolver nombres duplicados incrementando secuencialmente un número al final del nombre (ej., `documento (1).pdf`) si ya existe el archivo en la ruta destino.
+    *   `BuscarSOffice()`: Escanea directorios de Windows para hallar el ejecutable de LibreOffice (`soffice.exe`).
+    *   `ConvertirConLibreOffice(...)`: Realiza la conversión con LibreOffice headless y redirige la salida a una ruta limpia temporal. Si el subproceso excede un tiempo de espera de 180,000 ms, lo fuerza a cerrarse.
+    *   `ConvertirADocx()`, `ConvertirAXlsx()`, `ConvertirAPdf()`, `ConvertirAPptx()`: Rutinas de fallback en C# nativo que leen y recrean los documentos usando librerías NuGet.
 *   `EmailService`: Componente auxiliar de compartición de archivos. Utiliza llamadas nativas MAPI (`Mapi32.dll` -> `MAPISendMail`) para abrir el cliente de correo por defecto del sistema operativo con el archivo adjunto pre-cargado. Incluye fallbacks de ejecución de procesos para lanzar Outlook y Thunderbird vía CLI, u abrir un enlace con esquema `mailto:` en caso de error.
 *   `SendMailForm`: Formulario clásico e interfaz de usuario para el envío directo y autónomo de archivos adjuntos mediante el protocolo SMTP. Utiliza las clases `SmtpClient` y `MailMessage` de .NET de manera asíncrona y persiste la configuración local en formato JSON.
 *   `ThemeRenderer`: Sobrescribe los eventos de pintado (`OnPaint`) de los controles de Windows para aplicar paletas oscuras (Dark Mode) esquivando el estilo obsoleto por defecto.

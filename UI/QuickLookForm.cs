@@ -4,105 +4,104 @@ using System.IO;
 using System.Windows.Forms;
 using Microsoft.Web.WebView2.WinForms; // ¡Requisito indispensable para PDFs!
 
-namespace ExploradorArchivos.UI
+namespace ExploradorArchivos.UI;
+
+/// <summary>
+/// Ventana de vista previa ultra rápida ("Quick Look" estilo macOS).
+/// Permite previsualizar imágenes, texto y PDFs sin abrir un editor completo.
+/// </summary>
+public class QuickLookForm : Form
 {
-    /// <summary>
-    /// Ventana de vista previa ultra rápida ("Quick Look" estilo macOS).
-    /// Permite previsualizar imágenes, texto y PDFs sin abrir un editor completo.
-    /// </summary>
-    public class QuickLookForm : Form
+    private PictureBox? _pictureBox; 
+    private RichTextBox? _richTextBox;
+    private WebView2? _webView;
+
+    public QuickLookForm(string filePath)
     {
-        private PictureBox? _pictureBox;
-        private RichTextBox? _richTextBox;
-        private WebView2? _webView;
+        // 1. Configuración Ultra-Flat
+        this.FormBorderStyle = FormBorderStyle.None;
+        this.BackColor = ColorTranslator.FromHtml("#1E1E1E");
+        this.Size = new Size(800, 600);
+        this.ShowInTaskbar = false;
+        this.KeyPreview = true;
 
-        public QuickLookForm(string filePath)
+        this.Padding = new Padding(2);
+        this.Paint += (s, e) => {
+            using Pen pen = new Pen(ThemeRenderer.Accent, 2);
+            e.Graphics.DrawRectangle(pen, 1, 1, this.Width - 2, this.Height - 2);
+        };
+
+        // 2. Barra de título y Semáforos
+        Panel pnlTitleBar = new Panel
         {
-            // 1. Configuración Ultra-Flat
-            this.FormBorderStyle = FormBorderStyle.None;
-            this.BackColor = ColorTranslator.FromHtml("#1E1E1E");
-            this.Size = new Size(800, 600);
-            this.ShowInTaskbar = false;
-            this.KeyPreview = true;
+            Dock = DockStyle.Top,
+            Height = 40,
+            BackColor = ColorTranslator.FromHtml("#1E1E1E")
+        };
 
-            this.Padding = new Padding(2);
-            this.Paint += (s, e) => {
-                using Pen pen = new Pen(ThemeRenderer.Accent, 2);
-                e.Graphics.DrawRectangle(pen, 1, 1, this.Width - 2, this.Height - 2);
-            };
+        bool isDragging = false;
+        Point lastCursor = Point.Empty;
+        pnlTitleBar.MouseDown += (s, e) => { if (e.Button == MouseButtons.Left) { isDragging = true; lastCursor = e.Location; } };
+        pnlTitleBar.MouseMove += (s, e) => { if (isDragging) { this.Location = new Point(this.Location.X + (e.X - lastCursor.X), this.Location.Y + (e.Y - lastCursor.Y)); } };
+        pnlTitleBar.MouseUp += (s, e) => { isDragging = false; };
+        pnlTitleBar.DoubleClick += (s, e) => {
+            this.WindowState = this.WindowState == FormWindowState.Normal ? FormWindowState.Maximized : FormWindowState.Normal;
+        };
 
-            // 2. Barra de título y Semáforos
-            Panel pnlTitleBar = new Panel
-            {
-                Dock = DockStyle.Top,
-                Height = 40,
-                BackColor = ColorTranslator.FromHtml("#1E1E1E")
-            };
+        Panel pnlSemaforos = new Panel { Name = "pnlSemaforos", Location = new Point(15, 13), Size = new Size(60, 20), BackColor = Color.Transparent };
+        
+        Button btnClose = CrearBotonSemaforo(Color.FromArgb(255, 95, 86), 0, pnlTitleBar.BackColor);
+        btnClose.Click += (s, e) => this.Close();
+        
+        Button btnMin = CrearBotonSemaforo(Color.FromArgb(255, 189, 46), 20, pnlTitleBar.BackColor);
+        btnMin.Click += (s, e) => this.WindowState = FormWindowState.Minimized;
+        
+        Button btnMax = CrearBotonSemaforo(Color.FromArgb(39, 201, 63), 40, pnlTitleBar.BackColor);
+        btnMax.Click += (s, e) => {
+            this.WindowState = this.WindowState == FormWindowState.Normal ? FormWindowState.Maximized : FormWindowState.Normal;
+        };
 
-            bool isDragging = false;
-            Point lastCursor = Point.Empty;
-            pnlTitleBar.MouseDown += (s, e) => { if (e.Button == MouseButtons.Left) { isDragging = true; lastCursor = e.Location; } };
-            pnlTitleBar.MouseMove += (s, e) => { if (isDragging) { this.Location = new Point(this.Location.X + (e.X - lastCursor.X), this.Location.Y + (e.Y - lastCursor.Y)); } };
-            pnlTitleBar.MouseUp += (s, e) => { isDragging = false; };
-            pnlTitleBar.DoubleClick += (s, e) => {
-                this.WindowState = this.WindowState == FormWindowState.Normal ? FormWindowState.Maximized : FormWindowState.Normal;
-            };
+        pnlSemaforos.Controls.AddRange([btnClose, btnMin, btnMax]);
+        pnlTitleBar.Controls.Add(pnlSemaforos);
 
-            Panel pnlSemaforos = new Panel { Name = "pnlSemaforos", Location = new Point(15, 13), Size = new Size(60, 20), BackColor = Color.Transparent };
-            
-            Button btnClose = CrearBotonSemaforo(Color.FromArgb(255, 95, 86), 0, pnlTitleBar.BackColor);
-            btnClose.Click += (s, e) => this.Close();
-            
-            Button btnMin = CrearBotonSemaforo(Color.FromArgb(255, 189, 46), 20, pnlTitleBar.BackColor);
-            btnMin.Click += (s, e) => this.WindowState = FormWindowState.Minimized;
-            
-            Button btnMax = CrearBotonSemaforo(Color.FromArgb(39, 201, 63), 40, pnlTitleBar.BackColor);
-            btnMax.Click += (s, e) => {
-                this.WindowState = this.WindowState == FormWindowState.Normal ? FormWindowState.Maximized : FormWindowState.Normal;
-            };
-
-            pnlSemaforos.Controls.AddRange(new Control[] { btnClose, btnMin, btnMax });
-            pnlTitleBar.Controls.Add(pnlSemaforos);
-
-            Label lblTitle = new Label
-            {
-                Text = Path.GetFileName(filePath),
-                Dock = DockStyle.Fill,
-                TextAlign = ContentAlignment.MiddleCenter,
-                ForeColor = Color.White,
-                Font = new Font("Segoe UI Variable", 12, FontStyle.Bold)
-            };
-            
-            lblTitle.MouseDown += (s, e) => { if (e.Button == MouseButtons.Left) { isDragging = true; lastCursor = e.Location; } };
-            lblTitle.MouseMove += (s, e) => { if (isDragging) { this.Location = new Point(this.Location.X + (e.X - lastCursor.X), this.Location.Y + (e.Y - lastCursor.Y)); } };
-            lblTitle.MouseUp += (s, e) => { isDragging = false; };
-            lblTitle.DoubleClick += (s, e) => {
-                this.WindowState = this.WindowState == FormWindowState.Normal ? FormWindowState.Maximized : FormWindowState.Normal;
-            };
-
-            pnlTitleBar.Controls.Add(lblTitle);
-            lblTitle.SendToBack();
-            this.Controls.Add(pnlTitleBar);
-
-            // 3. Cargar el archivo
-            CargarContenido(filePath);
-
-            // 4. Cerrar con Espacio o Escape
-            this.KeyDown += (s, e) => {
-                if (e.KeyCode == Keys.Space || e.KeyCode == Keys.Escape)
-                    this.Close();
-            };
-
-            // Se remueve Deactivate para permitir usar los botones de semáforo sin que se cierre automáticamente
-        }
-
-        private void CargarContenido(string filePath)
+        Label lblTitle = new Label
         {
-            string ext = Path.GetExtension(filePath).ToLower();
+            Text = Path.GetFileName(filePath),
+            Dock = DockStyle.Fill,
+            TextAlign = ContentAlignment.MiddleCenter,
+            ForeColor = Color.White,
+            Font = new Font("Segoe UI Variable", 12, FontStyle.Bold)
+        };
+        
+        lblTitle.MouseDown += (s, e) => { if (e.Button == MouseButtons.Left) { isDragging = true; lastCursor = e.Location; } };
+        lblTitle.MouseMove += (s, e) => { if (isDragging) { this.Location = new Point(this.Location.X + (e.X - lastCursor.X), this.Location.Y + (e.Y - lastCursor.Y)); } };
+        lblTitle.MouseUp += (s, e) => { isDragging = false; };
+        lblTitle.DoubleClick += (s, e) => {
+            this.WindowState = this.WindowState == FormWindowState.Normal ? FormWindowState.Maximized : FormWindowState.Normal;
+        };
 
+        pnlTitleBar.Controls.Add(lblTitle);
+        lblTitle.SendToBack();
+        this.Controls.Add(pnlTitleBar);
+
+        // 3. Cargar el archivo
+        CargarContenido(filePath);
+
+        // 4. Cerrar con Espacio o Escape
+        this.KeyDown += (s, e) => {
+            if (e.KeyCode == Keys.Space || e.KeyCode == Keys.Escape)
+                this.Close();
+        };
+    }
+
+    private void CargarContenido(string filePath)
+    {
+        string ext = Path.GetExtension(filePath).ToLower();
+
+        switch (ext)
+        {
             // === IMÁGENES ===
-            if (ext is ".jpg" or ".jpeg" or ".png" or ".gif" or ".bmp" or ".webp")
-            {
+            case ".jpg" or ".jpeg" or ".png" or ".gif" or ".bmp" or ".webp":
                 _pictureBox = new PictureBox { Dock = DockStyle.Fill, SizeMode = PictureBoxSizeMode.Zoom };
                 byte[] bytes = File.ReadAllBytes(filePath);
                 using (var ms = new MemoryStream(bytes))
@@ -111,10 +110,10 @@ namespace ExploradorArchivos.UI
                 }
                 this.Controls.Add(_pictureBox);
                 _pictureBox.BringToFront();
-            }
+                break;
+
             // === TEXTO / CÓDIGO ===
-            else if (ext is ".txt" or ".json" or ".xml" or ".cs" or ".csv" or ".log" or ".py" or ".bat" or ".cmd" or ".dat" or ".md" or ".html" or ".css" or ".js")
-            {
+            case ".txt" or ".json" or ".xml" or ".cs" or ".csv" or ".log" or ".py" or ".bat" or ".cmd" or ".dat" or ".md" or ".html" or ".css" or ".js":
                 _richTextBox = new RichTextBox
                 {
                     Dock = DockStyle.Fill,
@@ -126,22 +125,21 @@ namespace ExploradorArchivos.UI
                 };
 
                 FileInfo fi = new FileInfo(filePath);
-                if (fi.Length > 1024 * 1024)
-                    _richTextBox.Text = "El archivo es demasiado grande para la vista previa rápida.";
-                else
-                    _richTextBox.Text = File.ReadAllText(filePath);
+                _richTextBox.Text = fi.Length > 1024 * 1024
+                    ? "El archivo es demasiado grande para la vista previa rápida."
+                    : File.ReadAllText(filePath);
 
                 this.Controls.Add(_richTextBox);
                 _richTextBox.BringToFront();
-            }
+                break;
+
             // === PDFs Y WEB ===
-            else if (ext == ".pdf")
-            {
+            case ".pdf":
                 CargarPDFAsync(filePath);
-            }
+                break;
+
             // === ARCHIVO NO SOPORTADO ===
-            else
-            {
+            default:
                 Label lblNoPreview = new Label
                 {
                     Text = "Vista previa no disponible para este formato.",
@@ -152,61 +150,61 @@ namespace ExploradorArchivos.UI
                 };
                 this.Controls.Add(lblNoPreview);
                 lblNoPreview.BringToFront();
-            }
+                break;
         }
+    }
 
-        private async void CargarPDFAsync(string filePath)
+    private async void CargarPDFAsync(string filePath)
+    {
+        try
         {
-            try
+            _webView = new WebView2
             {
-                _webView = new WebView2
-                {
-                    Dock = DockStyle.Fill,
-                    BackColor = ColorTranslator.FromHtml("#1E1E1E")
-                };
-
-                this.Controls.Add(_webView);
-                _webView.BringToFront();
-
-                // Inicializar motor Chromium
-                await _webView.EnsureCoreWebView2Async(null);
-
-                // Navegar al PDF
-                _webView?.CoreWebView2.Navigate(filePath);
-            }
-            catch (Exception)
-            {
-                Label lblError = new Label
-                {
-                    Text = "Error al cargar el visor PDF.\nVerifica que WebView2 esté instalado correctamente.",
-                    Dock = DockStyle.Fill,
-                    TextAlign = ContentAlignment.MiddleCenter,
-                    ForeColor = ThemeRenderer.Accent,
-                    Font = new Font("Segoe UI", 11)
-                };
-                this.Controls.Add(lblError);
-                lblError.BringToFront();
-            }
-        }
-
-        protected override void OnFormClosed(FormClosedEventArgs e)
-        {
-            _pictureBox?.Image?.Dispose();
-            _webView?.Dispose(); // Liberamos memoria de Chromium
-            base.OnFormClosed(e);
-        }
-
-        private Button CrearBotonSemaforo(Color color, int x, Color backColor)
-        {
-            Button b = new Button { Name = "btnSemaforo", Location = new Point(x, 0), Size = new Size(14, 14), BackColor = color, FlatStyle = FlatStyle.Flat };
-            b.FlatAppearance.BorderSize = 0;
-            b.Paint += (s, e) => {
-                e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
-                e.Graphics.Clear(backColor);
-                e.Graphics.FillEllipse(new SolidBrush(color), 0, 0, b.Width - 1, b.Height - 1);
-                e.Graphics.DrawEllipse(new Pen(Color.FromArgb(50, Color.Black)), 0, 0, b.Width - 1, b.Height - 1);
+                Dock = DockStyle.Fill,
+                BackColor = ColorTranslator.FromHtml("#1E1E1E")
             };
-            return b;
+
+            this.Controls.Add(_webView);
+            _webView.BringToFront();
+
+            // Inicializar motor Chromium
+            await _webView.EnsureCoreWebView2Async(null);
+
+            // Navegar al PDF
+            _webView?.CoreWebView2.Navigate(filePath);
         }
+        catch (Exception)
+        {
+            Label lblError = new Label
+            {
+                Text = "Error al cargar el visor PDF.\nVerifica que WebView2 esté instalado correctamente.",
+                Dock = DockStyle.Fill,
+                TextAlign = ContentAlignment.MiddleCenter,
+                ForeColor = ThemeRenderer.Accent,
+                Font = new Font("Segoe UI", 11)
+            };
+            this.Controls.Add(lblError);
+            lblError.BringToFront();
+        }
+    }
+
+    protected override void OnFormClosed(FormClosedEventArgs e)
+    {
+        _pictureBox?.Image?.Dispose();
+        _webView?.Dispose(); // Liberamos memoria de Chromium
+        base.OnFormClosed(e);
+    }
+
+    private Button CrearBotonSemaforo(Color color, int x, Color backColor)
+    {
+        Button b = new Button { Name = "btnSemaforo", Location = new Point(x, 0), Size = new Size(14, 14), BackColor = color, FlatStyle = FlatStyle.Flat };
+        b.FlatAppearance.BorderSize = 0;
+        b.Paint += (s, e) => {
+            e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+            e.Graphics.Clear(backColor);
+            e.Graphics.FillEllipse(new SolidBrush(color), 0, 0, b.Width - 1, b.Height - 1);
+            e.Graphics.DrawEllipse(new Pen(Color.FromArgb(50, Color.Black)), 0, 0, b.Width - 1, b.Height - 1);
+        };
+        return b;
     }
 }

@@ -1,8 +1,14 @@
 using MySqlConnector;
 using ExploradorArchivos.AppDataFusion.Models;
+using System.Globalization;
 
 namespace ExploradorArchivos.AppDataFusion.Database;
 
+/// <summary>
+/// Conector para base de datos MariaDB / MySQL.
+/// Se encarga de abrir conexiones, recuperar la metadata de columnas,
+/// buscar claves primarias, y mapear filas a objetos DataItem usando heurísticas semánticas.
+/// </summary>
 public class MariaDbConnector
 {
     public string CadenaConexion { get; set; } = "";
@@ -10,8 +16,7 @@ public class MariaDbConnector
     public int LimiteFilas { get; set; } = 0;
 
     public List<string> UltimasColumnas { get; private set; } = new();
-    public Dictionary<string, string> MapeoColumnas { get; private set; } =
-        new(StringComparer.OrdinalIgnoreCase);
+    public Dictionary<string, string> MapeoColumnas { get; private set; } = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
     /// Nombre real de la columna PRIMARY KEY en la tabla de la BD.
@@ -19,16 +24,21 @@ public class MariaDbConnector
     /// </summary>
     public string? ColPrimaryKey { get; private set; }
 
-    // Flag: el usuario ya eligió el mapeo manualmente → no tocar en LeerDatos
+    // Flag: el usuario ya eligió el mapeo manualmente.
     private bool _mapeoConfirmadoPorUsuario = false;
 
     public MariaDbConnector() { }
     public MariaDbConnector(string cadenaConexion, string tabla)
-    { CadenaConexion = cadenaConexion; Tabla = tabla; }
+    {
+        CadenaConexion = cadenaConexion;
+        Tabla = tabla;
+    }
 
     /// <summary>
-    /// Consulta la tabla en MariaDB limitando a 0 filas para extraer rápidamente
-    /// los metadatos y nombres reales de las columnas disponibles.
+    /// Método: ObtenerNombresColumnas
+    /// - Inicializa: MySqlConnection y MySqlCommand.
+    /// - Objetos: MySqlDataReader (lector de esquema).
+    /// - Operación: Consulta la estructura de la tabla con LIMIT 0 para listar columnas y obtener la clave primaria.
     /// </summary>
     public List<string> ObtenerNombresColumnas()
     {
@@ -37,65 +47,70 @@ public class MariaDbConnector
         {
             using var conn = new MySqlConnection(CadenaConexion);
             conn.Open();
+
             using var cmd = new MySqlCommand($"SELECT * FROM `{Tabla}` LIMIT 0", conn);
             using var r = cmd.ExecuteReader();
+            
             for (int i = 0; i < r.FieldCount; i++) cols.Add(r.GetName(i));
             r.Close();
-            // Detectar clave primaria real desde INFORMATION_SCHEMA
+
             ColPrimaryKey = ObtenerPrimaryKeyColumna(conn);
         }
         catch (Exception ex)
-        { Console.WriteLine($"[MariaDB] ObtenerNombresColumnas: {ex.Message}"); }
+        { 
+            Console.WriteLine($"[MariaDB] ObtenerNombresColumnas: {ex.Message}"); 
+        }
 
-        UltimasColumnas = new List<string>(cols);
+        UltimasColumnas = [..cols];
         ActualizarMapeoAutomatico(cols);
         _mapeoConfirmadoPorUsuario = false;
         return cols;
     }
 
-    /// <summary>Consulta INFORMATION_SCHEMA para obtener el nombre real de la PRIMARY KEY o un índice único.</summary>
+    /// <summary>
+    /// Método: ObtenerPrimaryKeyColumna
+    /// - Inicializa: MySqlCommand.
+    /// - Operación: Consulta INFORMATION_SCHEMA para recuperar la columna Primary Key o un índice UNIQUE; usa la primera columna como fallback.
+    /// </summary>
     private string? ObtenerPrimaryKeyColumna(MySqlConnection conn)
     {
         try
         {
-            // Intento 1: Clave PRIMARY KEY
-            string sql = @"SELECT COLUMN_NAME 
+            string? GetColumn(string sqlQuery)
+            {
+                using var cmd = new MySqlCommand(sqlQuery, conn);
+                cmd.Parameters.AddWithValue("@schema", conn.Database);
+                cmd.Parameters.AddWithValue("@tabla", Tabla);
+                return cmd.ExecuteScalar()?.ToString();
+            }
+
+            string sqlPk = @"SELECT COLUMN_NAME 
                 FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE 
                 WHERE TABLE_SCHEMA = @schema 
                   AND TABLE_NAME   = @tabla 
                   AND CONSTRAINT_NAME = 'PRIMARY' 
                 ORDER BY ORDINAL_POSITION 
                 LIMIT 1";
-            using var cmd = new MySqlCommand(sql, conn);
-            cmd.Parameters.AddWithValue("@schema", conn.Database);
-            cmd.Parameters.AddWithValue("@tabla", Tabla);
-            var result = cmd.ExecuteScalar()?.ToString();
-            if (!string.IsNullOrEmpty(result))
+            if (GetColumn(sqlPk) is { } pk && !string.IsNullOrEmpty(pk))
             {
-                Console.WriteLine($"[MariaDB] PK detectada (PRIMARY KEY): '{result}'");
-                return result;
+                Console.WriteLine($"[MariaDB] PK detectada (PRIMARY KEY): '{pk}'");
+                return pk;
             }
 
-            // Intento 2: Índice UNIQUE (primer campo del primer índice único)
             string sqlUnique = @"SELECT COLUMN_NAME 
                 FROM INFORMATION_SCHEMA.STATISTICS 
-                WHERE TABLE_SCHEMA = @schema2 
-                  AND TABLE_NAME   = @tabla2 
+                WHERE TABLE_SCHEMA = @schema 
+                  AND TABLE_NAME   = @tabla 
                   AND NON_UNIQUE   = 0 
                   AND INDEX_NAME  != 'PRIMARY' 
                 ORDER BY SEQ_IN_INDEX 
                 LIMIT 1";
-            using var cmd2 = new MySqlCommand(sqlUnique, conn);
-            cmd2.Parameters.AddWithValue("@schema2", conn.Database);
-            cmd2.Parameters.AddWithValue("@tabla2", Tabla);
-            var result2 = cmd2.ExecuteScalar()?.ToString();
-            if (!string.IsNullOrEmpty(result2))
+            if (GetColumn(sqlUnique) is { } uq && !string.IsNullOrEmpty(uq))
             {
-                Console.WriteLine($"[MariaDB] PK detectada (UNIQUE index): '{result2}'");
-                return result2;
+                Console.WriteLine($"[MariaDB] PK detectada (UNIQUE index): '{uq}'");
+                return uq;
             }
 
-            // Intento 3: Primera columna de la tabla (fallback más robusto)
             if (UltimasColumnas.Count > 0)
             {
                 string firstCol = UltimasColumnas[0];
@@ -109,7 +124,6 @@ public class MariaDbConnector
         catch (Exception ex)
         {
             Console.WriteLine($"[MariaDB] ObtenerPrimaryKey error: {ex.Message}");
-            // Fallback de emergencia: primera columna conocida
             if (UltimasColumnas.Count > 0)
             {
                 Console.WriteLine($"[MariaDB] Fallback de emergencia: primera columna '{UltimasColumnas[0]}'");
@@ -120,15 +134,14 @@ public class MariaDbConnector
     }
 
     /// <summary>
-    /// Permite al usuario forzar un mapeo manual de las columnas (roles: id, categoría, valor, nombre, fecha),
-    /// anulando la inferencia automática basada en expresiones regulares.
+    /// Método: SobreescribirMapeo
+    /// - Operación: Asigna las columnas mapeadas por el usuario a los campos estándar de DataItem, anulando el auto-mapeo.
     /// </summary>
     public void SobreescribirMapeo(
         string colId,
         string colCategoria, string colValor,
         string colNombre, string colFecha)
     {
-        // Si no se proporcionó un ID, intentar buscar uno automáticamente
         if (string.IsNullOrWhiteSpace(colId))
         {
             var aliases = new[] { "id", "_id", "codigo", "code", "num", "numero", "idx", "index", "rank", "no", "student_id", "car_id", "usedcarskuid", "sku_id", "sku" };
@@ -157,8 +170,10 @@ public class MariaDbConnector
     }
 
     /// <summary>
-    /// Abre la conexión a MariaDB, recupera todos los registros de la tabla configurada y
-    /// los mapea uno a uno hacia objetos <see cref="DataItem"/> en memoria.
+    /// Método: LeerDatos
+    /// - Inicializa: MySqlConnection, MySqlCommand, Dictionary (mapeo de índices).
+    /// - Objetos: MySqlDataReader (lector de registros).
+    /// - Operación: Recupera y mapea los registros de la tabla MariaDB a objetos DataItem rellenando CamposExtra heurísticamente.
     /// </summary>
     public List<DataItem> LeerDatos()
     {
@@ -169,7 +184,6 @@ public class MariaDbConnector
             conn.Open();
             Console.WriteLine($"[MariaDB] ✓  Conectado a {conn.Database}");
 
-            // Detectar PRIMARY KEY real antes de leer datos
             ColPrimaryKey = ObtenerPrimaryKeyColumna(conn);
 
             string sql = LimiteFilas > 0
@@ -187,11 +201,9 @@ public class MariaDbConnector
             if (!_mapeoConfirmadoPorUsuario)
                 ActualizarMapeoAutomatico(mapa.Keys);
 
-            // Si la PK fue detectada y no está en MapeoColumnas como "id", agregarla
             if (!string.IsNullOrEmpty(ColPrimaryKey) &&
                 !MapeoColumnas.ContainsKey(ColPrimaryKey))
             {
-                // Solo agregamos si no hay ya una columna mapeada como "id"
                 if (!MapeoColumnas.Values.Any(v => v == "id"))
                     MapeoColumnas[ColPrimaryKey] = "id";
             }
@@ -220,11 +232,8 @@ public class MariaDbConnector
 
                 item.Id = parsedOk ? idV : contador;
 
-                // IMPORTANTE: Siempre guardar el valor del identificador en CamposExtra
-                // (aunque la columna esté mapeada a otro rol), para poder usar en el WHERE del UPDATE
                 if (colId != null)
                 {
-                    // Leer el valor directamente del reader si no se leyó antes
                     if (string.IsNullOrEmpty(rawIdVal) && mapa.TryGetValue(colId, out int iId2) && !reader.IsDBNull(iId2))
                         rawIdVal = reader[iId2]?.ToString();
 
@@ -251,6 +260,7 @@ public class MariaDbConnector
             }
             Console.WriteLine($"[MariaDB] ✓  {lista.Count} registros leídos. " +
                 $"Cat={colCat ?? "—"} Val={colVal ?? "—"} Nom={colNom ?? "—"}");
+            
             EnriquecerCamposFaltantes(lista, colCat, colVal, colNom);
         }
         catch (Exception ex) { Console.WriteLine($"[MariaDB] ✗  Error: {ex.Message}"); }
@@ -258,8 +268,9 @@ public class MariaDbConnector
     }
 
     /// <summary>
-    /// Ejecuta una consulta rápida (COUNT) para verificar que la cadena de conexión
-    /// sea válida y la tabla exista en MariaDB. Retorna el resultado en el mensaje de salida.
+    /// Método: ProbarConexion
+    /// - Inicializa: MySqlConnection y MySqlCommand.
+    /// - Operación: Ejecuta SELECT COUNT(*) para verificar la conexión y la existencia de la tabla.
     /// </summary>
     public bool ProbarConexion(out string mensaje)
     {
@@ -276,54 +287,36 @@ public class MariaDbConnector
     }
 
     /// <summary>
-    /// Analiza los nombres de las columnas obtenidas de la BD y busca palabras clave comunes
-    /// (ej. "price", "ventas", "name", "fecha") para asignar automáticamente cada columna al rol correspondiente.
+    /// Método: ActualizarMapeoAutomatico
+    /// - Operación: Compara los nombres de columnas contra arreglos de alias semánticos para asociar cada rol.
     /// </summary>
     private void ActualizarMapeoAutomatico(IEnumerable<string>? cols = null)
     {
         var src = (cols ?? UltimasColumnas).ToList();
         MapeoColumnas.Clear();
 
-        string? Find(params string[] alias)
-        {
-            foreach (var a in alias)
-                foreach (var c in src)
-                    if (string.Equals(c, a, StringComparison.OrdinalIgnoreCase)) return c;
-            return null;
-        }
+        string? Find(params string[] aliases) =>
+            aliases.FirstOrDefault(alias => src.Any(col => string.Equals(col, alias, StringComparison.OrdinalIgnoreCase)));
 
-        string? c;
-        c = Find("id", "_id", "codigo", "code", "num", "numero", "idx", "index", "rank", "no", "student_id", "car_id", "usedcarskuid", "sku_id", "sku"); if (c != null) MapeoColumnas[c] = "id";
-        c = Find("nombre", "name", "titulo", "title", "pais", "country", "jugador", "player", "empleado", "employee", "producto", "item", "micrositio", "descripcion", "description", "persona", "person", "autor", "author", "atleta", "athlete", "brand", "marca", "model", "modelo"); if (c != null) MapeoColumnas[c] = "nombre";
-        c = Find("categoria", "category", "genero", "genre", "gender", "sexo", "sex", "region", "tipo", "type", "departamento", "department", "level", "nivel", "segmento", "segment", "grupo", "group_name", "group", "clasificacion", "clase", "class", "division"); if (c != null) MapeoColumnas[c] = "categoria";
-        c = Find("valor", "value", "precio", "price", "ventas_global", "ventas", "sales", "score", "puntos", "salario", "puntaje", "total", "monto", "amount", "importe", "cost", "costo", "revenue", "ingreso", "metrica", "Numero_de_notas_transmitidas", "salary", "points", "frec", "frecuencia", "frequency", "count", "cantidad", "edad_media", "edad", "age", "promedio", "avg"); if (c != null) MapeoColumnas[c] = "valor";
-        c = Find("fecha", "date", "fecha_lanzamiento", "anio", "year", "created_at", "updated_at", "timestamp", "fecha_registro", "fecha_reporte", "periodo", "fechaContratacion", "hireDate", "period"); if (c != null) MapeoColumnas[c] = "fecha";
+        if (Find("id", "_id", "codigo", "code", "num", "numero", "idx", "index", "rank", "no", "student_id", "car_id", "usedcarskuid", "sku_id", "sku") is { } cId) MapeoColumnas[cId] = "id";
+        if (Find("nombre", "name", "titulo", "title", "pais", "country", "jugador", "player", "empleado", "employee", "producto", "item", "micrositio", "descripcion", "description", "persona", "person", "autor", "author", "atleta", "athlete", "brand", "marca", "model", "modelo") is { } cNom) MapeoColumnas[cNom] = "nombre";
+        if (Find("categoria", "category", "genero", "genre", "gender", "sexo", "sex", "region", "tipo", "type", "departamento", "department", "level", "nivel", "segmento", "segment", "grupo", "group_name", "group", "clasificacion", "clase", "class", "division") is { } cCat) MapeoColumnas[cCat] = "categoria";
+        if (Find("valor", "value", "precio", "price", "ventas_global", "ventas", "sales", "score", "puntos", "salario", "puntaje", "total", "monto", "amount", "importe", "cost", "costo", "revenue", "ingreso", "metrica", "Numero_de_notas_transmitidas", "salary", "points", "frec", "frecuencia", "frequency", "count", "cantidad", "edad_media", "edad", "age", "promedio", "avg") is { } cVal) MapeoColumnas[cVal] = "valor";
+        if (Find("fecha", "date", "fecha_lanzamiento", "anio", "year", "created_at", "updated_at", "timestamp", "fecha_registro", "fecha_reporte", "periodo", "fechaContratacion", "hireDate", "period") is { } cFec) MapeoColumnas[cFec] = "fecha";
     }
 
-    private static string? LeerStr(MySqlDataReader r, Dictionary<string, int> m, string? col)
-    {
-        if (col == null || !m.TryGetValue(col, out int i) || r.IsDBNull(i)) return null;
-        var v = r[i]?.ToString();
-        return string.IsNullOrWhiteSpace(v) ? null : v;
-    }
+    private static string? LeerStr(MySqlDataReader r, Dictionary<string, int> m, string? col) =>
+        col != null && m.TryGetValue(col, out int i) && !r.IsDBNull(i) && r[i]?.ToString() is { } v && !string.IsNullOrWhiteSpace(v) ? v : null;
 
-    private static double? LeerDbl(MySqlDataReader r, Dictionary<string, int> m, string? col)
-    {
-        if (col == null || !m.TryGetValue(col, out int i) || r.IsDBNull(i)) return null;
-        return double.TryParse(r[i].ToString(),
-            System.Globalization.NumberStyles.Any,
-            System.Globalization.CultureInfo.InvariantCulture, out double v) ? v : null;
-    }
+    private static double? LeerDbl(MySqlDataReader r, Dictionary<string, int> m, string? col) =>
+        col != null && m.TryGetValue(col, out int i) && !r.IsDBNull(i) && double.TryParse(r[i].ToString(), NumberStyles.Any, CultureInfo.InvariantCulture, out double v) ? v : null;
 
-    private static DateTime? LeerDate(MySqlDataReader r, Dictionary<string, int> m, string? col)
-    {
-        if (col == null || !m.TryGetValue(col, out int i) || r.IsDBNull(i)) return null;
-        return DateTime.TryParse(r[i].ToString(), out DateTime d) ? d : null;
-    }
+    private static DateTime? LeerDate(MySqlDataReader r, Dictionary<string, int> m, string? col) =>
+        col != null && m.TryGetValue(col, out int i) && !r.IsDBNull(i) && DateTime.TryParse(r[i].ToString(), out DateTime d) ? d : null;
 
     /// <summary>
-    /// Evalúa la colección de items recién cargados. Si alguna propiedad principal (Nombre, Categoria, Valor)
-    /// quedó en blanco (o 0), ejecuta una heurística estadística sobre los CamposExtra para inferir el dato faltante.
+    /// Método: EnriquecerCamposFaltantes
+    /// - Operación: Autodetecta campos vacíos en el DataItem analizando dinámicamente las columnas de CamposExtra mediante heurísticas.
     /// </summary>
     private static void EnriquecerCamposFaltantes(
         List<DataItem> items, string? colCategoria, string? colValor, string? colNombre)
@@ -348,8 +341,7 @@ public class MariaDbConnector
 
             if (kValor != null && Math.Abs(item.Valor) < 0.0000001 &&
                 item.CamposExtra.TryGetValue(kValor, out var raw) &&
-                double.TryParse(raw, System.Globalization.NumberStyles.Any,
-                    System.Globalization.CultureInfo.InvariantCulture, out double v))
+                double.TryParse(raw, NumberStyles.Any, CultureInfo.InvariantCulture, out double v))
                 item.Valor = v;
 
             if (kNombre != null &&
@@ -361,96 +353,78 @@ public class MariaDbConnector
     }
 
     /// <summary>
-    /// Heurística: Examina todos los campos extras dinámicos y califica cuál es más probable
-    /// que sea una Categoría analizando cuántos valores únicos y de texto contiene frente al total.
+    /// Método: BuscarMejorClaveCategoria
+    /// - Operación: Califica cada columna según el porcentaje de valores textuales no vacíos y únicos, estimando cuál funciona como Categoría.
     /// </summary>
     private static string? BuscarMejorClaveCategoria(List<DataItem> items)
     {
-        var candidatos = items.SelectMany(i => i.CamposExtra.Keys)
-            .Distinct(StringComparer.OrdinalIgnoreCase);
-
-        string? mejor = null;
-        int mejorPuntaje = 0;
-
-        foreach (var key in candidatos)
-        {
-            int noVacios = 0, noNumericos = 0;
-            var unicos = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            foreach (var item in items)
+        return items.SelectMany(i => i.CamposExtra.Keys)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Select(key =>
             {
-                if (!item.CamposExtra.TryGetValue(key, out var raw) || string.IsNullOrWhiteSpace(raw)) continue;
-                noVacios++;
-                var v = raw.Trim();
-                unicos.Add(v);
-                bool esNumero = double.TryParse(v, System.Globalization.NumberStyles.Any,
-                    System.Globalization.CultureInfo.InvariantCulture, out _);
-                if (!esNumero) noNumericos++;
-            }
-
-            if (noVacios == 0 || noNumericos < Math.Max(2, noVacios / 2)) continue;
-            if (unicos.Count <= 1 || unicos.Count > Math.Max(2, items.Count - 1)) continue;
-
-            int puntaje = noVacios + Math.Min(unicos.Count * 2, 30);
-            if (puntaje > mejorPuntaje) { mejorPuntaje = puntaje; mejor = key; }
-        }
-        return mejor;
+                var values = items.Select(item => item.CamposExtra.TryGetValue(key, out var raw) ? raw : null)
+                                  .Where(v => !string.IsNullOrWhiteSpace(v))
+                                  .Select(v => v!.Trim())
+                                  .ToList();
+                int noVacios = values.Count;
+                int noNumericos = values.Count(v => !double.TryParse(v, NumberStyles.Any, CultureInfo.InvariantCulture, out _));
+                var unicos = new HashSet<string>(values, StringComparer.OrdinalIgnoreCase);
+                
+                bool valido = noVacios > 0 && 
+                              noNumericos >= Math.Max(2, noVacios / 2) && 
+                              unicos.Count > 1 && 
+                              unicos.Count <= Math.Max(2, items.Count - 1);
+                              
+                int puntaje = noVacios + Math.Min(unicos.Count * 2, 30);
+                return new { Key = key, Puntaje = puntaje, Valido = valido };
+            })
+            .Where(x => x.Valido)
+            .OrderByDescending(x => x.Puntaje)
+            .Select(x => x.Key)
+            .FirstOrDefault();
     }
 
     /// <summary>
-    /// Heurística: Examina los campos extras y elige la columna que contenga la mayor cantidad
-    /// de datos que puedan parsearse exitosamente a <see cref="double"/>.
+    /// Método: BuscarMejorClaveNumerica
+    /// - Operación: Encuentra la columna con el mayor número de elementos que puedan convertirse exitosamente a número decimal.
     /// </summary>
     private static string? BuscarMejorClaveNumerica(List<DataItem> items)
     {
-        var candidatos = items.SelectMany(i => i.CamposExtra.Keys)
-            .Distinct(StringComparer.OrdinalIgnoreCase);
-
-        string? mejor = null;
-        int mejorPuntaje = 0;
-
-        foreach (var key in candidatos)
-        {
-            int numericos = 0;
-            foreach (var item in items)
-                if (item.CamposExtra.TryGetValue(key, out var raw) &&
-                    double.TryParse(raw, System.Globalization.NumberStyles.Any,
-                        System.Globalization.CultureInfo.InvariantCulture, out _))
-                    numericos++;
-
-            if (numericos < Math.Max(2, items.Count / 3)) continue;
-            if (numericos > mejorPuntaje) { mejorPuntaje = numericos; mejor = key; }
-        }
-        return mejor;
+        return items.SelectMany(i => i.CamposExtra.Keys)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Select(key => new
+            {
+                Key = key,
+                Count = items.Count(item => item.CamposExtra.TryGetValue(key, out var raw) &&
+                                            double.TryParse(raw, NumberStyles.Any, CultureInfo.InvariantCulture, out _))
+            })
+            .Where(x => x.Count >= Math.Max(2, items.Count / 3))
+            .OrderByDescending(x => x.Count)
+            .Select(x => x.Key)
+            .FirstOrDefault();
     }
 
     /// <summary>
-    /// Heurística: Intenta identificar cuál campo dinámico restante sirve mejor como "Nombre" descriptivo,
-    /// evitando columnas puramente numéricas o que ya hayan sido seleccionadas como Categoría.
+    /// Método: BuscarMejorClaveTexto
+    /// - Operación: Identifica la columna de texto descriptivo sobrante que mejor actúe como Nombre del registro.
     /// </summary>
     private static string? BuscarMejorClaveTexto(List<DataItem> items, string? evitar)
     {
-        var candidatos = items.SelectMany(i => i.CamposExtra.Keys)
+        return items.SelectMany(i => i.CamposExtra.Keys)
             .Distinct(StringComparer.OrdinalIgnoreCase)
-            .Where(k => !string.Equals(k, evitar, StringComparison.OrdinalIgnoreCase));
-
-        string? mejor = null;
-        int mejorPuntaje = 0;
-
-        foreach (var key in candidatos)
-        {
-            int noVacios = 0, noNumericos = 0;
-            foreach (var item in items)
+            .Where(k => !string.Equals(k, evitar, StringComparison.OrdinalIgnoreCase))
+            .Select(key =>
             {
-                if (!item.CamposExtra.TryGetValue(key, out var raw) || string.IsNullOrWhiteSpace(raw)) continue;
-                noVacios++;
-                bool esNumero = double.TryParse(raw, System.Globalization.NumberStyles.Any,
-                    System.Globalization.CultureInfo.InvariantCulture, out _);
-                if (!esNumero) noNumericos++;
-            }
-            if (noVacios == 0 || noNumericos < Math.Max(2, noVacios / 2)) continue;
-            if (noVacios > mejorPuntaje) { mejorPuntaje = noVacios; mejor = key; }
-        }
-        return mejor;
+                var values = items.Select(item => item.CamposExtra.TryGetValue(key, out var raw) ? raw : null)
+                                  .Where(v => !string.IsNullOrWhiteSpace(v))
+                                  .ToList();
+                int noVacios = values.Count;
+                int noNumericos = values.Count(v => !double.TryParse(v, NumberStyles.Any, CultureInfo.InvariantCulture, out _));
+                return new { Key = key, NoVacios = noVacios, Valido = noVacios > 0 && noNumericos >= Math.Max(2, noVacios / 2) };
+            })
+            .Where(x => x.Valido)
+            .OrderByDescending(x => x.NoVacios)
+            .Select(x => x.Key)
+            .FirstOrDefault();
     }
 }
-

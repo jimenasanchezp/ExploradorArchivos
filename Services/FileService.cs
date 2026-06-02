@@ -36,104 +36,126 @@ public static class FileService
 
     private const uint FO_DELETE = 0x0003;
     private const ushort FOF_ALLOWUNDO = 0x0040; // Envía a la papelera
-    private const ushort FOF_NOCONFIRMATION = 0x0010; // No pregunta "Estás seguro?"
+    private const ushort FOF_NOCONFIRMATION = 0x0010; // Omitir cuadro de diálogo de confirmación
 
     /// <summary>
-    /// Envía archivos o carpetas de forma segura a la Papelera de Reciclaje.
-    /// Utiliza flags nativos para permitir la acción de deshacer (Undo) y omitir ventanas de confirmación del sistema.
+    /// Envía un archivo o directorio a la Papelera de Reciclaje de Windows.
     /// </summary>
-    /// <param name="ruta">Ruta absoluta del elemento a eliminar.</param>
-    /// <returns>Verdadero si la operación fue exitosa, falso en caso contrario.</returns>
+    /// <param name="ruta">Ruta absoluta del elemento que se desea eliminar.</param>
+    /// <returns>Verdadero si la operación finalizó con éxito; falso en caso contrario.</returns>
     public static bool EnviarAPapelera(string ruta)
     {
         try
         {
-            SHFILEOPSTRUCT shf = new SHFILEOPSTRUCT // Configuración para eliminar sin confirmación y permitir deshacer
+            // Inicialización: Configura la estructura para la operación de eliminación
+            SHFILEOPSTRUCT operacionArchivo = new SHFILEOPSTRUCT
             {
                 wFunc = FO_DELETE,
-                pFrom = ruta + '\0' + '\0',
+                pFrom = ruta + '\0' + '\0', // Requiere doble nulo al final del string
                 fFlags = FOF_ALLOWUNDO | FOF_NOCONFIRMATION
             };
-            int result = SHFileOperation(ref shf); // Ejecuta la operación
-            return result == 0;
+            
+            // Operación: Invoca a la API nativa de Windows
+            int resultadoOperacion = SHFileOperation(ref operacionArchivo);
+            
+            // Operación: Retorna verdadero si el código de salida de la API es 0 (éxito)
+            return resultadoOperacion == 0;
         }
-        catch { return false; }
+        catch 
+        { 
+            return false; 
+        }
     }
 
     // === LECTURA ASÍNCRONA DE DIRECTORIOS ===
     /// <summary>
-    /// Mapea asíncronamente archivos y carpetas de un directorio físico a objetos <see cref="FileSystemItem"/>.
-    /// Ejecuta la operación en un hilo secundario mediante <c>Task.Run</c> para evitar congelar la interfaz de usuario.
+    /// Obtiene de forma asíncrona la lista de carpetas y archivos dentro del directorio especificado.
     /// </summary>
-    /// <param name="rutaPath">Ruta absoluta del directorio a inspeccionar.</param>
-    /// <returns>Lista de objetos que representan el contenido del directorio.</returns>
+    /// <param name="rutaPath">Ruta absoluta del directorio que se desea inspeccionar.</param>
+    /// <returns>Una lista de objetos FileSystemItem que representan los archivos y carpetas encontrados.</returns>
     public static async Task<List<FileSystemItem>> ObtenerContenidoAsync(string rutaPath)
     {
+        // Operación: Ejecuta la lectura en un hilo secundario de Task para no congelar la UI
         return await Task.Run(() =>
-        // task,run para ejecutar la operación de lectura en un hilo separado y evitar bloquear la UI
-        // await para esperar el resultado sin bloquear el hilo principal, lo que mejora la responsividad de la aplicación
         {
-            var items = new List<FileSystemItem>();
+            // Declaración e inicialización: Lista destino de items para la UI
+            List<FileSystemItem> listaItems = new List<FileSystemItem>();
             try
             {
-                DirectoryInfo dir = new DirectoryInfo(rutaPath);
+                // Inicialización: Obtiene información del directorio raíz físico
+                DirectoryInfo directorioInfo = new DirectoryInfo(rutaPath);
 
-                // 1. Cargar Carpetas
-                foreach (var d in dir.GetDirectories())
-                //cuenta cuantas subcarpetas tiene cada carpeta, para mostrar esa información adicional en la UI.
-                //Si no se tienen permisos para acceder a una carpeta, se ignora y se continúa con la siguiente.
+                // Bucle: Recorre cada una de las subcarpetas del directorio actual
+                foreach (DirectoryInfo subcarpeta in directorioInfo.GetDirectories())
                 {
-                    int subFolders = 0;
-                    try { subFolders = d.GetDirectories().Length; } catch { } // Ignorar sin permisos
+                    // Declaración e inicialización: Cantidad de subcarpetas contenidas
+                    int totalSubcarpetas = 0;
+                    try 
+                    { 
+                        totalSubcarpetas = subcarpeta.GetDirectories().Length; 
+                    } 
+                    catch 
+                    { 
+                        // Ignora de forma silenciosa si no se tienen permisos de lectura para esa carpeta específica
+                    }
 
-                    items.Add(new FileSystemItem
-                    // FileSystemItem transforma los datos de la carpeta de windows  a un modelo propio
+                    // Operación: Construye y añade el modelo visual de la carpeta a la lista
+                    listaItems.Add(new FileSystemItem
                     {
-                        Nombre = d.Name,
-                        RutaCompleta = d.FullName,
+                        Nombre = subcarpeta.Name,
+                        RutaCompleta = subcarpeta.FullName,
                         EsCarpeta = true,
                         Tipo = "Carpeta",
                         TamanoTexto = "",
-                        InfoAdicional = $"{subFolders} subcarpetas",
-                        FechaModificacion = d.LastWriteTime
+                        InfoAdicional = $"{totalSubcarpetas} subcarpetas",
+                        FechaModificacion = subcarpeta.LastWriteTime
                     });
                 }
 
-                // 2. Cargar Archivos
-                foreach (var f in dir.GetFiles()) // obtiene la lista de los archivos del directorio
+                // Bucle: Recorre cada uno de los archivos del directorio actual
+                foreach (FileInfo archivo in directorioInfo.GetFiles())
                 {
-                    items.Add(new FileSystemItem
+                    // Operación: Construye y añade el modelo visual del archivo a la lista
+                    listaItems.Add(new FileSystemItem
                     {
-                        Nombre = f.Name,
-                        RutaCompleta = f.FullName,
+                        Nombre = archivo.Name,
+                        RutaCompleta = archivo.FullName,
                         EsCarpeta = false,
-                        Tipo = f.Extension.ToUpper().Replace(".", "") + " File",
-                        TamanoTexto = FormatearTamano(f.Length),
-                        InfoAdicional = f.Extension,
-                        FechaModificacion = f.LastWriteTime
+                        Tipo = archivo.Extension.ToUpper().Replace(".", "") + " File",
+                        TamanoTexto = FormatearTamano(archivo.Length),
+                        InfoAdicional = archivo.Extension,
+                        FechaModificacion = archivo.LastWriteTime
                     });
                 }
             }
-            catch (UnauthorizedAccessException) { /* Omitir carpetas sin permiso */ }
-            return items;
+            catch (UnauthorizedAccessException) 
+            { 
+                // Ignorar el acceso denegado a nivel de directorio general
+            }
+            return listaItems;
         });
     }
 
     /// <summary>
-    /// Convierte bytes crudos a formatos legibles por el usuario (B, KB, MB, GB, TB).
+    /// Convierte un valor de bytes en un formato legible para humanos (B, KB, MB, GB, TB).
     /// </summary>
-    /// <param name="bytes">Tamaño en bytes a convertir.</param>
-    /// <returns>Cadena formateada con el peso exacto en la unidad más adecuada.</returns>
-    private static string FormatearTamano(long bytes)
+    /// <param name="cantidadBytes">Número total de bytes a formatear.</param>
+    /// <returns>Cadena de caracteres formateada con la unidad de medida más apropiada.</returns>
+    private static string FormatearTamano(long cantidadBytes)
     {
-        string[] sufijos = { "B", "KB", "MB", "GB", "TB" };
-        int i = 0;
-        double dblSByte = bytes;
-        while (dblSByte >= 1024 && i < sufijos.Length - 1)
+        // Declaración e inicialización: Sufijos de unidades y variables de cálculo
+        string[] sufijosUnidades = { "B", "KB", "MB", "GB", "TB" };
+        int indiceUnidad = 0;
+        double tamañoConvertido = cantidadBytes;
+
+        // Bucle: Divide sucesivamente entre 1024 para escalar a la unidad de medida correcta
+        while (tamañoConvertido >= 1024 && indiceUnidad < sufijosUnidades.Length - 1)
         {
-            dblSByte /= 1024;
-            i++;
+            tamañoConvertido /= 1024;
+            indiceUnidad++;
         }
-        return $"{dblSByte:0.##} {sufijos[i]}";
+
+        // Operación: Retorna el tamaño formateado con hasta dos posiciones decimales y la unidad
+        return $"{tamañoConvertido:0.##} {sufijosUnidades[indiceUnidad]}";
     }
 }

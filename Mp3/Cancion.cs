@@ -23,12 +23,14 @@ namespace ExploradorArchivos.Mp3
 
         // === CONSTRUCTORES ===
 
-        // Constructor vacío para creación manual
+        /// <summary>
+        /// Constructor vacío por defecto para creación manual o serialización.
+        /// </summary>
         public Cancion() { }
 
         /// <summary>
-        /// Constructor principal: extrae etiquetas ID3v2 (Título, Artista, Álbum, Año, Duración) 
-        /// con <c>TagLib.File</c> y carga recursos asociados de manera automática.
+        /// Constructor principal de la clase.
+        /// Extrae las etiquetas ID3v2 (Título, Artista, Álbum, Año, Duración) utilizando TagLib y carga recursos asociados.
         /// </summary>
         /// <param name="ruta">Ruta física del archivo de audio.</param>
         public Cancion(string ruta)
@@ -39,7 +41,7 @@ namespace ExploradorArchivos.Mp3
             {
                 using var archivo = TagLib.File.Create(ruta);
 
-                // Metadatos básicos
+                // Si las etiquetas ID3v2 no tienen título, se usa el nombre del archivo de audio sin extensión
                 Titulo = !string.IsNullOrWhiteSpace(archivo.Tag.Title)
                     ? archivo.Tag.Title
                     : Path.GetFileNameWithoutExtension(ruta);
@@ -55,17 +57,17 @@ namespace ExploradorArchivos.Mp3
                 Anio = archivo.Tag.Year;
                 Duracion = archivo.Properties.Duration;
 
-                // === PORTADA ===
                 Portada = CargarPortadaDesdeTag(archivo);
                 if (Portada == null)
+                {
                     Portada = BuscarPortadaLocal(ruta);
+                }
 
-                // === LETRA ===
                 Letra = CargarLetra(archivo, ruta);
             }
             catch
             {
-                // Si TagLib falla, usamos el nombre del archivo
+                // Fallback: si TagLib falla (archivo corrupto/sin tags), se usa el nombre del archivo
                 Titulo = Path.GetFileNameWithoutExtension(ruta);
             }
         }
@@ -73,8 +75,10 @@ namespace ExploradorArchivos.Mp3
         // === MÉTODOS PRIVADOS ===
 
         /// <summary>
-        /// Extrae la portada embebida en el tag del archivo de audio.
+        /// Extrae la portada embebida en el tag del archivo de audio (por ejemplo, APIC en ID3v2).
         /// </summary>
+        /// <param name="archivo">El objeto TagLib.File que representa el archivo de audio abierto.</param>
+        /// <returns>La imagen cargada como System.Drawing.Image si existe; de lo contrario, null.</returns>
         private static Image? CargarPortadaDesdeTag(TagLib.File archivo)
         {
             try
@@ -86,69 +90,91 @@ namespace ExploradorArchivos.Mp3
                     return Image.FromStream(ms);
                 }
             }
-            catch { /* Imagen corrupta o formato no soportado */ }
+            catch
+            {
+                // Ignora excepciones por datos corruptos o formatos de imagen no soportados
+            }
             return null;
         }
 
         /// <summary>
-        /// Busca una imagen de portada en la misma carpeta del archivo de audio.
-        /// Busca archivos que contengan 'cover', 'folder', 'front' o 'album' en el nombre.
+        /// Busca un archivo de imagen de portada en el mismo directorio físico del archivo de audio.
+        /// Prioriza archivos cuyos nombres coincidan con palabras clave relacionadas a portadas.
         /// </summary>
+        /// <param name="rutaAudio">La ruta de archivo absoluta del audio.</param>
+        /// <returns>La imagen cargada de la portada si se encuentra alguna; de lo contrario, null.</returns>
         private static Image? BuscarPortadaLocal(string rutaAudio)
         {
             try
             {
                 string? directorio = Path.GetDirectoryName(rutaAudio);
-                if (string.IsNullOrEmpty(directorio)) return null;
+                if (string.IsNullOrEmpty(directorio))
+                {
+                    return null;
+                }
 
                 string[] extensiones = { ".jpg", ".jpeg", ".png", ".bmp", ".webp" };
                 string[] palabrasClave = { "cover", "folder", "front", "album", "artwork", "art" };
 
-                // Buscar archivos de imagen en la carpeta
+                // Buscar archivos de imagen válidos en la carpeta
                 var archivosImagen = Directory.GetFiles(directorio)
                     .Where(f => extensiones.Contains(Path.GetExtension(f).ToLower()))
                     .ToList();
 
-                // Primero buscar por palabras clave en el nombre
-                foreach (var img in archivosImagen)
+                // Intentar buscar archivos de imagen cuyo nombre coincida con palabras clave comunes
+                var imagenCoincidente = archivosImagen.FirstOrDefault(img =>
                 {
                     string nombre = Path.GetFileNameWithoutExtension(img).ToLower();
-                    if (palabrasClave.Any(kw => nombre.Contains(kw)))
-                    {
-                        using var fs = new FileStream(img, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
-                        return Image.FromStream(fs);
-                    }
+                    return palabrasClave.Any(kw => nombre.Contains(kw));
+                });
+
+                if (imagenCoincidente != null)
+                {
+                    using var fs = new FileStream(imagenCoincidente, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+                    return Image.FromStream(fs);
                 }
 
-                // Si no encuentra por nombre, tomar la primera imagen disponible
+                // Fallback: si no coincide con palabras clave, tomar la primera imagen del directorio
                 if (archivosImagen.Count > 0)
                 {
                     using var fs = new FileStream(archivosImagen[0], FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
                     return Image.FromStream(fs);
                 }
             }
-            catch { /* Sin permisos o imagen corrupta */ }
+            catch
+            {
+                // Ignora excepciones por falta de permisos o imágenes corruptas locales
+            }
             return null;
         }
 
         /// <summary>
-        /// Carga la letra de la canción desde el tag USLT o desde un archivo externo .lrc/.txt.
+        /// Carga la letra de la canción desde los tags internos de metadatos o busca archivos de texto externos (.lrc o .txt).
         /// </summary>
+        /// <param name="archivo">El objeto TagLib.File que representa el archivo de audio abierto.</param>
+        /// <param name="rutaAudio">La ruta de archivo absoluta del audio.</param>
+        /// <returns>La letra de la canción en formato string.</returns>
         private static string CargarLetra(TagLib.File archivo, string rutaAudio)
         {
-            // 1. Intentar tag USLT (Unsynchronized Lyrics)
+            // 1. Intento de lectura del tag USLT (Unsynchronized Lyrics) embebido
             if (!string.IsNullOrWhiteSpace(archivo.Tag.Lyrics))
+            {
                 return archivo.Tag.Lyrics;
+            }
 
-            // 2. Buscar archivo .lrc externo
+            // 2. Intento de búsqueda y lectura de un archivo de letra de tipo LRC (.lrc) con el mismo nombre
             string rutaLrc = Path.ChangeExtension(rutaAudio, ".lrc");
             if (File.Exists(rutaLrc))
+            {
                 return File.ReadAllText(rutaLrc);
+            }
 
-            // 3. Buscar archivo .txt con el mismo nombre
+            // 3. Intento de búsqueda y lectura de un archivo de texto estándar (.txt) con el mismo nombre
             string rutaTxt = Path.ChangeExtension(rutaAudio, ".txt");
             if (File.Exists(rutaTxt))
+            {
                 return File.ReadAllText(rutaTxt);
+            }
 
             return string.Empty;
         }
@@ -156,18 +182,25 @@ namespace ExploradorArchivos.Mp3
         // === PROPIEDADES DE AYUDA PARA LA UI ===
 
         /// <summary>
-        /// Texto formateado para mostrar en la UI.
+        /// Retorna una cadena de texto formateada con Artista, Álbum y Año para mostrarse en la interfaz.
         /// </summary>
         public string InfoFormateada =>
             Anio > 0
                 ? $"{Artista}  ·  {Album}  ·  {Anio}"
                 : $"{Artista}  ·  {Album}";
 
+        /// <summary>
+        /// Retorna la duración formateada legible en formato mm:ss o h:mm:ss según corresponda.
+        /// </summary>
         public string DuracionTexto =>
             Duracion.TotalHours >= 1
                 ? Duracion.ToString(@"h\:mm\:ss")
                 : Duracion.ToString(@"m\:ss");
 
+        /// <summary>
+        /// Representación textual por defecto de la clase.
+        /// </summary>
+        /// <returns>Cadena formateada como 'Artista - Título'.</returns>
         public override string ToString() => $"{Artista} - {Titulo}";
     }
 }
