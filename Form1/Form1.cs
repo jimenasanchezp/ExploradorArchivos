@@ -22,7 +22,7 @@ namespace ExploradorArchivos;
 public partial class Form1 : Form
 {
     // === Estado de navegación ===
-    private readonly NavigationService _navigationService = new();
+    private readonly NavigationService _navigationService = new(); // valor de ruta actual y lógica de navegación entre directorios, favoritos, accesos directos, etc.
     private string _rutaActual { get => _navigationService.RutaActual; set => _navigationService.NavegarA(value, false); }
     private List<FileSystemItem> _itemsActuales = new List<FileSystemItem>(); // Lista de items actualmente mostrados (para filtros y búsqueda)
     private string _filtroActivo = "Todos"; // filtro de visualización activo (Todos, Imágenes, Audio, Video, Texto/Código, Otros)
@@ -101,7 +101,8 @@ public partial class Form1 : Form
         public ToolStripMenuItem Copiar { get; } = new("📋  Copiar");
         public ToolStripMenuItem Renombrar { get; } = new("✏️  Cambiar nombre");
         public ToolStripMenuItem Eliminar { get; } = new("🗑️  Eliminar");
-        public ToolStripMenuItem EnviarCorreo { get; } = new("✉️  Enviar por correo");
+        public ToolStripMenuItem EnviarCorreoSmtp { get; } = new("✉️  Enviar por correo (SMTP/Gmail)");
+        public ToolStripMenuItem EnviarCorreoMapi { get; } = new("💻  Enviar por cliente local (Outlook)");
         public ToolStripMenuItem Propiedades { get; } = new("🛠️  Propiedades");
         public ToolStripMenuItem AppVideo { get; } = new("🎬  App Video");
         public ToolStripMenuItem AppFoto { get; } = new("🖼️  App Foto");
@@ -157,12 +158,20 @@ public partial class Form1 : Form
         c.Renombrar.Click += (s, e) => listViewPrincipal.SelectedItems[0].BeginEdit();
         c.Eliminar.Click += (s, e) => EliminarArchivo(GetSelectedPath());
         
-        c.EnviarCorreo.Click += (s, e) => {
+        c.EnviarCorreoSmtp.Click += (s, e) => {
             string ruta = GetSelectedPath();
             if (!string.IsNullOrEmpty(ruta) && File.Exists(ruta))
             {
                 using var frm = new SendMailForm(ruta);
                 frm.ShowDialog(this);
+            }
+        };
+
+        c.EnviarCorreoMapi.Click += (s, e) => {
+            string ruta = GetSelectedPath();
+            if (!string.IsNullOrEmpty(ruta) && File.Exists(ruta))
+            {
+                EmailService.EnviarCorreoConAdjunto(this.Handle, ruta);
             }
         };
         
@@ -243,7 +252,7 @@ public partial class Form1 : Form
         menu.Items.AddRange(new ToolStripItem[] {
             c.Abrir, c.AbrirCon, c.Exportar, c.Sep1,
             c.Copiar, c.Pegar, c.Renombrar, c.Eliminar, c.Sep2,
-            c.EnviarCorreo, c.Fijar, c.Favorito, c.VaciarFavoritos, c.Sep3,
+            c.EnviarCorreoSmtp, c.EnviarCorreoMapi, c.Fijar, c.Favorito, c.VaciarFavoritos, c.Sep3,
             c.NuevaCarpeta, c.Actualizar,
             c.Propiedades
         });
@@ -270,7 +279,8 @@ public partial class Form1 : Form
             c.Eliminar.Visible = algunItemSeleccionado;
             c.Fijar.Visible = algunItemSeleccionado;
             c.Favorito.Visible = algunItemSeleccionado;
-            c.EnviarCorreo.Visible = algunItemSeleccionado && File.Exists(GetSelectedPath());
+            c.EnviarCorreoSmtp.Visible = algunItemSeleccionado && File.Exists(GetSelectedPath());
+            c.EnviarCorreoMapi.Visible = algunItemSeleccionado && File.Exists(GetSelectedPath());
             c.Propiedades.Visible = algunItemSeleccionado;
 
             bool esFavoritosView = _rutaActual == "Favoritos";
