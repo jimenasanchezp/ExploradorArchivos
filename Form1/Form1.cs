@@ -671,6 +671,14 @@ public partial class Form1 : Form
 
     private void ConfigurarListViewPrincipal()
     {
+        typeof(ListView)
+            .GetProperty("DoubleBuffered", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)
+            ?.SetValue(listViewPrincipal, true);
+
+        typeof(TreeView)
+            .GetProperty("DoubleBuffered", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)
+            ?.SetValue(treeViewLateral, true);
+
         listViewPrincipal.BackColor = Color.White;
         listViewPrincipal.BorderStyle = BorderStyle.Fixed3D;
         treeViewLateral.BackColor = ThemeRenderer.SecondaryBg;

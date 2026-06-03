@@ -34,6 +34,12 @@ public partial class AppVideoForm : Form
     private Button _btnPlayPause = null!;
     private System.Windows.Forms.Timer _timerUI = null!;
     private float? _pendingPosition = null;
+
+    // Recorte en barra
+    private TextBox txtTrimInicio = default!;
+    private TextBox txtTrimFin = default!;
+    private Button btnEjecutarRecorte = default!;
+    private Label lblTrimStatus = default!;
     
     // Geolocalización
     private WebView2 webMap = default!;
@@ -87,7 +93,6 @@ public partial class AppVideoForm : Form
         AgregarBotonEditor("🌑 B&N", startX, () => AplicarFiltro("BN"));
         AgregarBotonEditor("🎵 Audio", startX + 100, ExtraerAudio);
         AgregarBotonEditor("↩️ Revertir", startX + 200, RevertirCambios);
-        AgregarBotonEditor("✂️ Recortar", startX + 300, RecortarVideo);
 
         // Main Layout
         SplitContainer split = new SplitContainer { Dock = DockStyle.Fill, SplitterDistance = 800 };
@@ -133,15 +138,56 @@ public partial class AppVideoForm : Form
         _btnPlayPause.Click += (s, e) => TogglePlayPause();
 
         lblTiempoFin = new Label { 
-            Text = "00:00:00", 
-            Location = new Point(80, 40),
+            Text = "00:00:00 / 00:00:00", 
+            Location = new Point(80, 42),
             AutoSize = true,
             Font = new Font("Consolas", 10),
             ForeColor = ThemeRenderer.Accent
         };
 
+        txtTrimInicio = new TextBox {
+            Location = new Point(260, 40),
+            Size = new Size(70, 20),
+            Text = "00:00:00",
+            BackColor = ThemeRenderer.MainBg,
+            ForeColor = ThemeRenderer.MainText,
+            BorderStyle = BorderStyle.FixedSingle
+        };
+
+        txtTrimFin = new TextBox {
+            Location = new Point(340, 40),
+            Size = new Size(70, 20),
+            Text = "00:00:00",
+            BackColor = ThemeRenderer.MainBg,
+            ForeColor = ThemeRenderer.MainText,
+            BorderStyle = BorderStyle.FixedSingle
+        };
+
+        btnEjecutarRecorte = new Button {
+            Text = "✂️ Recortar",
+            Location = new Point(425, 37),
+            Size = new Size(100, 26),
+            FlatStyle = FlatStyle.Flat,
+            BackColor = ThemeRenderer.Accent,
+            ForeColor = Color.White
+        };
+        btnEjecutarRecorte.FlatAppearance.BorderSize = 0;
+        btnEjecutarRecorte.Click += (s, e) => IniciarRecorteDesdeBarra();
+
+        lblTrimStatus = new Label {
+            Text = "",
+            Location = new Point(535, 42),
+            AutoSize = true,
+            ForeColor = ThemeRenderer.Accent,
+            Font = new Font("MS Sans Serif", 8, FontStyle.Italic)
+        };
+
         pnlControls.Controls.Add(_btnPlayPause);
         pnlControls.Controls.Add(lblTiempoFin);
+        pnlControls.Controls.Add(txtTrimInicio);
+        pnlControls.Controls.Add(txtTrimFin);
+        pnlControls.Controls.Add(btnEjecutarRecorte);
+        pnlControls.Controls.Add(lblTrimStatus);
         pnlControls.Controls.Add(_trackProgreso);
 
         pnlPlayer.Controls.Add(pnlVideoBorder);
@@ -193,6 +239,11 @@ public partial class AppVideoForm : Form
                     _trackProgreso.Value = _mediaPlayer.Position;
                 
                 _btnPlayPause.Text = _mediaPlayer.IsPlaying ? "⏸" : "▶";
+
+                // Actualizar progreso de tiempo
+                TimeSpan current = TimeSpan.FromMilliseconds(_mediaPlayer.Time >= 0 ? _mediaPlayer.Time : 0);
+                TimeSpan total = TimeSpan.FromMilliseconds(_mediaPlayer.Length >= 0 ? _mediaPlayer.Length : 0);
+                lblTiempoFin.Text = $"{current:hh\\:mm\\:ss} / {total:hh\\:mm\\:ss}";
             }
         };
     }
@@ -284,7 +335,9 @@ public partial class AppVideoForm : Form
             if (this.IsHandleCreated)
             {
                 this.BeginInvoke(new Action(() => {
-                    lblTiempoFin.Text = TimeSpan.FromMilliseconds(e.Length).ToString(@"hh\:mm\:ss");
+                    string durStr = TimeSpan.FromMilliseconds(e.Length).ToString(@"hh\:mm\:ss");
+                    lblTiempoFin.Text = durStr;
+                    txtTrimFin.Text = durStr;
                 }));
             }
         };
@@ -303,7 +356,7 @@ public partial class AppVideoForm : Form
     /// </summary>
     private async void CargarMetadatosAsync()
     {
-        _metadata = AppVideoProcessor.ObtenerMetadataManual(_rutaVideo);
+        _metadata = await Task.Run(() => AppVideoProcessor.ObtenerMetadataManual(_rutaVideo));
         ActualizarInfoMetadata();
 
         try
@@ -400,30 +453,18 @@ public partial class AppVideoForm : Form
     }
 
     /// <summary>
-    /// Solicita al usuario el tiempo de inicio y la duración, y procede a recortar el video.
+    /// Ejecuta el proceso de recorte de video a partir de los valores de tiempo de la barra de reproducción.
     /// </summary>
-    private async void RecortarVideo()
+    private async void IniciarRecorteDesdeBarra()
     {
-        TimeSpan posicionActual = _mediaPlayer != null ? TimeSpan.FromMilliseconds(_mediaPlayer.Time) : TimeSpan.Zero;
-        if (posicionActual < TimeSpan.Zero) posicionActual = TimeSpan.Zero;
+        string inicioStr = txtTrimInicio.Text;
+        string finStr = txtTrimFin.Text;
 
-        TimeSpan duracionTotal = _mediaPlayer != null ? TimeSpan.FromMilliseconds(_mediaPlayer.Length) : TimeSpan.Zero;
-        if (duracionTotal < TimeSpan.Zero) duracionTotal = TimeSpan.Zero;
-
-        string sugerenciaInicio = posicionActual.ToString(@"hh\:mm\:ss");
-        string sugerenciaFin = duracionTotal > TimeSpan.Zero ? duracionTotal.ToString(@"hh\:mm\:ss") : (posicionActual + TimeSpan.FromSeconds(10)).ToString(@"hh\:mm\:ss");
-
-        string inicioStr = Microsoft.VisualBasic.Interaction.InputBox(
-            "Introduce el tiempo de inicio (hh:mm:ss o segundos):", 
-            "Recortar Video - Inicio", 
-            sugerenciaInicio);
-        if (string.IsNullOrWhiteSpace(inicioStr)) return;
-
-        string finStr = Microsoft.VisualBasic.Interaction.InputBox(
-            "Introduce el tiempo de finalización (hh:mm:ss o segundos):", 
-            "Recortar Video - Final", 
-            sugerenciaFin);
-        if (string.IsNullOrWhiteSpace(finStr)) return;
+        if (string.IsNullOrWhiteSpace(inicioStr) || string.IsNullOrWhiteSpace(finStr))
+        {
+            MessageBox.Show("Por favor introduce los tiempos de inicio y fin.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            return;
+        }
 
         TimeSpan inicio;
         if (!TimeSpan.TryParse(inicioStr, out inicio))
@@ -457,6 +498,8 @@ public partial class AppVideoForm : Form
 
         TimeSpan duracion = fin - inicio;
 
+        lblTrimStatus.Text = "⏳ Recortando...";
+        btnEjecutarRecorte.Enabled = false;
         lblMetaInfo.Text = "\nRECORTANDO VIDEO...\nPor favor espera.";
         lblMetaInfo.Update(); // Asegurar actualización visual de la UI
 
@@ -521,6 +564,9 @@ public partial class AppVideoForm : Form
             }
         });
 
+        lblTrimStatus.Text = "";
+        btnEjecutarRecorte.Enabled = true;
+
         if (ok)
         {
             MessageBox.Show("Video recortado con éxito.", "Recorte de Video", MessageBoxButtons.OK, MessageBoxIcon.Information);
@@ -581,46 +627,67 @@ public partial class AppVideoForm : Form
         
         // Detener la reproducción y destruir el MediaPlayer para que VLC libere el handle del archivo
         PrepararParaProcesar();
-        await Task.Delay(1500); // Pausa ampliada para garantizar la liberación del handle por parte de VLC
         
-        bool ok = await AppVideoProcessor.AplicarFiltro(_rutaVideo, tempOutput, nombre);
+        bool ok = false;
+        string errorMsg = "";
         
-        if (ok)
+        await Task.Run(async () =>
         {
             try
             {
-                // Esperar hasta que el archivo original esté libre (máximo 10 intentos de 1 segundo)
-                bool archivoLibre = false;
-                for (int intento = 0; intento < 10; intento++)
+                await Task.Delay(1500).ConfigureAwait(false); // Pausa ampliada para garantizar la liberación del handle por parte de VLC
+                
+                ok = await AppVideoProcessor.AplicarFiltro(_rutaVideo, tempOutput, nombre).ConfigureAwait(false);
+                
+                if (ok)
                 {
-                    try
+                    // Esperar hasta que el archivo original esté libre (máximo 10 intentos de 1 segundo)
+                    bool archivoLibre = false;
+                    for (int intento = 0; intento < 10; intento++)
                     {
-                        using var fs = new FileStream(_rutaVideo, FileMode.Open, FileAccess.ReadWrite, FileShare.None);
-                        archivoLibre = true;
-                        break;
+                        try
+                        {
+                            using var fs = new FileStream(_rutaVideo, FileMode.Open, FileAccess.ReadWrite, FileShare.None);
+                            archivoLibre = true;
+                            break;
+                        }
+                        catch (IOException)
+                        {
+                            await Task.Delay(1000).ConfigureAwait(false);
+                        }
                     }
-                    catch (IOException)
-                    {
-                        await Task.Delay(1000);
-                    }
+
+                    if (!archivoLibre)
+                        throw new IOException("El archivo sigue siendo utilizado por otro proceso después de 10 segundos de espera.");
+
+                    // Reemplazar el archivo de video original con el filtrado
+                    File.Delete(_rutaVideo);
+                    File.Move(tempOutput, _rutaVideo);
                 }
-
-                if (!archivoLibre)
-                    throw new IOException("El archivo sigue siendo utilizado por otro proceso después de 10 segundos de espera.");
-
-                // Reemplazar el archivo de video original con el filtrado
-                File.Delete(_rutaVideo);
-                File.Move(tempOutput, _rutaVideo);
-                MessageBox.Show("Filtro aplicado con éxito sobre el mismo video.", "Filtro Aplicado", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Filtro aplicado, pero no se pudo reemplazar el archivo original: {ex.Message}\nEl archivo filtrado se guardó en: {tempOutput}", "Error de reemplazo", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                ok = false;
+                errorMsg = ex.Message;
             }
+        });
+        
+        if (ok)
+        {
+            MessageBox.Show("Filtro aplicado con éxito sobre el mismo video.", "Filtro Aplicado", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
         else
         {
-            MessageBox.Show("Error al aplicar filtro. Asegúrate de que ffmpeg.exe esté en la carpeta de la app.", "Error de FFmpeg", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            string msj = "Error al aplicar filtro.";
+            if (!string.IsNullOrEmpty(errorMsg))
+            {
+                msj += $"\nDetalle: {errorMsg}";
+            }
+            else
+            {
+                msj += "\nAsegúrate de que ffmpeg.exe esté en la carpeta de la app.";
+            }
+            MessageBox.Show(msj, "Error de FFmpeg", MessageBoxButtons.OK, MessageBoxIcon.Error);
             if (File.Exists(tempOutput))
             {
                 try { File.Delete(tempOutput); } catch { }

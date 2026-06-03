@@ -19,7 +19,7 @@ public static class AppVideoProcessor
     /// </summary>
     public static async Task<bool> Recortar(string input, string output, TimeSpan inicio, TimeSpan duracion)
     {
-        string arguments = $"-ss {inicio:hh\\:mm\\:ss} -t {duracion:hh\\:mm\\:ss} -i \"{input}\" -c copy \"{output}\" -y";
+        string arguments = $"-nostdin -ss {inicio:hh\\:mm\\:ss} -t {duracion:hh\\:mm\\:ss} -i \"{input}\" -c copy \"{output}\" -y";
         return await EjecutarComando(arguments);
     }
 
@@ -36,7 +36,7 @@ public static class AppVideoProcessor
 
         if (string.IsNullOrEmpty(videoFilter)) return false;
 
-        string arguments = $"-i \"{input}\" -vf \"{videoFilter}\" -c:a copy \"{output}\" -y";
+        string arguments = $"-nostdin -i \"{input}\" -vf \"{videoFilter}\" -c:a copy \"{output}\" -y";
         return await EjecutarComando(arguments);
     }
 
@@ -51,7 +51,7 @@ public static class AppVideoProcessor
         // -preset ultrafast → velocidad máxima (prioridad sobre tamaño)
         // -crf 23           → calidad razonable
         // -an               → sin audio (la cámara no captura audio en este flujo)
-        string arguments = $"-i \"{inputAvi}\" -vcodec libx264 -pix_fmt yuv420p -preset ultrafast -crf 23 -an \"{outputMp4}\" -y";
+        string arguments = $"-nostdin -i \"{inputAvi}\" -vcodec libx264 -pix_fmt yuv420p -preset ultrafast -crf 23 -an \"{outputMp4}\" -y";
         return await EjecutarComando(arguments);
     }
 
@@ -60,7 +60,7 @@ public static class AppVideoProcessor
     /// </summary>
     public static async Task<bool> ExtraerAudio(string input, string output)
     {
-        string arguments = $"-i \"{input}\" -vn -ab 192k -ar 44100 -y \"{output}\"";
+        string arguments = $"-nostdin -i \"{input}\" -vn -ab 192k -ar 44100 -y \"{output}\"";
         return await EjecutarComando(arguments);
     }
 

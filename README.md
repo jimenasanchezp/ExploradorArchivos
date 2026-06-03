@@ -28,8 +28,8 @@ El proyecto nació como un explorador de archivos tradicional y evolucionó hast
 |---|---|---|
 | `.jpg`, `.png`, `.bmp` | **AppFoto** | Filtros (BN, Sepia, Soft), ajuste de brillo/contraste/saturación, dibujo libre, recorte, lectura y escritura de coordenadas GPS (EXIF), visualización en mapa |
 | `.mp3`, `.wav` | **Mp3** | Reproducción con cola, modo aleatorio (shuffle) con restauración al orden secuencial original al desactivarse, carátulas ID3, búsqueda automática de letras por internet, barra de progreso personalizada, **edición y persistencia de metadatos (título, artista y foto de portada)** |
-| `.mp4`, `.avi`, `.mkv` | **AppVideo** | Reproducción con LibVLC, extracción de audio a MP3, silenciado de video, extracción de fotogramas — todo vía FFmpeg |
-| `.csv`, `.json`, `.xml`, `.txt` | **AppDataFusion** | Lectura inteligente sin esquema fijo, grilla virtualizada, ordenamiento (QuickSort) y filtrado avanzado (búsqueda exacta con `""` y geolocalización), exportación a `.docx`/`.xlsx`/correo, migración a PostgreSQL o MariaDB |
+| `.mp4`, `.avi`, `.mkv` | **AppVideo** | Reproducción con LibVLC, extracción de audio a MP3, silenciado de video, extracción de fotogramas, recorte de video no bloqueante e integrado en la barra de reproducción — todo vía FFmpeg |
+| `.csv`, `.json`, `.xml`, `.txt` | **AppDataFusion** | Lectura inteligente sin esquema fijo, grilla virtualizada, ordenamiento (QuickSort) y filtrado avanzado (búsqueda exacta con `""` y geolocalización), exportación a `.docx`/`.xlsx`/correo, migración masiva Bulk a PostgreSQL y MariaDB |
 | Cámara web | **AppCamara** | Captura de video en vivo desde la webcam usando P/Invoke nativo a `avicap32.dll` |
 | Micrófono | **AppGrabadora** | Grabación de audio WAV desde el micrófono del sistema usando NAudio |
 | Cualquier otro | **UI/FileViewerForm** | Visor de texto con edición, visor de imágenes, vista previa rápida (QuickLook con controles semáforo, arrastre de ventana y soporte para múltiples extensiones) |
@@ -200,7 +200,8 @@ Motor de procesamiento de imágenes que trabaja directamente con la API gráfica
 ### 🎥 AppVideo — Reproductor y procesador de video
 
 - **Reproducción:** Usa `LibVLCSharp` (el motor de VLC Media Player) embebido nativamente en el formulario.
-- **Procesamiento vía FFmpeg:** Invoca el binario de FFmpeg como un proceso hijo invisible (`CreateNoWindow = true`). Para convertir el evento `Process.Exited` en una promesa `async/await`, utiliza el patrón `TaskCompletionSource<bool>`.
+- **Procesamiento vía FFmpeg:** Invoca el binario de FFmpeg como un proceso hijo invisible (`CreateNoWindow = true`), agregando el parámetro `-nostdin` para prevenir bloqueos interactivos. Para convertir el evento `Process.Exited` en una promesa `async/await`, utiliza el patrón `TaskCompletionSource<bool>`.
+- **Recorte Integrado No Bloqueante:** Implementa una interfaz de selección de tiempo (Inicio y Fin) y confirmación directamente acoplada a la barra de reproducción inferior, ejecutando la operación asíncronamente en segundo plano sin congelar la ventana del explorador principal.
 - **Geolocalización Híbrida y Metadatos (Android + iOS):** Extrae de forma autónoma metadatos técnicos (duración, resolución, codec) usando `TagLibSharp`. Adicionalmente, cuenta con un parser binario nativo que extrae la geolocalización desde videos grabados por dispositivos **Android** (caja `©xyz`) y **iOS/iPhone** (resolviendo el árbol de átomos `keys` e `ilst` para la clave `com.apple.quicktime.location.ISO6709`), cargando automáticamente la ubicación en un mapa interactivo (Leaflet.js/WebView2).
 
 ### 📊 AppDataFusion — Suite de ciencia de datos
@@ -211,7 +212,7 @@ El módulo más complejo. Permite cargar archivos de datos con **esquemas descon
 - **Virtualización de grilla:** Para no saturar la RAM, la `DataGridView` solo muestra los primeros 75,000 registros de cualquier dataset.
 - **Filtrado Avanzado:** Implementa búsqueda exacta y sensible a mayúsculas cuando el término se escribe entre comillas dobles (ej. `"valor"`), además de filtrado y ordenamiento nativo para columnas de coordenadas (`latitude` y `longitude`).
 - **Exportación por Correo:** Envío directo de los registros visualizados mediante la generación automática de un archivo CSV temporal en el directorio `%TEMP%` y la apertura del cliente de correo nativo (`mailto:`).
-- **Migración a BBDD:** Genera dinámicamente sentencias `CREATE TABLE` e `INSERT` analizando las llaves del diccionario, y envía todo dentro de una transacción atómica.
+- **Migración Masiva Bulk a BBDD:** En lugar de inserciones secuenciales unitarias, genera dinámicamente sentencias optimizadas de carga por lote. Utiliza el importador binario `NpgsqlBinaryImporter` para PostgreSQL (protocolo `COPY BINARY`) y `MySqlBulkCopy` en MariaDB (haciendo uso de `AllowLoadLocalInfile=true`), logrando velocidades de importación asíncronas ultrarrápidas de miles de registros por segundo.
 
 ### 📷 AppCamara — Captura de webcam nativa
 

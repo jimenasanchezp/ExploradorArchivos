@@ -3,6 +3,7 @@ using MySqlConnector;
 using ExploradorArchivos.AppDataFusion.Models;
 using System.Globalization;
 using System.Linq;
+using System.Data;
 
 namespace ExploradorArchivos.AppDataFusion.Database;
 
@@ -48,54 +49,70 @@ public static class DatabaseWriter
 
             int total = datos.Count;
             int insertados = 0;
-            int errores = 0;
-            string primerError = "";
 
-            using var tx = conn.BeginTransaction(); // Transacción SQL para agrupar las inserciones masivas de forma rápida.
-            try
+            // Construir la sentencia COPY binaria
+            var colNames = columnas.Select(c => $"\"{c.NombreDB}\"").ToList();
+            string sqlCopy = $"COPY \"{tabla}\" ({string.Join(", ", colNames)}) FROM STDIN (FORMAT BINARY)";
+
+            using (var writer = conn.BeginBinaryImport(sqlCopy))
             {
                 foreach (var item in datos)
                 {
-                    tx.Save("fila"); // Savepoint individual para descartar solo el registro actual si falla.
-                    try
+                    writer.StartRow();
+                    for (int i = 0; i < columnas.Count; i++)
                     {
-                        InsertarItemPostgreSQL(conn, tx, tabla, item, columnas, infoColumnas, idEsEntero);
-                        insertados++;
-                        
-                        if (insertados % 100 == 0)
-                            progreso?.Report((int)(insertados * 100.0 / total));
+                        var (_, clave, display) = columnas[i];
+                        string rawVal = ObtenerValorExport(item, display, clave);
+
+                        if (i == 0)
+                        {
+                            if (idEsEntero)
+                            {
+                                if (int.TryParse(rawVal, out int idV))
+                                    writer.Write(idV, NpgsqlTypes.NpgsqlDbType.Integer);
+                                else
+                                    writer.Write(DBNull.Value);
+                            }
+                            else
+                            {
+                                if (string.IsNullOrEmpty(rawVal))
+                                    writer.Write(DBNull.Value);
+                                else
+                                    writer.Write(rawVal, NpgsqlTypes.NpgsqlDbType.Text);
+                            }
+                        }
+                        else if (clave == "valor")
+                        {
+                            if (double.TryParse(rawVal, NumberStyles.Any, CultureInfo.InvariantCulture, out double dblV))
+                                writer.Write(dblV, NpgsqlTypes.NpgsqlDbType.Double);
+                            else
+                                writer.Write(DBNull.Value);
+                        }
+                        else
+                        {
+                            if (string.IsNullOrEmpty(rawVal))
+                                writer.Write(DBNull.Value);
+                            else
+                                writer.Write(rawVal, NpgsqlTypes.NpgsqlDbType.Text);
+                        }
                     }
-                    catch (Exception ex)
-                    {
-                        tx.Rollback("fila"); // Revierte únicamente el registro actual en caso de error.
-                        errores++;
-                        if (string.IsNullOrEmpty(primerError))
-                            primerError = ex.Message;
-                        Console.WriteLine($"[PG Writer] Error fila {insertados + errores}: {ex.Message}");
-                    }
+                    insertados++;
+                    if (insertados % 500 == 0)
+                        progreso?.Report((int)(insertados * 100.0 / total));
                 }
-                tx.Commit(); // Confirma todas las inserciones exitosas.
-            }
-            catch
-            {
-                tx.Rollback(); // Revierte toda la transacción ante fallos generales catastróficos.
-                throw;
+                writer.Complete();
             }
 
             progreso?.Report(100);
             result.Insertados = insertados;
-            result.Errores = errores;
+            result.Errores = 0;
             result.Exito = true;
-            result.Mensaje = $" {insertados} registros insertados en '{tabla}'. Errores: {errores}.";
-            if (errores > 0 && !string.IsNullOrEmpty(primerError))
-            {
-                result.Mensaje += $"\n\nPrimer error detectado:\n{primerError}";
-            }
+            result.Mensaje = $" {insertados} registros importados masivamente (Bulk) en la tabla '{tabla}' con éxito.";
         }
         catch (Exception ex)
         {
             result.Exito = false;
-            result.Mensaje = $"? Error: {ex.Message}";
+            result.Mensaje = $"? Error en importación masiva (Bulk): {ex.Message}";
         }
         return result;
     }
@@ -228,46 +245,70 @@ public static class DatabaseWriter
 
             CrearTablaMariaDB(conn, tabla, columnas, idEsEntero);
 
+            // 1. Construir un DataTable con el esquema de la tabla de destino
+            using var dt = new DataTable();
+            for (int i = 0; i < columnas.Count; i++)
+            {
+                var col = columnas[i];
+                Type sysType = typeof(string);
+                if (i == 0 && idEsEntero) sysType = typeof(int);
+                else if (col.Clave == "valor") sysType = typeof(double);
+                
+                var dataCol = new DataColumn(col.NombreDB, sysType) { AllowDBNull = true };
+                dt.Columns.Add(dataCol);
+            }
+
+            // 2. Poblar el DataTable
             int total = datos.Count;
             int insertados = 0;
-            int errores = 0;
-
-            using var tx = conn.BeginTransaction();
-            try
+            foreach (var item in datos)
             {
-                foreach (var item in datos)
+                var row = dt.NewRow();
+                for (int i = 0; i < columnas.Count; i++)
                 {
-                    try
+                    var col = columnas[i];
+                    string rawVal = ObtenerValorExport(item, col.Display, col.Clave);
+
+                    if (i == 0)
                     {
-                        InsertarItemMariaDB(conn, tx, tabla, item, columnas, infoColumnas, idEsEntero);
-                        insertados++;
-                        if (insertados % 100 == 0)
-                            progreso?.Report((int)(insertados * 100.0 / total));
+                        if (idEsEntero)
+                            row[i] = int.TryParse(rawVal, out int idV) ? (object)idV : DBNull.Value;
+                        else
+                            row[i] = string.IsNullOrEmpty(rawVal) ? DBNull.Value : (object)rawVal;
                     }
-                    catch (Exception ex)
+                    else if (col.Clave == "valor")
                     {
-                        errores++;
-                        Console.WriteLine($"[MD Writer] Error fila {insertados + errores}: {ex.Message}");
+                        row[i] = double.TryParse(rawVal, NumberStyles.Any, CultureInfo.InvariantCulture, out double dblV) ? (object)dblV : DBNull.Value;
+                    }
+                    else
+                    {
+                        row[i] = string.IsNullOrEmpty(rawVal) ? DBNull.Value : (object)rawVal;
                     }
                 }
-                tx.Commit();
-            }
-            catch
-            {
-                tx.Rollback();
-                throw;
+                dt.Rows.Add(row);
+                insertados++;
+                if (insertados % 500 == 0)
+                    progreso?.Report((int)(insertados * 50.0 / total)); // 50% de progreso máximo para la preparación
             }
 
+            // 3. Ejecutar MySqlBulkCopy
+            var bulkCopy = new MySqlBulkCopy(conn)
+            {
+                DestinationTableName = tabla
+            };
+
+            var bulkResult = bulkCopy.WriteToServer(dt);
+
             progreso?.Report(100);
-            result.Insertados = insertados;
-            result.Errores = errores;
+            result.Insertados = bulkResult.RowsInserted;
+            result.Errores = 0;
             result.Exito = true;
-            result.Mensaje = $"? {insertados} registros insertados en `{tabla}`. Errores: {errores}.";
+            result.Mensaje = $" {bulkResult.RowsInserted} registros importados masivamente (Bulk) en la tabla '{tabla}' con éxito.";
         }
         catch (Exception ex)
         {
             result.Exito = false;
-            result.Mensaje = $"? Error: {ex.Message}";
+            result.Mensaje = $"? Error en importación masiva (Bulk): {ex.Message}";
         }
         return result;
     }
@@ -399,7 +440,8 @@ public static class DatabaseWriter
             Server = host,
             Port = uint.TryParse(puerto, out uint p) ? p : 3306,
             UserID = usuario,
-            Password = contrasena
+            Password = contrasena,
+            AllowLoadLocalInfile = true
         };
         if (!string.IsNullOrWhiteSpace(database))
         {

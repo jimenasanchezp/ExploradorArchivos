@@ -29,6 +29,7 @@ public partial class MainForm : Form
 
     private Dictionary<string, List<DataItem>> _porCategoria = new();
     private Dictionary<int, DataItem> _porId = new();
+    private QualityReport? _qualityReport;
 
     private PostgreSqlConnector? _lastPgConnector;
     private MariaDbConnector? _lastMdConnector;
@@ -595,8 +596,51 @@ public partial class MainForm : Form
         _ultimoTipoCargado = tipo;
         await ActualizarTodoAsync();
         if (!silencioso)
-            ActualizarEstadoBarra(
-                $"{nuevos.Count} registros cargados desde {Path.GetFileName(ruta)} - Total: {_datos.Count}");
+        {
+            int emptyCount = 0;
+            int duplicateCount = _qualityReport?.DuplicateItems.Count ?? 0;
+            int emailCount = 0;
+            int phoneCount = 0;
+            int dateCount = 0;
+
+            if (_qualityReport != null)
+            {
+                foreach (var kvp in _qualityReport.ItemErrors.Values)
+                {
+                    foreach (var err in kvp.Values)
+                    {
+                        switch (err.ErrorType)
+                        {
+                            case "Empty": emptyCount++; break;
+                            case "Email": emailCount++; break;
+                            case "Phone": phoneCount++; break;
+                            case "Date": dateCount++; break;
+                        }
+                    }
+                }
+            }
+            int totalAnomalies = emptyCount + duplicateCount + emailCount + phoneCount + dateCount;
+
+            string statusMsg = $"{nuevos.Count} registros cargados desde {Path.GetFileName(ruta)} - Total: {_datos.Count}";
+            ActualizarEstadoBarra(statusMsg);
+
+            if (totalAnomalies > 0)
+            {
+                MessageBox.Show($"¡Análisis de Calidad Completado!\nSe detectaron {totalAnomalies} anomalías en el archivo:\n\n" +
+                                $"- Campos vacíos: {emptyCount}\n" +
+                                $"- Registros duplicados: {duplicateCount}\n" +
+                                $"- Correos inválidos: {emailCount}\n" +
+                                $"- Teléfonos mal formateados: {phoneCount}\n" +
+                                $"- Fechas inconsistentes: {dateCount}\n\n" +
+                                "Las celdas afectadas se han resaltado en la cuadrícula.",
+                                "Control de Calidad de Datos", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
+            else
+            {
+                MessageBox.Show("¡Análisis de Calidad Completado!\nNo se encontraron anomalías en el archivo cargado.",
+                                "Control de Calidad de Datos", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+        }
     }
 
 
@@ -1143,6 +1187,7 @@ public partial class MainForm : Form
         _datosVista = new List<DataItem>(_datosBase);
 
         ReconstruirInfoColumnas();
+        _qualityReport = DataQualityAnalyzer.Analyze(_datosVista, _infoColumnas);
         DetectarNumericosYMoneda();
         RefrescarCombosGrafica();
         RefrescarComboboxes();
@@ -1164,6 +1209,40 @@ public partial class MainForm : Form
         int count = _datos.Count;
         int sources = _datos.Select(d => d.Fuente).Distinct().Count();
         lblSubtext.Text = $"{count:N0} registros fusionados - {sources} fuente{(sources != 1 ? "s" : "")} activa{(sources != 1 ? "s" : "")}";
+
+        // Calcular conteo de anomalías
+        int emptyCount = 0;
+        int duplicateCount = _qualityReport?.DuplicateItems.Count ?? 0;
+        int emailCount = 0;
+        int phoneCount = 0;
+        int dateCount = 0;
+
+        if (_qualityReport != null)
+        {
+            foreach (var kvp in _qualityReport.ItemErrors.Values)
+            {
+                foreach (var err in kvp.Values)
+                {
+                    switch (err.ErrorType)
+                    {
+                        case "Empty": emptyCount++; break;
+                        case "Email": emailCount++; break;
+                        case "Phone": phoneCount++; break;
+                        case "Date": dateCount++; break;
+                    }
+                }
+            }
+        }
+        int totalAnomalies = emptyCount + duplicateCount + emailCount + phoneCount + dateCount;
+
+        if (totalAnomalies > 0)
+        {
+            ActualizarEstadoBarra($"⚠️ Calidad: {totalAnomalies} anomalías detectadas ({emptyCount} vacíos, {duplicateCount} duplicados, {emailCount} correos, {phoneCount} tels, {dateCount} fechas).");
+        }
+        else
+        {
+            ActualizarEstadoBarra($"✓ Calidad de datos óptima: 0 anomalías detectadas.");
+        }
     }
 
     private List<DataItem> GetDatosBase()
@@ -1368,6 +1447,7 @@ public partial class MainForm : Form
         if (e.RowIndex < 0) return;
         var dgv = (DataGridView)sender;
 
+        // A. Coloreado predeterminado según fuente
         if (dgv.Columns.Contains("Fuente"))
         {
             try
@@ -1391,6 +1471,7 @@ public partial class MainForm : Form
             catch { }
         }
 
+        // B. Formateo numérico y de moneda
         if (e.ColumnIndex >= 0 && e.ColumnIndex < dgv.Columns.Count && e.Value is double dv)
         {
             string colHeader = dgv.Columns[e.ColumnIndex].HeaderText;
@@ -1400,6 +1481,49 @@ public partial class MainForm : Form
                 e.FormattingApplied = true;
             }
         }
+
+        // C. Coloreado específico para anomalías de calidad de datos
+        try
+        {
+            var rowView = dgv.Rows[e.RowIndex].DataBoundItem as DataRowView;
+            var item = rowView?.Row["_itemRef_"] as DataItem;
+
+            if (item != null && _qualityReport != null)
+            {
+                string colHeader = dgv.Columns[e.ColumnIndex].HeaderText;
+                string? clave = _infoColumnas.FirstOrDefault(c => string.Equals(c.Display, colHeader, StringComparison.OrdinalIgnoreCase)).Clave;
+                if (clave == null)
+                {
+                    clave = _colsDefault.FirstOrDefault(c => string.Equals(c.Display, colHeader, StringComparison.OrdinalIgnoreCase)).Clave;
+                }
+
+                // 1. Marcar duplicados (toda la fila)
+                if (_qualityReport.DuplicateItems.Contains(item))
+                {
+                    e.CellStyle.BackColor = Color.FromArgb(255, 192, 203); // Rojo suave / Rosa pastel
+                    e.CellStyle.ForeColor = Color.Black;
+                    dgv.Rows[e.RowIndex].Cells[e.ColumnIndex].ToolTipText = "Registro Duplicado.";
+                }
+
+                // 2. Colorear celdas con errores específicos
+                if (clave != null && _qualityReport.ItemErrors.TryGetValue(item, out var colErrors) && colErrors.TryGetValue(clave, out var err))
+                {
+                    Color bg = err.ErrorType switch
+                    {
+                        "Empty" => Color.FromArgb(255, 255, 224), // Amarillo pastel
+                        "Email" => Color.FromArgb(255, 228, 181), // Naranja pastel
+                        "Phone" => Color.FromArgb(230, 230, 250), // Morado claro
+                        "Date" => Color.FromArgb(224, 247, 250),  // Azul suave
+                        _ => e.CellStyle.BackColor
+                    };
+
+                    e.CellStyle.BackColor = bg;
+                    e.CellStyle.ForeColor = Color.Black;
+                    dgv.Rows[e.RowIndex].Cells[e.ColumnIndex].ToolTipText = err.SuggestedFix;
+                }
+            }
+        }
+        catch { }
     }
 
     // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•

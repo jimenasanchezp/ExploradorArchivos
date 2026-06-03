@@ -25,13 +25,15 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Folder Include="AppVideo\" />
-  </ItemGroup>
-
-  <ItemGroup>
     <Compile Remove="scratch_db\**" />
     <EmbeddedResource Remove="scratch_db\**" />
     <None Remove="scratch_db\**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Update="Form1\Form1.Visualizacion.resx">
+      <ManifestResourceName>ExploradorArchivos.Form1.Visualizacion</ManifestResourceName>
+    </EmbeddedResource>
   </ItemGroup>
 
 </Project>
