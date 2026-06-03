@@ -1419,6 +1419,10 @@ public partial class MainForm : Form
             dgv.BackgroundColor = Color.White;
             dgv.BorderStyle = BorderStyle.FixedSingle;
             dgv.ReadOnly = (dgv != dgvTodos);
+            if (dgv == dgvTodos)
+            {
+                dgv.SelectionMode = DataGridViewSelectionMode.CellSelect;
+            }
             
             // Lineas fijas
             dgv.CellBorderStyle = DataGridViewCellBorderStyle.Single;

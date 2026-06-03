@@ -87,6 +87,7 @@ public partial class AppVideoForm : Form
         AgregarBotonEditor("🌑 B&N", startX, () => AplicarFiltro("BN"));
         AgregarBotonEditor("🎵 Audio", startX + 100, ExtraerAudio);
         AgregarBotonEditor("↩️ Revertir", startX + 200, RevertirCambios);
+        AgregarBotonEditor("✂️ Recortar", startX + 300, RecortarVideo);
 
         // Main Layout
         SplitContainer split = new SplitContainer { Dock = DockStyle.Fill, SplitterDistance = 800 };
@@ -396,6 +397,154 @@ public partial class AppVideoForm : Form
         if (_mediaPlayer.IsPlaying) _mediaPlayer.Pause();
         else _mediaPlayer.Play();
         _btnPlayPause.Text = _mediaPlayer.IsPlaying ? "⏸" : "▶";
+    }
+
+    /// <summary>
+    /// Solicita al usuario el tiempo de inicio y la duración, y procede a recortar el video.
+    /// </summary>
+    private async void RecortarVideo()
+    {
+        TimeSpan posicionActual = _mediaPlayer != null ? TimeSpan.FromMilliseconds(_mediaPlayer.Time) : TimeSpan.Zero;
+        if (posicionActual < TimeSpan.Zero) posicionActual = TimeSpan.Zero;
+
+        TimeSpan duracionTotal = _mediaPlayer != null ? TimeSpan.FromMilliseconds(_mediaPlayer.Length) : TimeSpan.Zero;
+        if (duracionTotal < TimeSpan.Zero) duracionTotal = TimeSpan.Zero;
+
+        string sugerenciaInicio = posicionActual.ToString(@"hh\:mm\:ss");
+        string sugerenciaFin = duracionTotal > TimeSpan.Zero ? duracionTotal.ToString(@"hh\:mm\:ss") : (posicionActual + TimeSpan.FromSeconds(10)).ToString(@"hh\:mm\:ss");
+
+        string inicioStr = Microsoft.VisualBasic.Interaction.InputBox(
+            "Introduce el tiempo de inicio (hh:mm:ss o segundos):", 
+            "Recortar Video - Inicio", 
+            sugerenciaInicio);
+        if (string.IsNullOrWhiteSpace(inicioStr)) return;
+
+        string finStr = Microsoft.VisualBasic.Interaction.InputBox(
+            "Introduce el tiempo de finalización (hh:mm:ss o segundos):", 
+            "Recortar Video - Final", 
+            sugerenciaFin);
+        if (string.IsNullOrWhiteSpace(finStr)) return;
+
+        TimeSpan inicio;
+        if (!TimeSpan.TryParse(inicioStr, out inicio))
+        {
+            if (double.TryParse(inicioStr, out double secs))
+                inicio = TimeSpan.FromSeconds(secs);
+            else
+            {
+                MessageBox.Show("Tiempo de inicio no válido. Formato esperado: hh:mm:ss o segundos.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+        }
+
+        TimeSpan fin;
+        if (!TimeSpan.TryParse(finStr, out fin))
+        {
+            if (double.TryParse(finStr, out double secs))
+                fin = TimeSpan.FromSeconds(secs);
+            else
+            {
+                MessageBox.Show("Tiempo de finalización no válido. Formato esperado: hh:mm:ss o segundos.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+        }
+
+        if (fin <= inicio)
+        {
+            MessageBox.Show("El tiempo de finalización debe ser mayor que el tiempo de inicio.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            return;
+        }
+
+        TimeSpan duracion = fin - inicio;
+
+        lblMetaInfo.Text = "\nRECORTANDO VIDEO...\nPor favor espera.";
+        lblMetaInfo.Update(); // Asegurar actualización visual de la UI
+
+        PrepararParaProcesar();
+
+        bool ok = false;
+        string errorMsg = "";
+        string tempOutput = Path.Combine(Path.GetDirectoryName(_rutaVideo)!, "temp_" + Guid.NewGuid().ToString("N") + Path.GetExtension(_rutaVideo));
+
+        // Ejecutar procesamiento pesado en segundo plano
+        await Task.Run(async () =>
+        {
+            try
+            {
+                // Crear copia de seguridad original (.bak) si no existe
+                string backupPath = _rutaVideo + ".bak";
+                if (!File.Exists(backupPath))
+                {
+                    File.Copy(_rutaVideo, backupPath, overwrite: false);
+                }
+
+                // Preservar metadatos
+                if (_metadata != null)
+                {
+                    AppVideoProcessor.GuardarMetadata(_metadata);
+                }
+
+                // Esperar a que VLC libere completamente el handle del archivo
+                await Task.Delay(1500).ConfigureAwait(false);
+
+                ok = await AppVideoProcessor.Recortar(_rutaVideo, tempOutput, inicio, duracion).ConfigureAwait(false);
+
+                if (ok)
+                {
+                    // Esperar hasta que el archivo original esté libre
+                    bool archivoLibre = false;
+                    for (int intento = 0; intento < 15; intento++)
+                    {
+                        try
+                        {
+                            using var fs = new FileStream(_rutaVideo, FileMode.Open, FileAccess.ReadWrite, FileShare.None);
+                            archivoLibre = true;
+                            break;
+                        }
+                        catch (IOException)
+                        {
+                            await Task.Delay(1000).ConfigureAwait(false);
+                        }
+                    }
+
+                    if (!archivoLibre)
+                        throw new IOException("El archivo sigue bloqueado por otro proceso.");
+
+                    File.Delete(_rutaVideo);
+                    File.Move(tempOutput, _rutaVideo);
+                }
+            }
+            catch (Exception ex)
+            {
+                ok = false;
+                errorMsg = ex.Message;
+            }
+        });
+
+        if (ok)
+        {
+            MessageBox.Show("Video recortado con éxito.", "Recorte de Video", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+        else
+        {
+            string msj = "Error al recortar video.";
+            if (!string.IsNullOrEmpty(errorMsg))
+            {
+                msj += $"\nDetalle: {errorMsg}";
+            }
+            else
+            {
+                msj += "\nAsegúrate de que ffmpeg.exe esté en la carpeta de la app.";
+            }
+            MessageBox.Show(msj, "Error de FFmpeg", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            if (File.Exists(tempOutput))
+            {
+                try { File.Delete(tempOutput); } catch { }
+            }
+        }
+        
+        CargarMetadatos();
+        ReiniciarReproductor();
     }
 
     /// <summary>

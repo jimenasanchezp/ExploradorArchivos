@@ -21,6 +21,7 @@ public partial class AppFotoForm : Form // Declara la clase del formulario hered
     private readonly List<Image> _undoStack = new List<Image>(); // Lista para gestionar el historial de deshacer (limitada para conservar memoria).
 
     private readonly string _rutaFoto; // Ruta del archivo de foto cargado en el disco.
+    private MemoryStream? _fotoStream; // Stream en memoria para evitar el bloqueo del archivo en disco.
     private AppFotoMetadata _metadata = default!; // Objeto para almacenar y leer metadatos EXIF de la foto.
     private Image _imagenOriginal = default!; // Referencia a la imagen original cargada inicialmente.
     private Image _imagenActual = default!; // Referencia a la imagen con modificaciones en tiempo real.
@@ -296,7 +297,9 @@ public partial class AppFotoForm : Form // Declara la clase del formulario hered
         {
             if (!File.Exists(_rutaFoto)) return; // Cancela la operación si la ruta provista no corresponde a un archivo en disco.
 
-            _imagenOriginal = Image.FromFile(_rutaFoto); // Carga la imagen de forma sincrónica.
+            byte[] bytes = File.ReadAllBytes(_rutaFoto);
+            _fotoStream = new MemoryStream(bytes);
+            _imagenOriginal = Image.FromStream(_fotoStream); // Carga la imagen desde el stream en memoria para evitar bloquear el archivo en disco.
             AppFotoProcessor.CorrectOrientation(_imagenOriginal); // Corrige la orientación rotacional utilizando tags EXIF.
             _imagenActual = (Image)_imagenOriginal.Clone(); // Clona la imagen cargada para el flujo de edición.
             _undoStack.Add((Image)_imagenActual.Clone()); // Inserta el estado original en la lista de deshacer.
@@ -585,6 +588,7 @@ public partial class AppFotoForm : Form // Declara la clase del formulario hered
         _imagenOriginal?.Dispose(); // Libera recursos del objeto de imagen original cargado.
         _imagenActual?.Dispose(); // Libera recursos del objeto de la imagen modificada en visor.
         _undoStack.ForEach(img => img?.Dispose()); // Utiliza LINQ/ForEach para liberar de memoria cada una de las imágenes de respaldo del historial.
+        _fotoStream?.Dispose(); // Libera el stream en memoria.
         base.OnFormClosing(e); // Llama al comportamiento de cierre de formulario base.
     }
 }

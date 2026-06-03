@@ -81,9 +81,9 @@ public static class AppVideoProcessor
             if (process == null) return false;
 
             // Leer stderr de forma asíncrona para evitar que el búfer se llene y bloquee el proceso
-            string errors = await process.StandardError.ReadToEndAsync();
+            string errors = await process.StandardError.ReadToEndAsync().ConfigureAwait(false);
 
-            await process.WaitForExitAsync();
+            await process.WaitForExitAsync().ConfigureAwait(false);
             
             if (process.ExitCode != 0)
             {
