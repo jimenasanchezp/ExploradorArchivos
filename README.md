@@ -145,21 +145,22 @@ ExploradorArchivos/
 ├── AppGrabadora/                 # 🎙️ Grabadora de audio
 │   └── GestorGrabacion.cs        #   Captura WAV desde micrófono con NAudio (WaveInEvent)
 │
-└── AppDataFusion/                # 📊 Suite de ciencia de datos
-    ├── Core/
-    │   ├── Models/
-    │   │   └── DataItem.cs       #   Modelo flexible con Dictionary<string,string> CamposExtra
-    │   ├── Readers/
-    │   │   ├── CsvDataReader.cs  #   Lector CSV robusto (Regex para comas en comillas)
-    │   │   ├── JsonDataReader.cs #   Lector JSON con aplanamiento de objetos anidados
-    │   │   ├── XmlDataReader.cs  #   Lector XML con inferencia de nodos
-    │   │   └── TxtDataReader.cs  #   Lector de texto plano delimitado
-    │   ├── Processing/
-    │   │   └── DataProcessor.cs  #   QuickSort in-situ, filtrado, estadísticas
-    │   ├── Database/
-    │   │   ├── DatabaseWriter.cs #   Generador dinámico de DDL + INSERT transaccional
-    │   │   ├── PostgreSqlConnector.cs  # Conector PostgreSQL (Npgsql)
-    │   │   └── MariaDbConnector.cs     # Conector MariaDB (MySqlConnector)
+├── AppDataFusion/                # 📊 Suite de ciencia de datos
+│   ├── Core/
+│   │   ├── Models/
+│   │   │   └── DataItem.cs       #   Modelo flexible con Dictionary<string,string> CamposExtra
+│   │   ├── Readers/
+│   │   │   ├── CsvDataReader.cs  #   Lector CSV robusto (Regex para comas en comillas)
+│   │   │   ├── JsonDataReader.cs #   Lector JSON con aplanamiento de objetos anidados
+│   │   │   ├── XmlDataReader.cs  #   Lector XML con inferencia de nodos
+│   │   │   └── TxtDataReader.cs  #   Lector de texto plano delimitado
+│   │   ├── Processing/
+│   │   │   ├── DataProcessor.cs  #   QuickSort in-situ, filtrado, estadísticas
+│   │   │   └── DataQualityAnalyzer.cs # Analizador de calidad de datos y detección de anomalías
+│   │   ├── Database/
+│   │   │   ├── DatabaseWriter.cs #   Generador dinámico de DDL + importación Bulk masiva
+│   │   │   ├── PostgreSqlConnector.cs  # Conector PostgreSQL (Npgsql)
+│   │   │   └── MariaDbConnector.cs     # Conector MariaDB (MySqlConnector)
     │   └── Services/
     │       ├── FileExportService.cs    # Exportación a .docx y .xlsx
     │       └── GeocodingService.cs     # Geocodificación inversa de coordenadas
@@ -211,6 +212,7 @@ El módulo más complejo. Permite cargar archivos de datos con **esquemas descon
 - **Lectura polimórfica:** Cuatro lectores (`CsvDataReader`, `JsonDataReader`, `XmlDataReader`, `TxtDataReader`) convierten cualquier formato a una lista uniforme de `DataItem`. El modelo usa un `Dictionary<string, string> CamposExtra` para capturar columnas que no se conocen en tiempo de compilación.
 - **Virtualización de grilla:** Para no saturar la RAM, la `DataGridView` solo muestra los primeros 75,000 registros de cualquier dataset.
 - **Filtrado Avanzado:** Implementa búsqueda exacta y sensible a mayúsculas cuando el término se escribe entre comillas dobles (ej. `"valor"`), además de filtrado y ordenamiento nativo para columnas de coordenadas (`latitude` y `longitude`).
+- **Análisis de Calidad de Datos:** Incorpora `DataQualityAnalyzer` para escanear en tiempo real anomalías como campos vacíos, correos o teléfonos mal formateados, inconsistencias lógicas en fechas y registros duplicados, generando un reporte de calidad (`QualityReport`) con sugerencias automatizadas de corrección.
 - **Exportación por Correo:** Envío directo de los registros visualizados mediante la generación automática de un archivo CSV temporal en el directorio `%TEMP%` y la apertura del cliente de correo nativo (`mailto:`).
 - **Migración Masiva Bulk a BBDD:** En lugar de inserciones secuenciales unitarias, genera dinámicamente sentencias optimizadas de carga por lote. Utiliza el importador binario `NpgsqlBinaryImporter` para PostgreSQL (protocolo `COPY BINARY`) y `MySqlBulkCopy` en MariaDB (haciendo uso de `AllowLoadLocalInfile=true`), logrando velocidades de importación asíncronas ultrarrápidas de miles de registros por segundo.
 
