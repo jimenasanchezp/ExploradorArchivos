@@ -60,6 +60,14 @@ partial class MainForm
     private Button btnFiltrar, btnLimpiarFiltro, btnOrdenar;
     private RadioButton rbAscendente, rbDescendente;
     private DataGridView dgvTodos;
+    // ── Pagination bar (Tab 1) ────────────────────────────────────────
+    private Panel pnlPaginacion;
+    private Button btnPagAnterior, btnPagSiguiente;
+    private Label lblPaginaInfo;
+    // ── Toast / activity banner ──────────────────────────────────────
+    private Panel pnlToast;
+    private Label lblToastMsg;
+    private System.Windows.Forms.Timer tmrToast;
 
     // ── Tab 2 ──────────────────────────────────────────────────────────
     private SplitContainer splitCategoria;
@@ -556,7 +564,64 @@ partial class MainForm
         dgvTodos = BuildGrid(clrBg, clrSurface, clrBorder, clrText, clrTextDim, clrText);
         dgvTodos.Dock = DockStyle.Fill;
 
+        // ── Pagination bar ────────────────────────────────────────────
+        pnlPaginacion = new Panel
+        {
+            Dock = DockStyle.Bottom,
+            Height = 44,
+            BackColor = clrSurface,
+            Padding = new Padding(16, 4, 16, 4)
+        };
+        var pagBorderTop = new Panel { Dock = DockStyle.Top, Height = 1, BackColor = clrBorder };
+
+        btnPagAnterior = new Button
+        {
+            Text = "◀  Anterior",
+            AutoSize = false,
+            Size = new Size(110, 32),
+            Location = new Point(16, 6),
+            FlatStyle = FlatStyle.Flat,
+            BackColor = clrSurface2,
+            ForeColor = clrTextDim,
+            Font = new Font("Segoe UI", 9.5f, FontStyle.Bold),
+            Cursor = Cursors.Hand,
+            Enabled = false
+        };
+        btnPagAnterior.FlatAppearance.BorderSize = 0;
+        btnPagAnterior.FlatAppearance.MouseOverBackColor = clrAcento;
+        btnPagAnterior.Click += BtnPagAnterior_Click!;
+
+        btnPagSiguiente = new Button
+        {
+            Text = "Siguiente  ▶",
+            AutoSize = false,
+            Size = new Size(120, 32),
+            Location = new Point(140, 6),
+            FlatStyle = FlatStyle.Flat,
+            BackColor = clrAcento,
+            ForeColor = Color.White,
+            Font = new Font("Segoe UI", 9.5f, FontStyle.Bold),
+            Cursor = Cursors.Hand,
+            Enabled = false
+        };
+        btnPagSiguiente.FlatAppearance.BorderSize = 0;
+        btnPagSiguiente.FlatAppearance.MouseOverBackColor = Color.FromArgb(255, 100, 160);
+        btnPagSiguiente.Click += BtnPagSiguiente_Click!;
+
+        lblPaginaInfo = new Label
+        {
+            Text = "",
+            AutoSize = true,
+            Location = new Point(280, 12),
+            ForeColor = clrTextDim,
+            Font = new Font("Segoe UI", 9.5f),
+            BackColor = Color.Transparent
+        };
+
+        pnlPaginacion.Controls.AddRange(new Control[] { pagBorderTop, btnPagAnterior, btnPagSiguiente, lblPaginaInfo });
+
         tabTodos.Controls.Add(dgvTodos);
+        tabTodos.Controls.Add(pnlPaginacion);
         tabTodos.Controls.Add(pnlToolsTodos);
 
     // ──  ──────────────────────────────────────────────────────────
@@ -842,7 +907,35 @@ partial class MainForm
     // ──  ──────────────────────────────────────────────────────────
         //  ASSEMBLE MAIN PANEL
     // ──  ──────────────────────────────────────────────────────────
+        // ── TOAST ACTIVITY BANNER ──────────────────────────────────
+        var toastAccent = ColorTranslator.FromHtml("#FF4D80");
+        var toastBg     = ColorTranslator.FromHtml("#FFF0F6");
+        var toastTxt    = ColorTranslator.FromHtml("#7A1040");
+
+        pnlToast = new Panel
+        {
+            Dock = DockStyle.Top,
+            Height = 46,
+            BackColor = toastBg,
+            Padding = new Padding(14, 0, 14, 0),
+            Visible = false
+        };
+        var toastBorder = new Panel { Dock = DockStyle.Bottom, Height = 3, BackColor = toastAccent };
+        lblToastMsg = new Label
+        {
+            Dock = DockStyle.Fill,
+            TextAlign = ContentAlignment.MiddleLeft,
+            ForeColor = toastTxt,
+            BackColor = Color.Transparent,
+            Font = new Font("Segoe UI", 10.5f, FontStyle.Bold),
+            Text = ""
+        };
+        tmrToast = new System.Windows.Forms.Timer { Interval = 3500 };
+        tmrToast.Tick += (s, e) => { tmrToast.Stop(); pnlToast.Visible = false; };
+        pnlToast.Controls.AddRange(new Control[] { lblToastMsg, toastBorder });
+
         pnlMain.Controls.Add(tabControl1);
+        pnlMain.Controls.Add(pnlToast);
         pnlMain.Controls.Add(pnlTopStats);
 
     // ──  ──────────────────────────────────────────────────────────

@@ -35,6 +35,10 @@ public partial class MainForm : Form
     private MariaDbConnector? _lastMdConnector;
 
     private const int DISPLAY_LIMIT = 75_000;
+    // ── Pagination state ──────────────────────────────────────────────
+    private const int PAGE_SIZE = 500;   // filas visibles por página
+    private int _paginaActual = 0;       // índice 0-based de la página
+    private List<DataItem> _datosVistaPag = new(); // snapshot de la vista actual para paginar
 
     private readonly string _dirDatos = Path.Combine(
         AppDomain.CurrentDomain.BaseDirectory, "TestData");
@@ -1011,6 +1015,7 @@ public partial class MainForm : Form
         _datosVista = string.IsNullOrEmpty(valor)
             ? new List<DataItem>(_datosBase)
             : await Task.Run(() => DataProcessor.Filtrar(_datosBase, clave, valor, true));
+        _paginaActual = 0; // Siempre mostrar desde la primera página al filtrar
         await BindGridAsync(dgvTodos, _datosVista, lblContadorTodos);
         ActualizarEstadoBarra($"Filtro '{display}' = '{valor}' -> {_datosVista.Count} resultados.");
     }
@@ -1197,6 +1202,7 @@ public partial class MainForm : Form
         foreach (var cat in _porCategoria.Keys.OrderBy(k => k))
             lstCategorias.Items.Add(cat);
 
+        _paginaActual = 0; // Reiniciar paginación al actualizar datos
         await BindGridAsync(dgvTodos, _datosVista, lblContadorTodos);
         ActualizarChart();
 
@@ -1291,16 +1297,36 @@ public partial class MainForm : Form
 
    
     /// <summary>
-    /// Genera y vincula un DataTable dinámico de manera asíncrona a un DataGridView,
-    /// aplicando un límite de visualización para mantener el rendimiento gráfico.
+    /// Genera y vincula un DataTable dinámico de manera asíncrona a un DataGridView.
+    /// Cuando el DataGridView es <c>dgvTodos</c>, aplica paginación basada en <see cref="_paginaActual"/>
+    /// en lugar del límite fijo. Para los demás grids se mantiene el límite de 75k.
     /// </summary>
     private async Task BindGridAsync(DataGridView dgv, List<DataItem> items,
         Label? contadorLabel, bool usarColsDefault = false)
     {
         if (contadorLabel?.IsHandleCreated == true)
             contadorLabel.Invoke(() => contadorLabel.Text = "Cargando...");
-        bool limitado = items.Count > DISPLAY_LIMIT;
-        var itemsDisplay = limitado ? items.Take(DISPLAY_LIMIT).ToList() : items;
+
+        List<DataItem> itemsDisplay;
+        bool limitado = false;
+
+        if (dgv == dgvTodos)
+        {
+            // Paginación activa para el tab principal
+            _datosVistaPag = items;
+            int totalPags = Math.Max(1, (int)Math.Ceiling(items.Count / (double)PAGE_SIZE));
+            _paginaActual = Math.Clamp(_paginaActual, 0, totalPags - 1);
+            int skip = _paginaActual * PAGE_SIZE;
+            itemsDisplay = items.Skip(skip).Take(PAGE_SIZE).ToList();
+            limitado = items.Count > PAGE_SIZE;
+        }
+        else
+        {
+            // Comportamiento original para grids secundarios
+            limitado = items.Count > DISPLAY_LIMIT;
+            itemsDisplay = limitado ? items.Take(DISPLAY_LIMIT).ToList() : items;
+        }
+
         var colInfos = usarColsDefault
             ? new List<(string, string)>(_colsDefault)
             : new List<(string, string)>(_infoColumnas);
@@ -1315,11 +1341,16 @@ public partial class MainForm : Form
             dgv.Invoke(() => AplicarDataTable(dgv, dt, items.Count, limitado, contadorLabel, colInfos));
         else
             AplicarDataTable(dgv, dt, items.Count, limitado, contadorLabel, colInfos);
+
+        // Actualizar barra de paginación solo para el grid principal
+        if (dgv == dgvTodos)
+            RefrescarControlPaginacion(items.Count);
     }
 
     /// <summary>
     /// Asigna el DataTable creado al DataGridView en el hilo de la interfaz de usuario,
     /// configurando automáticamente el ancho, alineación y estilo de las columnas generadas.
+    /// Para el grid principal actualiza el label contador mostrando la página actual.
     /// </summary>
     private void AplicarDataTable(DataGridView dgv, DataTable dt, int totalReal, bool limitado,
         Label? contadorLabel, List<(string Display, string Clave)> colInfos)
@@ -1371,19 +1402,76 @@ public partial class MainForm : Form
             dgv.CellFormatting -= DgvCellFormatting!;
             dgv.CellFormatting += DgvCellFormatting!;
 
-            // Forzar dibujo de lÃ­neas si no estÃ¡n por defecto
+            // Forzar dibujo de líneas si no están por defecto
             dgv.CellBorderStyle = DataGridViewCellBorderStyle.Single;
             dgv.GridColor = Color.LightGray;
 
             if (contadorLabel != null)
-                contadorLabel.Text = limitado
-                    ? $"Mostrando {DISPLAY_LIMIT:N0} de {totalReal:N0}"
-                    : $"{totalReal:N0} registros";
+            {
+                if (dgv == dgvTodos)
+                {
+                    int totalPags = Math.Max(1, (int)Math.Ceiling(totalReal / (double)PAGE_SIZE));
+                    int inicio = _paginaActual * PAGE_SIZE + 1;
+                    int fin = Math.Min((_paginaActual + 1) * PAGE_SIZE, totalReal);
+                    contadorLabel.Text = totalReal == 0
+                        ? "Sin registros"
+                        : $"{inicio:N0} – {fin:N0} de {totalReal:N0} ({totalPags} págs.)";
+                }
+                else
+                {
+                    contadorLabel.Text = limitado
+                        ? $"Mostrando {DISPLAY_LIMIT:N0} de {totalReal:N0}"
+                        : $"{totalReal:N0} registros";
+                }
+            }
         }
         finally
         {
             _isBinding = false;
         }
+    }
+
+    /// <summary>
+    /// Actualiza el estado habilitado/deshabilitado de los botones de paginación
+    /// y el texto del label informativo de la barra inferior.
+    /// </summary>
+    private void RefrescarControlPaginacion(int totalItems)
+    {
+        if (pnlPaginacion == null) return;
+        int totalPags = Math.Max(1, (int)Math.Ceiling(totalItems / (double)PAGE_SIZE));
+        bool visible = totalItems > PAGE_SIZE;
+
+        void Update()
+        {
+            pnlPaginacion.Visible = visible;
+            btnPagAnterior.Enabled = visible && _paginaActual > 0;
+            btnPagSiguiente.Enabled = visible && _paginaActual < totalPags - 1;
+            int inicio = _paginaActual * PAGE_SIZE + 1;
+            int fin = Math.Min((_paginaActual + 1) * PAGE_SIZE, totalItems);
+            lblPaginaInfo.Text = visible
+                ? $"Página {_paginaActual + 1} de {totalPags}   ({inicio:N0} – {fin:N0} de {totalItems:N0} registros)"
+                : "";
+        }
+
+        if (pnlPaginacion.InvokeRequired) pnlPaginacion.Invoke(Update);
+        else Update();
+    }
+
+    /// <summary>Navega a la página anterior y refresca el DataGrid principal.</summary>
+    private async void BtnPagAnterior_Click(object sender, EventArgs e)
+    {
+        if (_paginaActual <= 0) return;
+        _paginaActual--;
+        await BindGridAsync(dgvTodos, _datosVistaPag, lblContadorTodos);
+    }
+
+    /// <summary>Navega a la página siguiente y refresca el DataGrid principal.</summary>
+    private async void BtnPagSiguiente_Click(object sender, EventArgs e)
+    {
+        int totalPags = Math.Max(1, (int)Math.Ceiling(_datosVistaPag.Count / (double)PAGE_SIZE));
+        if (_paginaActual >= totalPags - 1) return;
+        _paginaActual++;
+        await BindGridAsync(dgvTodos, _datosVistaPag, lblContadorTodos);
     }
 
     /// <summary>
@@ -1575,14 +1663,50 @@ public partial class MainForm : Form
     // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
     /// <summary>
-    /// Actualiza el texto de la barra de estado de manera thread-safe.
+    /// Actualiza el texto de la barra de estado de manera thread-safe y
+    /// muestra el banner tipo toast en la parte superior del contenido principal.
+    /// Los mensajes que empiezan con ✓ o "Listo" cierran el toast automáticamente;
+    /// los demás lo mantienen visible hasta el siguiente mensaje de cierre.
     /// </summary>
     private void ActualizarEstadoBarra(string mensaje)
     {
-        if (lblStatus.GetCurrentParent()?.InvokeRequired == true)
-            lblStatus.GetCurrentParent().Invoke(() => lblStatus.Text = mensaje);
-        else
+        void Update()
+        {
             lblStatus.Text = mensaje;
+
+            // Determinar si es un mensaje de actividad o de cierre
+            bool esCierre = mensaje.StartsWith("✓") ||
+                            mensaje.StartsWith("Listo") ||
+                            mensaje.StartsWith("Datos limpiados") ||
+                            mensaje.EndsWith("cargados.") ||
+                            mensaje.EndsWith("registros.") ||
+                            mensaje.EndsWith("registros") ||
+                            mensaje.EndsWith("actualizado.") ||
+                            mensaje.EndsWith("actualizados.") ||
+                            mensaje.EndsWith("resultados.") ||
+                            mensaje.StartsWith("❌") ||
+                            mensaje.StartsWith("⚠");
+
+            // Elegir ícono emoji según tipo
+            string icono = mensaje.StartsWith("❌") ? "❌ " :
+                           mensaje.StartsWith("⚠")  ? "⚠️ " :
+                           mensaje.StartsWith("✓")  ? "✅ " :
+                           esCierre                 ? "✅ " : "⏳ ";
+
+            lblToastMsg.Text = icono + mensaje;
+            pnlToast.Visible = true;
+
+            tmrToast.Stop();
+            // Auto-ocultar siempre: mensajes de actividad en 5 s, de cierre en 3.5 s
+            tmrToast.Interval = esCierre ? 3500 : 5000;
+            tmrToast.Start();
+        }
+
+        if (lblStatus.GetCurrentParent()?.InvokeRequired == true)
+            lblStatus.GetCurrentParent().Invoke(Update);
+        else
+            Update();
+
         Application.DoEvents();
     }
 

@@ -72,42 +72,67 @@ public static class DataProcessor
     public static List<DataItem> Filtrar(List<DataItem> datos, string campo, string valor, bool exacto = false)
     {
         var resultado = new List<DataItem>();
-        
+
         bool exactMatch = exacto || (valor.StartsWith("\"") && valor.EndsWith("\"") && valor.Length >= 2);
-        
-        string v = (valor.StartsWith("\"") && valor.EndsWith("\"") && valor.Length >= 2) 
-            ? valor.Substring(1, valor.Length - 2).ToLower() 
+
+        string v = (valor.StartsWith("\"") && valor.EndsWith("\"") && valor.Length >= 2)
+            ? valor.Substring(1, valor.Length - 2).ToLower()
             : valor.ToLower();
-            
-        string campoLow = campo.ToLower();
+
+        string campoLow = campo.ToLowerInvariant();
 
         for (int i = 0; i < datos.Count; i++)
         {
             var item = datos[i];
-            
+
             bool CheckMatch(string? field)
             {
-                string f = (field ?? "").ToLower();
+                string f = (field ?? "").Trim().ToLower();
                 return exactMatch ? f == v : f.Contains(v);
+            }
+
+            // Búsqueda numérica flexible: buscar "100" debe encontrar 100, 100.00, 100.5
+            bool CheckNumero(double num)
+            {
+                string s1 = num.ToString("G").ToLower();
+                string s2 = num.ToString("F2").ToLower();
+                string s3 = ((long)num).ToString();
+                return exactMatch
+                    ? s1 == v || s2 == v || s3 == v
+                    : s1.Contains(v) || s2.Contains(v) || s3.Contains(v);
+            }
+
+            // Búsqueda case-insensitive en CamposExtra
+            string BuscarExtra()
+            {
+                if (item.CamposExtra.TryGetValue(campo, out var ev)) return ev ?? "";
+                foreach (var kv in item.CamposExtra)
+                    if (string.Equals(kv.Key.Trim(), campoLow, StringComparison.OrdinalIgnoreCase))
+                        return kv.Value ?? "";
+                return "";
             }
 
             bool match = campoLow switch
             {
-                "nombre" => CheckMatch(item.Nombre),
+                "nombre"    => CheckMatch(item.Nombre),
                 "categoria" => CheckMatch(item.Categoria),
-                "fuente" => CheckMatch(item.Fuente),
-                "id" => item.Id.ToString() == v,
-                "valor" => CheckMatch(item.Valor.ToString("F2")),
-                "fecha" => CheckMatch(item.Fecha.ToString("yyyy-MM-dd")),
-                "latitude" => CheckMatch(item.Latitude?.ToString("F6")),
+                "fuente"    => CheckMatch(item.Fuente),
+                "id"        => item.Id.ToString() == v || item.Id.ToString().Contains(v),
+                "valor"     => CheckNumero(item.Valor),
+                "fecha"     => CheckMatch(item.Fecha.ToString("yyyy-MM-dd")),
+                "latitude"  => CheckMatch(item.Latitude?.ToString("F6")),
                 "longitude" => CheckMatch(item.Longitude?.ToString("F6")),
-                
-                _ => item.CamposExtra != null && item.CamposExtra.TryGetValue(campoLow, out var ev) && ev != null
-                     ? CheckMatch(ev)
-                     : CheckMatch(item.Nombre) || CheckMatch(item.Categoria)
+
+                // Campo dinámico: busca case-insensitive en CamposExtra
+                // Si no hay match en CamposExtra (campo no existe), hace búsqueda global
+                _ => BuscarExtra() is { } extraVal && extraVal.Length > 0
+                        ? CheckMatch(extraVal)
+                        : CheckMatch(item.Nombre) || CheckMatch(item.Categoria)
+                          || CheckNumero(item.Valor)
+                          || item.CamposExtra.Values.Any(ev => CheckMatch(ev))
             };
-            
-            if (match) 
+
+            if (match)
                 resultado.Add(item);
         }
         return resultado;
@@ -179,19 +204,30 @@ public static class DataProcessor
     /// </summary>
     private static object ObtenerLlaveOrdenamiento(DataItem d, string campo)
     {
-        return campo.ToLower() switch
+        string campoLow = campo.ToLowerInvariant();
+        return campoLow switch
         {
-            "id" => d.Id,
-            "valor" => d.Valor,
-            "nombre" => d.Nombre,
-            "categoria" => d.Categoria,
-            "fecha" => d.Fecha,
-            "fuente" => d.Fuente,
-            "latitude" => d.Latitude ?? 0,
-            "longitude" => d.Longitude ?? 0,
-            
-            _ => d.CamposExtra.TryGetValue(campo.ToLower(), out var v) ? v : ""
+            "id"        => d.Id,
+            "valor"     => d.Valor,
+            "nombre"    => d.Nombre ?? "",
+            "categoria" => d.Categoria ?? "",
+            "fecha"     => d.Fecha,
+            "fuente"    => d.Fuente ?? "",
+            "latitude"  => d.Latitude ?? 0.0,
+            "longitude" => d.Longitude ?? 0.0,
+            // Búsqueda case-insensitive en CamposExtra
+            _ => BuscarExtraOrden(d, campo)
         };
+    }
+
+    private static string BuscarExtraOrden(DataItem d, string campo)
+    {
+        if (d.CamposExtra.TryGetValue(campo, out var v)) return v ?? "";
+        string campoLow = campo.Trim().ToLowerInvariant();
+        foreach (var kv in d.CamposExtra)
+            if (string.Equals(kv.Key.Trim(), campoLow, StringComparison.OrdinalIgnoreCase))
+                return kv.Value ?? "";
+        return "";
     }
 
     /// <summary>

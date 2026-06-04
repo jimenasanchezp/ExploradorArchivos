@@ -57,13 +57,18 @@ public static class DataQualityAnalyzer
             foreach (var (display, clave) in colInfos)
             {
                 string val = ObtenerValorCampo(item, clave);
+                string claveLow = clave.ToLowerInvariant();
 
                 // A. Campos Vacíos o Nulos
-                if (string.IsNullOrWhiteSpace(val))
+                // latitude y longitude son opcionales — no se marcan como vacíos
+                bool esOpcional = claveLow is "latitude" or "longitude";
+                if (!esOpcional && string.IsNullOrWhiteSpace(val))
                 {
                     itemErrors[clave] = ("Empty", val, "El campo no puede estar vacío");
                     continue;
                 }
+
+                if (string.IsNullOrWhiteSpace(val)) continue; // opcionales vacíos: sin validaciones adicionales
 
                 // B. Validación de Correo
                 if (emailKeys.Contains(clave))
@@ -108,19 +113,44 @@ public static class DataQualityAnalyzer
 
     private static string ObtenerValorCampo(DataItem item, string clave)
     {
-        return clave.ToLower() switch
+        string claveLow = clave.ToLowerInvariant();
+        return claveLow switch
         {
-            "id" => item.Id.ToString(),
-            "nombre" => item.Nombre,
-            "categoria" => item.Categoria,
-            "valor" => item.Valor.ToString(),
-            "fecha" => item.Fecha.ToString("yyyy-MM-dd"),
-            "fuente" => item.Fuente,
-            "latitude" => item.Latitude?.ToString() ?? "",
+            "id"        => item.Id.ToString(),
+            "nombre"    => item.Nombre ?? "",
+            "categoria" => item.Categoria ?? "",
+            "valor"     => item.Valor.ToString("G"),
+            "fecha"     => item.Fecha == default ? "" : item.Fecha.ToString("yyyy-MM-dd"),
+            "fuente"    => item.Fuente ?? "",
+            "latitude"  => item.Latitude?.ToString() ?? "",
             "longitude" => item.Longitude?.ToString() ?? "",
-            _ => item.CamposExtra.TryGetValue(clave, out var val) ? val : ""
+            // Búsqueda case-insensitive en CamposExtra
+            _ => BuscarEnExtra(item, clave)
         };
     }
+
+    /// <summary>
+    /// Busca un valor en <see cref="DataItem.CamposExtra"/> de forma case-insensitive.
+    /// Intenta primero la clave exacta; si no la encuentra, recorre el diccionario
+    /// comparando sin importar mayúsculas ni espacios extra al inicio/fin.
+    /// </summary>
+    private static string BuscarEnExtra(DataItem item, string clave)
+    {
+        // 1. Clave exacta (camino rápido)
+        if (item.CamposExtra.TryGetValue(clave, out var exacto))
+            return exacto ?? "";
+
+        // 2. Búsqueda case-insensitive
+        string claveLow = clave.Trim().ToLowerInvariant();
+        foreach (var kv in item.CamposExtra)
+        {
+            if (string.Equals(kv.Key.Trim(), claveLow, StringComparison.OrdinalIgnoreCase))
+                return kv.Value ?? "";
+        }
+
+        return "";
+    }
+
 
     private static bool IsValidEmail(string email)
     {
