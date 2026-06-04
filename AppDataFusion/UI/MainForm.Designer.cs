@@ -29,7 +29,7 @@ partial class MainForm
 
     // Header action buttons
     private FlowLayoutPanel pnlHeaderButtons;
-    private Button btnHdrExpCsv, btnHdrExpJson, btnHdrExpXml, btnHdrExpTxt, btnHdrEmail, btnHdrLimpiar;
+    private Button btnHdrExpCsv, btnHdrExpJson, btnHdrExpXml, btnHdrExpTxt, btnHdrEmail, btnHdrLimpiar, btnHdrGuardar;
 
     // Sidebar database buttons
     private Panel pnlSidebarDB;
@@ -452,10 +452,12 @@ partial class MainForm
         btnHdrLimpiar = HdrBtn("Limpiar", Color.White, clrRose, MenuLimpiarDatos_Click!);
         btnHdrLimpiar.FlatAppearance.BorderSize = 1;
         btnHdrLimpiar.FlatAppearance.BorderColor = clrRose;
+        btnHdrGuardar = HdrBtn("Guardar", clrMint, ColorTranslator.FromHtml("#0F5132"), BtnGuardar_Click!);
+        btnHdrGuardar.Enabled = false;
 
         // Add to flow layout (right to left means first added is rightmost)
         pnlHeaderButtons.Controls.AddRange(new Control[] { 
-            btnHdrEmail, btnHdrExpCsv, btnHdrExpJson, btnHdrExpXml, btnHdrExpTxt, btnHdrLimpiar 
+            btnHdrEmail, btnHdrGuardar, btnHdrExpCsv, btnHdrExpJson, btnHdrExpXml, btnHdrExpTxt, btnHdrLimpiar 
         });
 
         tblHeader.Controls.Add(pnlTitles, 0, 0);

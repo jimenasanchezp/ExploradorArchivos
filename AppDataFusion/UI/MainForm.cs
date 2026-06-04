@@ -23,6 +23,8 @@ public partial class MainForm : Form
     private List<DataItem> _datosBase = new();
     private List<DataItem> _datosVista = new();
     private string? _rutaInicial;
+    private readonly Dictionary<string, string> _rutasArchivosCargados = new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<string> _fuentesModificadas = new(StringComparer.OrdinalIgnoreCase);
     private bool isDragging = false;
     private bool _isBinding = false;
     private Point lastCursor;
@@ -117,6 +119,14 @@ public partial class MainForm : Form
             
             ActualizarEstadoBarra("Llamando a la API de Geocoding...");
             await GeocodingService.IdentificarCoordenadasAsync(_datos);
+            
+            foreach (var item in _datos)
+            {
+                if (!string.IsNullOrEmpty(item.Fuente))
+                    _fuentesModificadas.Add(item.Fuente);
+            }
+            btnHdrGuardar.Enabled = true;
+
             await ActualizarTodoAsync();
             ActualizarEstadoBarra("GeocodificaciÃ³n completada.");
         };
@@ -589,6 +599,7 @@ public partial class MainForm : Form
                     "Archivo no encontrado", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             return;
         }
+        _rutasArchivosCargados[tipo] = ruta;
         ActualizarEstadoBarra($"Leyendo {Path.GetFileName(ruta)}...");
         var nuevos = await Task.Run(() =>
         {
@@ -688,6 +699,7 @@ public partial class MainForm : Form
         var mapeo = _infoColumnas.ToDictionary(c => c.Display, c => c.Clave, StringComparer.OrdinalIgnoreCase);
 
         ActualizarEstadoBarra($"Preparando archivo para enviar por correo...");
+                ActualizarEstadoBarra($"Preparando archivo para enviar por correo...");
         await Task.Run(() => FileExportService.ExportarCsv(tempFile, datos, columnas, mapeo));
 
         try
@@ -783,6 +795,134 @@ public partial class MainForm : Form
             ActualizarEstadoBarra($"Error al exportar: {ex.Message}");
             MessageBox.Show($"Error al exportar:\n{ex.Message}",
                 "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+    }
+
+    /// <summary>
+    /// Guarda los cambios en memoria de vuelta a sus respectivos archivos de origen
+    /// o solicita una nueva ruta si se cargaron de forma temporal.
+    /// </summary>
+    private async void BtnGuardar_Click(object? sender, EventArgs e)
+    {
+        if (_fuentesModificadas.Count == 0)
+        {
+            MessageBox.Show("No hay cambios pendientes para guardar.", "Guardar", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+
+        btnHdrGuardar.Enabled = false;
+        ActualizarEstadoBarra("Guardando cambios...");
+
+        try
+        {
+            var columnas = _infoColumnas.Select(c => c.Display).ToList();
+            var mapeo = _infoColumnas.ToDictionary(
+                c => c.Display, c => c.Clave, StringComparer.OrdinalIgnoreCase);
+
+            var listaFuentes = _fuentesModificadas.ToList();
+            var guardados = new List<string>();
+
+            foreach (var fuente in listaFuentes)
+            {
+                // Solo guardamos si es un formato de archivo local.
+                // Si es base de datos, ya se sincronizó en tiempo real.
+                if (string.Equals(fuente, "postgresql", StringComparison.OrdinalIgnoreCase) || 
+                    string.Equals(fuente, "mariadb", StringComparison.OrdinalIgnoreCase))
+                {
+                    guardados.Add($"Base de datos ({fuente.ToUpper()}) sincronizada en tiempo real");
+                    continue;
+                }
+
+                // Obtener los datos que pertenecen a esta fuente
+                var datosFuente = _datos.Where(d => string.Equals(d.Fuente, fuente, StringComparison.OrdinalIgnoreCase)).ToList();
+                if (datosFuente.Count == 0) continue;
+
+                // Buscar ruta guardada
+                _rutasArchivosCargados.TryGetValue(fuente, out var ruta);
+
+                if (string.IsNullOrEmpty(ruta) || !File.Exists(ruta))
+                {
+                    // Si no hay una ruta guardada o no existe el archivo, preguntar al usuario dónde guardarlo
+                    string filter = fuente.ToLowerInvariant() switch
+                    {
+                        "csv" => "CSV (*.csv)|*.csv",
+                        "json" => "JSON (*.json)|*.json",
+                        "xml" => "XML (*.xml)|*.xml",
+                        "txt" => "TXT pipe-separated (*.txt)|*.txt",
+                        _ => "Todos|*.*"
+                    };
+
+                    using var dlg = new SaveFileDialog
+                    {
+                        Title = $"Guardar datos de {fuente.ToUpper()}",
+                        Filter = filter,
+                        FileName = $"DataFusionArena_{fuente}_{DateTime.Now:yyyyMMdd_HHmmss}.{fuente}",
+                        InitialDirectory = Environment.GetFolderPath(Environment.SpecialFolder.Desktop)
+                    };
+
+                    if (dlg.ShowDialog() == DialogResult.OK)
+                    {
+                        ruta = dlg.FileName;
+                        _rutasArchivosCargados[fuente] = ruta;
+                    }
+                    else
+                    {
+                        // Si cancela, pasamos al siguiente pero mantenemos la fuente como modificada
+                        continue;
+                    }
+                }
+
+                // Guardar usando el servicio de exportación de forma asíncrona
+                string rutaFinal = ruta;
+                await Task.Run(() =>
+                {
+                    switch (fuente.ToLowerInvariant())
+                    {
+                        case "csv": FileExportService.ExportarCsv(rutaFinal, datosFuente, columnas, mapeo); break;
+                        case "json": FileExportService.ExportarJson(rutaFinal, datosFuente, columnas, mapeo); break;
+                        case "xml": FileExportService.ExportarXml(rutaFinal, datosFuente, columnas, mapeo); break;
+                        case "txt": FileExportService.ExportarTxt(rutaFinal, datosFuente, columnas, mapeo); break;
+                    }
+                });
+
+                guardados.Add($"{fuente.ToUpper()}: {Path.GetFileName(rutaFinal)}");
+            }
+
+            // Eliminar de las fuentes modificadas aquellas que sí se guardaron con éxito
+            foreach (var item in guardados)
+            {
+                if (item.StartsWith("CSV:", StringComparison.OrdinalIgnoreCase)) _fuentesModificadas.Remove("csv");
+                else if (item.StartsWith("JSON:", StringComparison.OrdinalIgnoreCase)) _fuentesModificadas.Remove("json");
+                else if (item.StartsWith("XML:", StringComparison.OrdinalIgnoreCase)) _fuentesModificadas.Remove("xml");
+                else if (item.StartsWith("TXT:", StringComparison.OrdinalIgnoreCase)) _fuentesModificadas.Remove("txt");
+                else if (item.Contains("Base de datos"))
+                {
+                    _fuentesModificadas.Remove("postgresql");
+                    _fuentesModificadas.Remove("mariadb");
+                }
+            }
+
+            if (_fuentesModificadas.Count > 0)
+            {
+                btnHdrGuardar.Enabled = true;
+            }
+
+            if (guardados.Count > 0)
+            {
+                string msg = "Cambios guardados con éxito:\n\n" + string.Join("\n", guardados);
+                ActualizarEstadoBarra("✓ Cambios guardados con éxito.");
+                MessageBox.Show(msg, "Guardar Cambios", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+            else
+            {
+                ActualizarEstadoBarra("Guardado cancelado.");
+            }
+        }
+        catch (Exception ex)
+        {
+            btnHdrGuardar.Enabled = true;
+            ActualizarEstadoBarra($"❌ Error al guardar cambios: {ex.Message}");
+            MessageBox.Show($"Error al guardar cambios:\n{ex.Message}", "Error al Guardar", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
     }
 
@@ -1128,6 +1268,14 @@ public partial class MainForm : Form
         int antes = _datos.Count;
         var limpia = await Task.Run(() => DataProcessor.EliminarDuplicados(_datos));
         _datos.Clear(); _datos.AddRange(limpia);
+        
+        foreach (var item in _datos)
+        {
+            if (!string.IsNullOrEmpty(item.Fuente))
+                _fuentesModificadas.Add(item.Fuente);
+        }
+        btnHdrGuardar.Enabled = true;
+
         await ActualizarTodoAsync();
         lblProcInfo.Text = $"Eliminados {antes - _datos.Count}. Quedan {_datos.Count}.";
         btnEliminarDuplicados.Enabled = false;
@@ -1826,6 +1974,9 @@ public partial class MainForm : Form
         _datosBase.Clear(); _datosVista.Clear();
         _lastPgConnector = null; _lastMdConnector = null; _ultimoTipoCargado = "";
         _numericDisplays.Clear(); _currencyDisplays.Clear();
+        _rutasArchivosCargados.Clear();
+        _fuentesModificadas.Clear();
+        btnHdrGuardar.Enabled = false;
 
         foreach (var dgv in new[] { dgvTodos, dgvCategoria, dgvProcesamiento })
         { if (dgv != null) { dgv.DataSource = null; dgv.Columns.Clear(); } }
@@ -2048,6 +2199,13 @@ public partial class MainForm : Form
                     lstCategorias.Items.Add(cat);
 
                 ActualizarEstadoBarra($"Registro ID {item.Id} editado: '{col.Name}' modificado a '{valStr}'.");
+
+                if (!string.IsNullOrEmpty(item.Fuente))
+                    _fuentesModificadas.Add(item.Fuente);
+                else if (!string.IsNullOrEmpty(_ultimoTipoCargado))
+                    _fuentesModificadas.Add(_ultimoTipoCargado);
+                
+                btnHdrGuardar.Enabled = true;
 
                 // Sincronizar con la base de datos de forma asíncrona si hay una conexión activa
                 if (string.Equals(item.Fuente, "postgresql", StringComparison.OrdinalIgnoreCase) && _lastPgConnector != null)

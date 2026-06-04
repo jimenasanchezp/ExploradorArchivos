@@ -115,6 +115,13 @@ public static class FileService
                 // Bucle: Recorre cada uno de los archivos del directorio actual
                 foreach (FileInfo archivo in directorioInfo.GetFiles())
                 {
+                    // Evitar mostrar archivos ocultos de sistema como desktop.ini o thumbs.db
+                    if (string.Equals(archivo.Name, "desktop.ini", StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(archivo.Name, "thumbs.db", StringComparison.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
+
                     // Operación: Construye y añade el modelo visual del archivo a la lista
                     listaItems.Add(new FileSystemItem
                     {
