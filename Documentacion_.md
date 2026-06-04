@@ -107,6 +107,13 @@ La conversión de archivos (por ejemplo, al exportar o previsualizar documentos 
    - **Caso B (LibreOffice ausente o el archivo es una imagen):** Se redirige el flujo al motor fallback interno basado en C# (con `PdfSharpCore`, `ClosedXML` y `DocX`).
 3. **Procesamiento Fallback:** Las funciones de fallback manipulan el contenido a bajo nivel, procesando por ejemplo archivos de texto línea por línea (limitado a 50,000 líneas en Word por consumo de RAM), particionando líneas de texto que exceden el ancho de la página en PDF, o aplanando tablas de Excel y distribuyéndolas en múltiples hojas si sobrepasan el límite de 1,000,000 de filas.
 
+### G) Flujo de Captura y Grabación de Pantalla (AppCapturaPantalla)
+El proceso de captura y grabación de pantalla está optimizado para hilos de fondo mediante un modelo asíncrono:
+1. **Captura instantánea:** Minimiza el formulario del explorador, realiza una pausa de `250 ms` para limpiar la UI y copia los píxeles usando `Graphics.CopyFromScreen` directamente a un archivo PNG.
+2. **Grabación de vídeo:** Inicializa `AviGrabador` guardando en disco a través de la transferencia directa de punteros de memoria de Bitmap (`Scan0`).
+3. **Bucle asíncrono:** Ejecuta `BucleCapturaAsync` en un hilo secundario con `Task.Run` y control por token (`CancellationTokenSource`), manteniendo la tasa en ~15 FPS.
+4. **Compresión:** Al detener la grabación, se invoca de manera asíncrona a `ffmpeg.exe` en segundo plano para convertir el archivo de contenedor temporal AVI sin comprimir a un archivo MP4 codificado en H.264 para uso final.
+
 ---
 
 ## 📚 6. Referencia Exhaustiva y Diccionario Completo de Clases
@@ -137,14 +144,140 @@ Esta sección documenta **todas las clases** y funciones de los módulos del sis
 *   `AppGrabadoraForm`: Vista minimalista para grabación.
 *   `GestorGrabacion`: Usa `WaveInEvent` (NAudio) para capturar el búfer de entrada del micrófono de la PC y escribir directamente al disco duro (`WaveFileWriter`) previniendo desbordamientos de memoria (Buffer Overruns).
 
-### 📊 AppDataFusion (Data Science y ETL)
-*   `MainForm`: Panel de control de datos. Maneja la grilla virtualizada con controles de filtrado en la toolbar, ordenación interactiva, paginación masiva, _toast banners_ de estado, exportación y conexiones BBDD.
-*   `CsvDataReader` / `JsonDataReader` / `XmlDataReader` / `TxtDataReader`: Colección de parsers inteligentes (DataParsers) que leen archivos asíncronamente extrayendo propiedades a un modelo genérico `DataItem`, incluso infiriendo columnas desconocidas en tiempo de ejecución.
-*   `DataProcessor`: Contiene la lógica central de ordenación y filtrado.
-    *   **Filtrado (`Filtrar`)**: Soporte para coincidencia exacta usando comillas (`"valor"`), filtrado numérico flexible (permite que `"100"` coincida con `100.00` y `100`), e inferencia dinámica case-insensitive sobre campos agregados en caliente (`CamposExtra`). Si el campo a buscar no existe, realiza un _fallback_ de búsqueda global en toda la fila.
-    *   **Ordenamiento (`OrdenarLinq`)**: Mapeo estricto del campo a su tipo primitivo (ej. orden cronológico real sobre campos `Fecha`, y numérico en lugar de alfabético sobre `Valor` o coordenadas).
-*   `DataQualityAnalyzer`: Analizador de calidad heurístico. Identifica campos requeridos vacíos (excluyendo coordenadas GPS), teléfonos y correos inválidos, detecta firmas de registros duplicados en todo el _dataset_ y emite reportes con sugerencias de autocorrección sin modificar los datos originales.
-*   `DatabaseWriter`: Motor de **migración masiva (Bulk Migration)** de diccionarios C# a BBDD SQL. Ejecuta `CREATE TABLE` en tiempo de vuelo infiriendo dinámicamente todo el esquema desde memoria, seguido de una inserción masiva (`MySqlBulkLoader` en MariaDB y transacciones `BEGIN TRANSACTION` en PostgreSQL) informando a la UI mediante indicadores asíncronos.
+### 📹 AppCapturaPantalla (Grabación y Captura de Pantalla)
+*   `AppCapturaPantallaForm`: Interfaz de usuario que orquesta el modo de captura (pantalla completa o región selector), la visualización de la previsualización del video e inicia/detiene la grabación o captura. Implementa un bucle asíncrono de fotogramas (`BucleCapturaAsync`) con `CancellationTokenSource` y `Task.Run` para no congelar la interfaz.
+*   `RegionSelectorForm`: Overlay transparente de pantalla completa (`Opacity = 0.45`, `Cursors.Cross`) que permite al usuario seleccionar interactivamente una porción de la pantalla arrastrando el ratón en cualquier dirección (normalización de rectángulos).
+*   `ScreenCaptureService`: Lógica pura que captura frames mediante `Graphics.CopyFromScreen` y los envía a disco o los inyecta en el grabador de video en tiempo real.
+*   `AviGrabador`: Utiliza P/Invoke nativo (`avifil32.dll` de Windows) para escribir los fotogramas en disco (AVI crudo) pasando directamente el puntero `Scan0` para evitar basura de memoria.
+
+### 📊 AppDataFusion (Data Science y ETL - Core)
+
+La carpeta `Core` constituye el motor de lógica de negocio y persistencia de **AppDataFusion**. A continuación se presenta un desglose exhaustivo de cada subcarpeta, clase, método, estructura de datos y variable dentro del espacio de nombres `ExploradorArchivos.AppDataFusion`.
+
+#### 1. Subcarpeta: Models/
+
+Esta subcarpeta define la entidad de datos universal que fluye a través de toda la aplicación.
+
+##### 📄 Class: `DataItem.cs`
+Es el modelo de datos flexible y unificado. Su principal objetivo es permitir la interoperabilidad entre esquemas heterogéneos.
+
+*   **Variables y Propiedades (Miembros de Instancia):**
+    *   `Id` (`int`): Identificador único numérico del registro.
+    *   `Nombre` (`string`): Cadena descriptiva del elemento. Inicializada por defecto como `string.Empty`.
+    *   `Categoria` (`string`): Categoría del elemento. Inicializada por defecto como `string.Empty`.
+    *   `Valor` (`double`): Medida cuantitativa asociada.
+    *   `Fuente` (`string`): Indica de dónde proviene el registro (ej. `"csv"`, `"json"`, `"xml"`, `"txt"`, `"postgresql"`, `"mariadb"`).
+    *   `Fecha` (`DateTime`): Registro temporal, inicializado en `DateTime.Now`.
+    *   `Latitude` (`double?`) y `Longitude` (`double?`): Coordenadas geográficas anulables.
+    *   `CamposExtra` (`Dictionary<string, string>`): Estructura clave-valor instanciada con el comparador `StringComparer.OrdinalIgnoreCase`. Almacena dinámicamente cualquier columna adicional no contemplada en las propiedades fijas (ej. `"price_per_kilogram"`, `"store type"`).
+
+*   **Métodos y Algoritmos:**
+    *   `NormalizarParaComparar(string s)`:
+        *   **Algoritmo:** Toma una cadena de texto, la descompone en diacríticos usando la normalización unicode Form D (`NormalizationForm.FormD`), recorre carácter por carácter omitiendo marcas de no espaciado (acentos, diéresis), y extrae únicamente letras y números en minúsculas.
+        *   **Utilidad:** Homogeneiza búsquedas como `"Store Type"` y `"store_type"`, reduciendo ambas a `"storetype"`.
+    *   `Clonar()`: Retorna un duplicado superficial (`MemberwiseClone`).
+    *   `Equals(object?)` y `GetHashCode()`: Sobreescritos para realizar comparaciones de identidad de registro basándose en las propiedades `Id`, `Nombre` (case-insensitive) y `Categoria` (case-insensitive).
+
+#### 2. Subcarpeta: Database/
+
+Esta subcarpeta gestiona la persistencia de datos relacionales e implementa una capa polimórfica para interactuar con motores de bases de datos.
+
+##### 📄 Interface: `IDbConnector.cs`
+Define el contrato abstracto y uniforme que deben implementar los controladores de bases de datos.
+
+*   **Propiedades obligatorias:**
+    *   `CadenaConexion` (`string`), `Tabla` (`string`), `LimiteFilas` (`int`).
+    *   `UltimasColumnas` (`List<string>`): Columnas físicas presentes en la tabla.
+    *   `MapeoColumnas` (`Dictionary<string, string>`): Relación de las columnas de base de datos con los roles lógicos de la aplicación (ej: `{"id_cliente": "id", "precio_venta": "valor"}`).
+    *   `ColPrimaryKey` (`string?`): Nombre físico del identificador de tabla de la BD.
+*   **Métodos obligatorios:**
+    *   `ObtenerNombresColumnas()`, `SobreescribirMapeo(...)`, `LeerDatos()`, `ProbarConexion(out string mensaje)`.
+
+##### 📄 Class: `DbConnectorFactory.cs` (Fábrica)
+Clase estática que implementa el patrón de creación de software *Factory*.
+*   `Crear(string tipo, string cadenaConexion, string tabla)`: Evalúa el tipo de motor y retorna un objeto de tipo `IDbConnector` (instanciando un `PostgreSqlConnector` o un `MariaDbConnector`).
+
+##### 📄 Class: `PostgreSqlConnector.cs` y `MariaDbConnector.cs`
+Controladores concretos de base de datos. PostgreSQL utiliza `Npgsql` y MariaDB utiliza `MySqlConnector`.
+
+*   **Métodos Clave y Lógica Interna:**
+    *   `ObtenerNombresColumnas()`:
+        *   **Lógica:** Ejecuta una consulta ligera de esquema (`SELECT * FROM tabla LIMIT 0`) para poblar `UltimasColumnas` sin descargar registros de la red. Llama a `ObtenerPrimaryKeyColumna` para rastrear las claves primarias en los metadatos de sistema.
+    *   `ObtenerPrimaryKeyColumna(connection)`:
+        *   **Lógica:** Consulta de forma parametrizada las tablas del sistema (`INFORMATION_SCHEMA` en MariaDB; `information_schema.table_constraints` e `information_schema.key_column_usage` en Postgres) buscando restricciones `PRIMARY KEY` o `UNIQUE`. Si no existen, toma la primera columna por defecto como fallback.
+    *   `LeerDatos()`:
+        *   **Lógica:** Ejecuta `SELECT * FROM tabla` (añadiendo cláusula de límite si `LimiteFilas > 0`). Utiliza un diccionario de mapeo interno `Dictionary<string, int>` para acelerar el acceso a los ordinales del lector de datos.
+        *   Normaliza los mapeos de columnas dinámicas con `DataItem.NormalizarParaComparar` y excluye las columnas mapeadas a propiedades fijas para prevenir redundancias. Almacena las columnas sobrantes en `CamposExtra`.
+    *   `EnriquecerCamposFaltantes(...)` (Heurísticas de autodescubrimiento):
+        *   Si el usuario no definió columnas para `Nombre`, `Categoria` o `Valor`, la clase analiza estadísticamente los datos cargados en `CamposExtra`:
+            *   `BuscarMejorClaveCategoria`: Busca columnas con baja cardinalidad (número de valores únicos menor al total de registros) y que contengan mayoritariamente texto descriptivo (no numérico).
+            *   `BuscarMejorClaveNumerica`: Selecciona la columna con la mayor tasa de conversión a `double`.
+            *   `BuscarMejorClaveTexto`: Selecciona columnas de texto descriptivo sobrantes que no coincidan con la categoría elegida.
+
+##### 📄 Class: `DatabaseWriter.cs` (Escritura Masiva y Celda a Celda)
+Clase estática para inserciones y actualizaciones sobre las bases de datos.
+
+*   **Inserciones Bulk (Masivas):**
+    *   `EscribirEnPostgreSQL(...)`:
+        *   **Algoritmo:** Utiliza el exportador binario masivo `conn.BeginBinaryImport` de `Npgsql`. Crea la tabla física si no existe mediante comandos DDL dinámicos (`CrearTablaPostgreSQL`). Escribe directamente en el búfer de red de Postgres controlando y recalculando identificadores secuenciales únicos para evitar violaciones de clave primaria.
+    *   `EscribirEnMariaDB(...)`:
+        *   **Algoritmo:** Invoca a la clase de utilidad `MySqlBulkCopy`. Para evitar duplicados en memoria o intermediarios pesados (como `DataTable` o `DataSet`), implementa la clase interna privada `FastDataReader` que hereda de `IDataReader`.
+        *   **`FastDataReader` (Custom implementation):** Actúa como un iterador directo sobre la colección `List<DataItem>`. Al llamar a `Read()`, avanza el puntero por la lista en memoria y entrega los valores formateados en `GetValue(int idx)`, resolviendo autoincrementos e IDs duplicados en tiempo real.
+
+*   **Actualizaciones en Caliente (Celda a Celda):**
+    *   `ActualizarCampoPostgreSQL` / `ActualizarCampoMariaDB`:
+        *   **Lógica:** Cuando el usuario edita una celda en la pantalla de App Data, estas funciones ejecutan de manera asíncrona un comando parametrizado `UPDATE tabla SET columna = @val WHERE idCol = @id`.
+        *   En Postgres, previamente realiza una consulta a `information_schema.columns` para recuperar el tipo de dato físico de la columna (ej: `integer`, `double precision`, `boolean`, `text`). Esto permite castear de forma segura la cadena de texto de la UI al tipo nativo de base de datos antes de enviarlo, evitando errores de tipado de datos en el motor SQL.
+
+#### 3. Subcarpeta: Readers/
+
+Esta sección procesa archivos planos de disco y los convierte en objetos `DataItem` utilizando mecanismos de streaming para proteger el consumo de memoria.
+
+*   📄 `CsvDataReader.cs`:
+    *   **Especialización:** Lector de archivos de valores separados por comas, tabuladores o puntos y comas.
+    *   **Algoritmo de Parseo (`SepararCsvRobust`):** Procesa la línea carácter por carácter manteniendo un estado booleano (`enComillas`) e índices de profundidad de corchetes (`[ ]`) o llaves (`{ }`). Esto permite ignorar el carácter delimitador (ej: una coma `,`) si se encuentra encerrado entre comillas dobles o forma parte de un objeto JSON estructurado dentro del CSV.
+*   📄 `JsonDataReader.cs`:
+    *   **Especialización:** Utiliza `JsonDocument` para analizar archivos JSON.
+    *   **Lógica adaptativa:** Si la raíz del archivo es un arreglo directo de objetos, los procesa linealmente. Si la raíz es un objeto complejo, utiliza búsquedas recursivas en sus propiedades buscando la primera propiedad que almacene un array de objetos, aplanándola de forma automatizada.
+*   📄 `XmlDataReader.cs`:
+    *   **Especialización:** Analiza archivos XML utilizando `System.Xml.Linq`. Extrae información de atributos XML y subnodos, volcando todo elemento no mapeado al diccionario dinámico `CamposExtra`.
+*   📄 `TxtDataReader.cs`:
+    *   **Especialización:** Carga archivos delimitados o planos, calculando heurísticamente cuál es el carácter separador preponderante en las primeras líneas.
+
+#### 4. Subcarpeta: Processing/
+
+Contiene los algoritmos para transformar y auditar los datos de la aplicación.
+
+##### 📄 Class: `DataProcessor.cs`
+*   `Filtrar(List<DataItem> datos, string campo, string valor, bool exactMatch)`:
+    *   **Lógica:** Realiza búsquedas de texto e introduce búsquedas numéricas flexibles (ej: buscar `"100"` evalúa la conversión del valor a double, entero y texto con decimales para hallar correspondencias válidas). Si el campo a buscar no pertenece a los campos fijos, realiza una consulta normalizada en `CamposExtra`. Si no halla el campo, ejecuta una búsqueda global transversal en todos los campos y valores extras de la fila.
+*   `OrdenarLinq(List<DataItem> datos, string campo, bool ascendente)`:
+    *   **Lógica:** Realiza ordenación dinámica en caliente a través de LINQ. Emplea `ObtenerLlaveOrdenamiento` para extraer el tipo de dato correspondiente (tipo `int`, `double`, `DateTime` o `string`), asegurando que las columnas numéricas o de fechas se clasifiquen correctamente bajo sus respectivos tipos de datos.
+
+##### 📄 Class: `DataQualityAnalyzer.cs`
+*   **Lógica del Análisis de Calidad:**
+    *   Agrupa las columnas del dataset buscando semánticas de teléfonos, correos y fechas en base a arrays de palabras clave (`PhoneKeywords`, `EmailKeywords`, `DateKeywords`).
+    *   Detecta duplicados mediante una firma de contenido (`Id + Nombre + Categoria + Valor`).
+    *   Rastrea campos vacíos omitiendo los campos opcionales `latitude` y `longitude`.
+    *   Valida formatos de correos mediante la expresión regular `EmailRegex`.
+    *   Valida y sugiere formatos para teléfonos (`ValidateAndFixPhone`) corrigiendo prefijos o caracteres no válidos.
+    *   Valida formatos de fechas (`DetectAndFixDate`) sugiriendo la conversión a formatos estándar ISO (`yyyy-MM-dd`).
+
+#### 5. Subcarpeta: Services/
+
+Servicios compartidos de interacción externa y exportación.
+
+##### 📄 Class: `GeocodingService.cs`
+*   **Estructuras y Conexiones:**
+    *   `_httpClient`: Instancia estática reutilizable de `HttpClient` configurada con el encabezado `User-Agent` obligatorio (`"DataFusionArena/1.0"`) para cumplir con los lineamientos de Nominatim.
+    *   `_cache` (`Dictionary<string, (double, double)?>`): Caché que guarda las geolocalizaciones ya resueltas.
+    *   **Algoritmo:** Busca claves en `CamposExtra` que contengan palabras como `"ciudad"`, `"city"`, `"location"`. Ejecuta una consulta HTTP asíncrona a `https://nominatim.openstreetmap.org/search` limitando la respuesta a un resultado en formato JSON.
+    *   **Throttle y Limitaciones:** Restringe las peticiones a un lote máximo de 20 consultas por proceso (`MAX_GEOCODE_PER_BATCH`) e introduce un retardo de `Task.Delay(1000)` tras cada petición para respetar la directiva de 1 petición por segundo.
+
+##### 📄 Class: `FileExportService.cs`
+*   **Lógica de Exportación:**
+    *   Toma la colección en memoria y recopila mediante LINQ todas las claves distintas que existen en `CamposExtra` de todos los elementos (`SelectMany(d => d.CamposExtra.Keys).Distinct()`).
+    *   Reconstruye el esquema tabular completo con todas las columnas dinámicas y fijas, escribiéndolas en disco en el formato solicitado (CSV, JSON, XML o TXT).
 
 ### 📁 Form1 y Base
 *   `Form1`: El navegador clásico. Coordina el árbol de carpetas de Windows y lanza las aplicaciones correspondientes (El Enrutador).
