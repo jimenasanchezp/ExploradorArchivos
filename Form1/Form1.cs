@@ -12,6 +12,7 @@ using ExploradorArchivos.Mp3;
 using ExploradorArchivos.AppVideo;
 using ExploradorArchivos.AppFoto;
 using ExploradorArchivos.AppDataFusion;
+using ExploradorArchivos.AppCapturaPantalla;
 
 namespace ExploradorArchivos;
 
@@ -743,7 +744,7 @@ public partial class Form1 : Form
         pnlTop.Controls.Add(pnlNav);
 
         // Grupo: Dirección
-        Panel pnlAddr = CrearGrupoHerramientas("", 155, 20, pnlTop.Width - 410);
+        Panel pnlAddr = CrearGrupoHerramientas("", 155, 20, pnlTop.Width - 455);
         pnlAddr.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
 
         Button btnCopiarRuta = new Button();
@@ -769,15 +770,16 @@ public partial class Form1 : Form
         pnlTop.Controls.Add(pnlAddr);
 
         // Grupo: Acciones
-        Panel pnlActions = CrearGrupoHerramientas("", pnlTop.Width - 245, 20, 235);
+        Panel pnlActions = CrearGrupoHerramientas("", pnlTop.Width - 275, 20, 265);
         pnlActions.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-        pnlActions.Controls.Add(btnNuevaCarpeta); btnNuevaCarpeta.Location = new Point(10, 18); btnNuevaCarpeta.Size = new Size(35, 30);
-        pnlActions.Controls.Add(btnExportarCSV); btnExportarCSV.Location = new Point(55, 18); btnExportarCSV.Size = new Size(35, 30);
-        pnlActions.Controls.Add(_btnToggleVista); _btnToggleVista.Location = new Point(100, 18); _btnToggleVista.Size = new Size(35, 30);
+        pnlActions.Controls.Add(btnNuevaCarpeta);    btnNuevaCarpeta.Location    = new Point(10,  18); btnNuevaCarpeta.Size    = new Size(35, 30);
+        pnlActions.Controls.Add(btnExportarCSV);     btnExportarCSV.Location     = new Point(50,  18); btnExportarCSV.Size     = new Size(35, 30);
+        pnlActions.Controls.Add(_btnToggleVista);    _btnToggleVista.Location    = new Point(90,  18); _btnToggleVista.Size    = new Size(35, 30);
         
         _btnAppData = new Button();
-        pnlActions.Controls.Add(_btnAppData); _btnAppData.Location = new Point(145, 18); _btnAppData.Size = new Size(35, 30);
-        pnlActions.Controls.Add(btnCamara); btnCamara.Location = new Point(190, 18); btnCamara.Size = new Size(35, 30);
+        pnlActions.Controls.Add(_btnAppData);        _btnAppData.Location        = new Point(130, 18); _btnAppData.Size        = new Size(35, 30);
+        pnlActions.Controls.Add(btnCamara);          btnCamara.Location          = new Point(170, 18); btnCamara.Size          = new Size(35, 30);
+        pnlActions.Controls.Add(btnCapturaPantalla); btnCapturaPantalla.Location = new Point(210, 18); btnCapturaPantalla.Size = new Size(35, 30);
 
         pnlTop.Controls.Add(pnlActions);
     }
@@ -838,6 +840,7 @@ public partial class Form1 : Form
         ConfigurarBotonClasico(_btnToggleVista, "🖼️");
         ConfigurarBotonClasico(_btnAppData, "📊");
         ConfigurarBotonClasico(btnCamara, "📷");
+        ConfigurarBotonClasico(btnCapturaPantalla, "📺");
 
         // --- Barra de Direcciones ---
         pnlAddressBorder.BackColor = Color.White;
@@ -1015,6 +1018,9 @@ public partial class Form1 : Form
         // Cámara
         btnCamara.Click += BtnCamara_Click;
 
+        // Captura de Pantalla
+        btnCapturaPantalla.Click += BtnCapturaPantalla_Click;
+
         // App Data Button click handler
         _btnAppData.Click += (s, e) => {
             string selectedPath = listViewPrincipal.SelectedItems.Count > 0 ? GetSelectedPath() : null;
@@ -1039,5 +1045,15 @@ public partial class Form1 : Form
                 editor.Show();
             }
         }
+    }
+
+    /// <summary>
+    /// Abre el módulo de captura y grabación de pantalla.
+    /// Los archivos se guardan por defecto en Mis Imágenes (capturas) y Mis Videos (grabaciones).
+    /// </summary>
+    private void BtnCapturaPantalla_Click(object? sender, EventArgs e)
+    {
+        using var form = new AppCapturaPantallaForm();
+        form.ShowDialog(this);
     }
 }

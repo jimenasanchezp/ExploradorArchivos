@@ -37,6 +37,7 @@ namespace ExploradorArchivos
             btnSubir = new Button();
             btnAtras = new Button();
             btnCamara = new Button();
+            btnCapturaPantalla = new Button();
             pnlBottom = new Panel();
             pnlTrash = new Panel();
             lblTrash = new Label();
@@ -173,6 +174,13 @@ namespace ExploradorArchivos
             btnCamara.Name = "btnCamara";
             btnCamara.Size = new Size(75, 23);
             btnCamara.TabIndex = 0;
+            // 
+            // btnCapturaPantalla
+            // 
+            btnCapturaPantalla.Location = new Point(0, 0);
+            btnCapturaPantalla.Name = "btnCapturaPantalla";
+            btnCapturaPantalla.Size = new Size(75, 23);
+            btnCapturaPantalla.TabIndex = 0;
             // 
             // pnlBottom
             // 
@@ -384,6 +392,7 @@ namespace ExploradorArchivos
         public System.Windows.Forms.Button btnActualizar = null!;
         public System.Windows.Forms.Button btnExportarCSV = null!;
         public System.Windows.Forms.Button btnCamara = null!;
+        public System.Windows.Forms.Button btnCapturaPantalla = null!;
 
         public System.Windows.Forms.Panel pnlBottom = null!;
         public System.Windows.Forms.Label lblStatus = null!;
