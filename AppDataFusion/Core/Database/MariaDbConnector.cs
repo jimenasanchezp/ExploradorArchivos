@@ -9,7 +9,7 @@ namespace ExploradorArchivos.AppDataFusion.Database;
 /// Se encarga de abrir conexiones, recuperar la metadata de columnas,
 /// buscar claves primarias, y mapear filas a objetos DataItem usando heurísticas semánticas.
 /// </summary>
-public class MariaDbConnector
+public class MariaDbConnector : IDbConnector
 {
     public string CadenaConexion { get; set; } = "";
     public string Tabla { get; set; } = "";
@@ -214,7 +214,30 @@ public class MariaDbConnector
             string? colVal = MapeoColumnas.FirstOrDefault(kv => kv.Value == "valor").Key;
             string? colFec = MapeoColumnas.FirstOrDefault(kv => kv.Value == "fecha").Key;
 
-            var mapeadasSet = new HashSet<string>(MapeoColumnas.Keys, StringComparer.OrdinalIgnoreCase);
+            string? EncontrarColumnaBd(string? colUi)
+            {
+                if (string.IsNullOrEmpty(colUi)) return null;
+                string norm = DataItem.NormalizarParaComparar(colUi);
+                foreach (var k in mapa.Keys)
+                {
+                    if (DataItem.NormalizarParaComparar(k) == norm)
+                        return k;
+                }
+                return null;
+            }
+
+            string? dbColId = EncontrarColumnaBd(colId);
+            string? dbColNom = EncontrarColumnaBd(colNom);
+            string? dbColCat = EncontrarColumnaBd(colCat);
+            string? dbColVal = EncontrarColumnaBd(colVal);
+            string? dbColFec = EncontrarColumnaBd(colFec);
+
+            var mappedDbCols = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            if (dbColId != null) mappedDbCols.Add(dbColId);
+            if (dbColNom != null) mappedDbCols.Add(dbColNom);
+            if (dbColCat != null) mappedDbCols.Add(dbColCat);
+            if (dbColVal != null) mappedDbCols.Add(dbColVal);
+            if (dbColFec != null) mappedDbCols.Add(dbColFec);
 
             int contador = 1;
             while (reader.Read())
@@ -224,7 +247,7 @@ public class MariaDbConnector
                 bool parsedOk = false;
                 int idV = 0;
                 string? rawIdVal = null;
-                if (colId != null && mapa.TryGetValue(colId, out int iId) && !reader.IsDBNull(iId))
+                if (dbColId != null && mapa.TryGetValue(dbColId, out int iId) && !reader.IsDBNull(iId))
                 {
                     rawIdVal = reader[iId].ToString();
                     parsedOk = int.TryParse(rawIdVal, out idV);
@@ -232,23 +255,23 @@ public class MariaDbConnector
 
                 item.Id = parsedOk ? idV : contador;
 
-                if (colId != null)
+                if (dbColId != null)
                 {
-                    if (string.IsNullOrEmpty(rawIdVal) && mapa.TryGetValue(colId, out int iId2) && !reader.IsDBNull(iId2))
+                    if (string.IsNullOrEmpty(rawIdVal) && mapa.TryGetValue(dbColId, out int iId2) && !reader.IsDBNull(iId2))
                         rawIdVal = reader[iId2]?.ToString();
 
                     if (!string.IsNullOrEmpty(rawIdVal))
-                        item.CamposExtra[colId] = rawIdVal;
+                        item.CamposExtra[dbColId] = rawIdVal;
                 }
 
-                item.Nombre = LeerStr(reader, mapa, colNom) ?? $"Registro-{contador}";
-                item.Categoria = LeerStr(reader, mapa, colCat) ?? "Sin categoría";
-                item.Valor = LeerDbl(reader, mapa, colVal) ?? 0;
-                item.Fecha = LeerDate(reader, mapa, colFec) ?? DateTime.Now;
+                item.Nombre = LeerStr(reader, mapa, dbColNom) ?? $"Registro-{contador}";
+                item.Categoria = LeerStr(reader, mapa, dbColCat) ?? "Sin categoría";
+                item.Valor = LeerDbl(reader, mapa, dbColVal) ?? 0;
+                item.Fecha = LeerDate(reader, mapa, dbColFec) ?? DateTime.Now;
 
                 foreach (var kv in mapa)
                 {
-                    if (mapeadasSet.Contains(kv.Key)) continue;
+                    if (mappedDbCols.Contains(kv.Key)) continue;
                     if (!reader.IsDBNull(kv.Value))
                         item.CamposExtra[kv.Key] = reader[kv.Value]?.ToString() ?? "";
                 }
@@ -259,9 +282,9 @@ public class MariaDbConnector
                     Console.WriteLine($"[MariaDB]    ... {contador} registros leídos");
             }
             Console.WriteLine($"[MariaDB] ✓  {lista.Count} registros leídos. " +
-                $"Cat={colCat ?? "—"} Val={colVal ?? "—"} Nom={colNom ?? "—"}");
+                $"Cat={dbColCat ?? "—"} Val={dbColVal ?? "—"} Nom={dbColNom ?? "—"}");
             
-            EnriquecerCamposFaltantes(lista, colCat, colVal, colNom);
+            EnriquecerCamposFaltantes(lista, dbColCat, dbColVal, dbColNom);
         }
         catch (Exception ex) { Console.WriteLine($"[MariaDB] ✗  Error: {ex.Message}"); }
         return lista;

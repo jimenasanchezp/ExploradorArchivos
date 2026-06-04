@@ -102,12 +102,13 @@ public static class DataProcessor
                     : s1.Contains(v) || s2.Contains(v) || s3.Contains(v);
             }
 
-            // Búsqueda case-insensitive en CamposExtra
+            // Búsqueda normalizada en CamposExtra
             string BuscarExtra()
             {
                 if (item.CamposExtra.TryGetValue(campo, out var ev)) return ev ?? "";
+                string normCampo = DataItem.NormalizarParaComparar(campo);
                 foreach (var kv in item.CamposExtra)
-                    if (string.Equals(kv.Key.Trim(), campoLow, StringComparison.OrdinalIgnoreCase))
+                    if (DataItem.NormalizarParaComparar(kv.Key) == normCampo)
                         return kv.Value ?? "";
                 return "";
             }
@@ -223,9 +224,9 @@ public static class DataProcessor
     private static string BuscarExtraOrden(DataItem d, string campo)
     {
         if (d.CamposExtra.TryGetValue(campo, out var v)) return v ?? "";
-        string campoLow = campo.Trim().ToLowerInvariant();
+        string normCampo = DataItem.NormalizarParaComparar(campo);
         foreach (var kv in d.CamposExtra)
-            if (string.Equals(kv.Key.Trim(), campoLow, StringComparison.OrdinalIgnoreCase))
+            if (DataItem.NormalizarParaComparar(kv.Key) == normCampo)
                 return kv.Value ?? "";
         return "";
     }

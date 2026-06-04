@@ -13,6 +13,7 @@ public class FormConexionBD : Form
 {
     public string CadenaConexion { get; private set; } = "";
     public string NombreTabla { get; private set; } = "";
+    public bool UsarPrimaryKey { get; private set; } = true;
 
     private readonly TextBox txtHost, txtPuerto, txtUsuario, txtContrasena;
     private readonly ComboBox cmbBD;
@@ -20,6 +21,7 @@ public class FormConexionBD : Form
     private readonly Button btnCargarBDs;
     private readonly Button btnDetectarTablas;
     private readonly Label lblEstadoTablas;
+    private readonly CheckBox chkPrimaryKey;
     private readonly bool _esPg;
     private readonly string _pd, _ud;
 
@@ -130,6 +132,17 @@ public class FormConexionBD : Form
             Size = new Size(cw, 18),
             ForeColor = ThemeRenderer.SecondaryText
         };
+        y += 24;
+
+        chkPrimaryKey = new CheckBox
+        {
+            Text = "Establecer la primera columna como Primary Key",
+            Location = new Point(cx, y),
+            AutoSize = true,
+            Checked = true,
+            Visible = esEscritura,
+            ForeColor = ThemeRenderer.MainText
+        };
         y += 30;
 
         var ok = new Button
@@ -166,6 +179,7 @@ public class FormConexionBD : Form
                 ? DatabaseWriter.BuildPostgreSqlConnectionString(h, p, db, u, txtContrasena.Text)
                 : DatabaseWriter.BuildMariaDbConnectionString(h, p, db, u, txtContrasena.Text);
             NombreTabla = cmbTabla.Text.Trim();
+            UsarPrimaryKey = chkPrimaryKey.Checked;
             if (string.IsNullOrWhiteSpace(db))
             {
                 MessageBox.Show("Debes especificar la base de datos.",
@@ -187,7 +201,7 @@ public class FormConexionBD : Form
             l1, txtHost, l2, txtPuerto, l3, cmbBD, btnCargarBDs,
             l4, txtUsuario, l5, txtContrasena,
             sep, lTabla, cmbTabla, btnDetectarTablas, lblEstadoTablas,
-            ok, can
+            chkPrimaryKey, ok, can
         });
         AcceptButton = ok;
         CancelButton = can;

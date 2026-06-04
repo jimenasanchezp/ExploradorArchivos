@@ -280,9 +280,25 @@ public partial class MainForm : Form
         var ya = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var col in columnas)
         {
-            string clave = mapeo.TryGetValue(col, out var p) ? p.ToLower() : col.ToLowerInvariant();
-            _infoColumnas.Add((col, clave));
-            ya.Add(col.ToLowerInvariant());
+            string? matchedKey = null;
+            string? mappedRole = null;
+            string normCol = DataItem.NormalizarParaComparar(col);
+
+            foreach (var kv in mapeo)
+            {
+                if (DataItem.NormalizarParaComparar(kv.Key) == normCol)
+                {
+                    matchedKey = kv.Key;
+                    mappedRole = kv.Value;
+                    break;
+                }
+            }
+
+            string clave = mappedRole != null ? mappedRole.ToLowerInvariant() : col.ToLowerInvariant();
+            string display = matchedKey ?? col;
+
+            _infoColumnas.Add((display, clave));
+            ya.Add(display.ToLowerInvariant());
         }
         if (!ya.Contains("fuente")) _infoColumnas.Add(("Fuente", "fuente"));
         if (!ya.Contains("latitude") && _datos.Any(d => d.Latitude.HasValue && d.Latitude != 0))
@@ -808,7 +824,7 @@ public partial class MainForm : Form
                 var progreso = new Progress<int>(pct => ActualizarEstadoBarra($"Migrando a PostgreSQL: {pct}%"));
 
                 var result = await DatabaseWriter.EscribirEnPostgreSQLAsync(
-                    dlg.CadenaConexion, dlg.NombreTabla, snapshot, _infoColumnas, progreso);
+                    dlg.CadenaConexion, dlg.NombreTabla, snapshot, _infoColumnas, progreso, dlg.UsarPrimaryKey);
 
                 if (result.Exito)
                 {
@@ -817,6 +833,14 @@ public partial class MainForm : Form
 
                     var pg = new PostgreSqlConnector(dlg.CadenaConexion, dlg.NombreTabla);
                     await Task.Run(() => pg.ObtenerNombresColumnas());
+                    
+                    string colId = _infoColumnas.FirstOrDefault(c => c.Clave == "id").Display ?? "";
+                    string colCategoria = _infoColumnas.FirstOrDefault(c => c.Clave == "categoria").Display ?? "";
+                    string colValor = _infoColumnas.FirstOrDefault(c => c.Clave == "valor").Display ?? "";
+                    string colNombre = _infoColumnas.FirstOrDefault(c => c.Clave == "nombre").Display ?? "";
+                    string colFecha = _infoColumnas.FirstOrDefault(c => c.Clave == "fecha").Display ?? "";
+                    pg.SobreescribirMapeo(colId, colCategoria, colValor, colNombre, colFecha);
+
                     _lastPgConnector = pg;
                     _lastMdConnector = null;
                     _ultimoTipoCargado = "postgresql";
@@ -900,7 +924,7 @@ public partial class MainForm : Form
                 var progreso = new Progress<int>(pct => ActualizarEstadoBarra($"Migrando a MariaDB: {pct}%"));
 
                 var result = await DatabaseWriter.EscribirEnMariaDBAsync(
-                    dlg.CadenaConexion, dlg.NombreTabla, snapshot, _infoColumnas, progreso);
+                    dlg.CadenaConexion, dlg.NombreTabla, snapshot, _infoColumnas, progreso, dlg.UsarPrimaryKey);
 
                 if (result.Exito)
                 {
@@ -909,6 +933,14 @@ public partial class MainForm : Form
 
                     var md = new MariaDbConnector(dlg.CadenaConexion, dlg.NombreTabla);
                     await Task.Run(() => md.ObtenerNombresColumnas());
+
+                    string colId = _infoColumnas.FirstOrDefault(c => c.Clave == "id").Display ?? "";
+                    string colCategoria = _infoColumnas.FirstOrDefault(c => c.Clave == "categoria").Display ?? "";
+                    string colValor = _infoColumnas.FirstOrDefault(c => c.Clave == "valor").Display ?? "";
+                    string colNombre = _infoColumnas.FirstOrDefault(c => c.Clave == "nombre").Display ?? "";
+                    string colFecha = _infoColumnas.FirstOrDefault(c => c.Clave == "fecha").Display ?? "";
+                    md.SobreescribirMapeo(colId, colCategoria, colValor, colNombre, colFecha);
+
                     _lastMdConnector = md;
                     _lastPgConnector = null;
                     _ultimoTipoCargado = "mariadb";
@@ -1485,9 +1517,35 @@ public partial class MainForm : Form
         HashSet<string> currencyDisplays)
     {
         var dt = new DataTable();
+        
+        // Detecta si la columna "id" realmente contiene enteros mirando los datos reales.
+        // Si la primera columna tiene texto (ej: "Aguascalientes"), usar string en vez de int.
+        var sampleItem = items.FirstOrDefault();
+        var idDisplays = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        if (sampleItem != null)
+        {
+            foreach (var (display, clave) in colInfos)
+            {
+                if (clave == "id")
+                {
+                    string rawCheck = BuscarExtra(sampleItem, display);
+                    if (string.IsNullOrEmpty(rawCheck)) rawCheck = BuscarExtra(sampleItem, clave);
+                    // Si el valor real no es un número, NO usar Int32
+                    if (!string.IsNullOrEmpty(rawCheck) && !int.TryParse(rawCheck, out _))
+                        idDisplays.Add(display);
+                }
+            }
+        }
+
         foreach (var (display, clave) in colInfos)
         {
-            var tipo = clave switch { "id" => typeof(int), "valor" => typeof(double), _ => typeof(string) };
+            Type tipo;
+            if (clave == "id" && !idDisplays.Contains(display))
+                tipo = typeof(int);
+            else if (clave == "valor")
+                tipo = typeof(double);
+            else
+                tipo = typeof(string);
             if (!dt.Columns.Contains(display)) dt.Columns.Add(display, tipo);
         }
         dt.Columns.Add("_itemRef_", typeof(DataItem));
@@ -1500,6 +1558,37 @@ public partial class MainForm : Form
             foreach (var (display, clave) in colInfos)
             {
                 if (!dt.Columns.Contains(display)) continue;
+
+                string raw = BuscarExtra(item, display);
+                if (string.IsNullOrEmpty(raw)) raw = BuscarExtra(item, clave);
+
+                if (!string.IsNullOrEmpty(raw))
+                {
+                    if (currencyDisplays.Contains(display) && double.TryParse(raw, NumberStyles.Any, CultureInfo.InvariantCulture, out double cv))
+                    {
+                        row[display] = "$" + cv.ToString("N2");
+                    }
+                    else
+                    {
+                        var colType = dt.Columns[display]!.DataType;
+                        if (colType == typeof(int))
+                        {
+                            if (int.TryParse(raw, out int intVal)) row[display] = intVal;
+                            else row[display] = DBNull.Value;
+                        }
+                        else if (colType == typeof(double))
+                        {
+                            if (double.TryParse(raw, NumberStyles.Any, CultureInfo.InvariantCulture, out double dblVal)) row[display] = dblVal;
+                            else row[display] = DBNull.Value;
+                        }
+                        else
+                        {
+                            row[display] = raw;
+                        }
+                    }
+                    continue;
+                }
+
                 switch (clave)
                 {
                     case "id": row[display] = (object)item.Id; break;
@@ -1510,14 +1599,7 @@ public partial class MainForm : Form
                     case "fuente": row[display] = item.Fuente; break;
                     case "latitude": row[display] = item.Latitude.HasValue ? item.Latitude.Value.ToString("F6") : ""; break;
                     case "longitude": row[display] = item.Longitude.HasValue ? item.Longitude.Value.ToString("F6") : ""; break;
-                    default:
-                        string raw = BuscarExtra(item, clave);
-                        if (!string.IsNullOrEmpty(raw) && currencyDisplays.Contains(display)
-                            && double.TryParse(raw, NumberStyles.Any, CultureInfo.InvariantCulture, out double cv))
-                            row[display] = "$" + cv.ToString("N2");
-                        else
-                            row[display] = raw;
-                        break;
+                    default: row[display] = ""; break;
                 }
             }
             dt.Rows.Add(row);
@@ -1721,9 +1803,13 @@ public partial class MainForm : Form
     private static string BuscarExtra(DataItem item, string clave)
     {
         if (string.IsNullOrEmpty(clave)) return "";
-        if (item.CamposExtra.TryGetValue(clave, out var v)) return v;
+        if (item.CamposExtra.TryGetValue(clave, out var v1) && v1 != null) return v1;
+        
+        string normClave = ExploradorArchivos.AppDataFusion.Models.DataItem.NormalizarParaComparar(clave);
         foreach (var kv in item.CamposExtra)
-            if (string.Equals(kv.Key, clave, StringComparison.OrdinalIgnoreCase)) return kv.Value;
+        {
+            if (ExploradorArchivos.AppDataFusion.Models.DataItem.NormalizarParaComparar(kv.Key) == normClave) return kv.Value ?? "";
+        }
         return "";
     }
 

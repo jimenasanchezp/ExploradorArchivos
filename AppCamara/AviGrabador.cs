@@ -113,6 +113,7 @@ internal sealed class AviGrabador : IDisposable
     private int _lastWrittenFrameIndex = -1;
     private int _width;
     private int _height;
+    private int _fps = 30; // Guardamos los fps reales
     private bool _abierto = false;
     private bool _disposed = false;
 
@@ -123,6 +124,7 @@ internal sealed class AviGrabador : IDisposable
 
         _width = ancho;
         _height = alto;
+        _fps = fps;
 
         AVIFileInit();
 
@@ -181,8 +183,8 @@ internal sealed class AviGrabador : IDisposable
     {
         if (!_abierto) return;
 
-        // Calcular a qué fotograma de un video de 30 FPS corresponde el tiempo transcurrido
-        int targetFrameIndex = (int)(elapsed.TotalSeconds * 30);
+        // Calcular a qué fotograma corresponde el tiempo transcurrido usando los FPS reales del video
+        int targetFrameIndex = (int)(elapsed.TotalSeconds * _fps);
         if (targetFrameIndex <= _lastWrittenFrameIndex)
         {
             targetFrameIndex = _lastWrittenFrameIndex + 1;
@@ -202,6 +204,11 @@ internal sealed class AviGrabador : IDisposable
         Bitmap bmp24 = new Bitmap(_width, _height, PixelFormat.Format24bppRgb);
         using (Graphics g = Graphics.FromImage(bmp24))
         {
+            // Para corregir la orientación y los colores que requiere el formato DIB/AVI crudo
+            // aplicamos RotateNoneFlipY (voltear verticalmente) ya que el formato de video 
+            // no comprimido lee la memoria de abajo hacia arriba.
+            fuente.RotateFlip(RotateFlipType.RotateNoneFlipY);
+            
             g.DrawImage(fuente, 0, 0, _width, _height);
         }
 
@@ -213,34 +220,19 @@ internal sealed class AviGrabador : IDisposable
 
         try
         {
-            int stride = Math.Abs(bmpData.Stride);
-            int bufferLen = stride * _height;
+            int bufferLen = Math.Abs(bmpData.Stride) * _height;
 
-            // Invertir las filas en memoria de abajo hacia arriba (Bottom-Up) ya que es requerido por el formato DIB/BMP
-            byte[] invertido = new byte[bufferLen];
-            for (int y = 0; y < _height; y++)
-            {
-                int srcOff = (_height - 1 - y) * stride;
-                Marshal.Copy(bmpData.Scan0 + y * stride, invertido, srcOff, stride);
-            }
+            int startFrame = _lastWrittenFrameIndex + 1;
+            if (startFrame < 0) startFrame = 0;
 
-            // Fijar los bytes en la memoria y transferirlos al flujo AVI
-            GCHandle handle = GCHandle.Alloc(invertido, GCHandleType.Pinned);
-            try
+            for (int f = startFrame; f <= targetFrameIndex; f++)
             {
-                int startFrame = _lastWrittenFrameIndex + 1;
-                if (startFrame < 0) startFrame = 0;
-
-                for (int f = startFrame; f <= targetFrameIndex; f++)
-                {
-                    AVIStreamWrite(_pCompressed, f, 1,
-                        handle.AddrOfPinnedObject(), bufferLen,
-                        AVIIF_KEYFRAME, IntPtr.Zero, IntPtr.Zero);
-                }
-            }
-            finally
-            {
-                handle.Free();
+                // Pasamos directamente el puntero Scan0 a la API nativa.
+                // Esto elimina la necesidad de duplicar el array (ahorra ~90MB/s de basura)
+                // y resuelve el stuttering. Además, al no invertirlo, la imagen queda derecha.
+                AVIStreamWrite(_pCompressed, f, 1,
+                    bmpData.Scan0, bufferLen,
+                    AVIIF_KEYFRAME, IntPtr.Zero, IntPtr.Zero);
             }
         }
         finally

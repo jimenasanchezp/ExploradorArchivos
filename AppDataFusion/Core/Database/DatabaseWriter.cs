@@ -28,76 +28,102 @@ public static class DatabaseWriter
         string tabla,
         List<DataItem> datos,
         List<(string Display, string Clave)> infoColumnas,
-        IProgress<int>? progreso = null)
+        IProgress<int>? progreso = null,
+        bool usarPrimaryKey = true)
     {
-        var result = new WriteResult(); // Almacena el estado final, inserciones y errores.
+        var result = new WriteResult();
         try
         {
-            using var conn = new NpgsqlConnection(cadenaConexion); // Abre la conexión física a la base de datos PostgreSQL.
+            using var conn = new NpgsqlConnection(cadenaConexion);
             conn.Open();
 
-            var columnas = BuildColumnasSanitizadas(infoColumnas); // Sanitiza nombres y remueve columnas duplicadas.
+            var columnas = BuildColumnasSanitizadas(infoColumnas);
+            var mappers = CrearMapeos(columnas, datos);
 
-            // Determina si los IDs suministrados son de tipo numérico (entero).
             bool idEsEntero = columnas.Count > 0 && datos.All(item =>
             {
-                string rawVal = ObtenerValorExport(item, columnas[0].Display, columnas[0].Clave);
-                return string.IsNullOrEmpty(rawVal) || int.TryParse(rawVal, out _);
+                object val = mappers[0](item);
+                if (val is int) return true;
+                if (val == null || val == DBNull.Value || string.IsNullOrEmpty(val.ToString())) return true;
+                return int.TryParse(val.ToString(), out _);
             });
 
-            CrearTablaPostgreSQL(conn, tabla, columnas, idEsEntero); // Ejecuta el script DDL de creación de la tabla.
+            CrearTablaPostgreSQL(conn, tabla, columnas, idEsEntero, usarPrimaryKey);
 
             int total = datos.Count;
             int insertados = 0;
 
-            // Construir la sentencia COPY binaria
             var colNames = columnas.Select(c => $"\"{c.NombreDB}\"").ToList();
             string sqlCopy = $"COPY \"{tabla}\" ({string.Join(", ", colNames)}) FROM STDIN (FORMAT BINARY)";
 
             using (var writer = conn.BeginBinaryImport(sqlCopy))
             {
+                int nextId = 1;
+                var seenIdsInt = new HashSet<int>();
+                var seenIdsText = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                var textSuffixTracker = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+
                 foreach (var item in datos)
                 {
                     writer.StartRow();
                     for (int i = 0; i < columnas.Count; i++)
                     {
-                        var (_, clave, display) = columnas[i];
-                        string rawVal = ObtenerValorExport(item, display, clave);
+                        var col = columnas[i];
+                        object rawVal = mappers[i](item);
 
                         if (i == 0)
                         {
                             if (idEsEntero)
                             {
-                                if (int.TryParse(rawVal, out int idV))
-                                    writer.Write(idV, NpgsqlTypes.NpgsqlDbType.Integer);
-                                else
-                                    writer.Write(DBNull.Value);
+                                int idV;
+                                if (rawVal is int iVal) idV = iVal;
+                                else if (rawVal != null && rawVal != DBNull.Value && int.TryParse(rawVal.ToString(), out int pId)) idV = pId;
+                                else idV = nextId++;
+                                
+                                if (usarPrimaryKey)
+                                {
+                                    if (!seenIdsInt.Add(idV))
+                                    {
+                                        idV = nextId;
+                                        while (!seenIdsInt.Add(idV)) idV++;
+                                        nextId = idV + 1;
+                                    }
+                                }
+                                writer.Write(idV, NpgsqlTypes.NpgsqlDbType.Integer);
                             }
                             else
                             {
-                                if (string.IsNullOrEmpty(rawVal))
-                                    writer.Write(DBNull.Value);
-                                else
-                                    writer.Write(rawVal, NpgsqlTypes.NpgsqlDbType.Text);
+                                string strId = rawVal?.ToString();
+                                if (string.IsNullOrWhiteSpace(strId)) strId = Guid.NewGuid().ToString();
+                                else if (usarPrimaryKey)
+                                {
+                                    string orig = strId;
+                                    if (!seenIdsText.Add(strId))
+                                    {
+                                        if (!textSuffixTracker.TryGetValue(orig, out int suffix)) suffix = 1;
+                                        while (!seenIdsText.Add(strId)) strId = $"{orig}_{suffix++}";
+                                        textSuffixTracker[orig] = suffix;
+                                    }
+                                }
+                                writer.Write(strId, NpgsqlTypes.NpgsqlDbType.Text);
                             }
                         }
-                        else if (clave == "valor")
+                        else if (col.Clave == "valor")
                         {
-                            if (double.TryParse(rawVal, NumberStyles.Any, CultureInfo.InvariantCulture, out double dblV))
-                                writer.Write(dblV, NpgsqlTypes.NpgsqlDbType.Double);
-                            else
-                                writer.Write(DBNull.Value);
+                            if (rawVal is double dblV) writer.Write(dblV, NpgsqlTypes.NpgsqlDbType.Double);
+                            else if (rawVal != null && rawVal != DBNull.Value && double.TryParse(rawVal.ToString(), NumberStyles.Any, CultureInfo.InvariantCulture, out double parsedVal))
+                                writer.Write(parsedVal, NpgsqlTypes.NpgsqlDbType.Double);
+                            else writer.Write(DBNull.Value);
                         }
                         else
                         {
-                            if (string.IsNullOrEmpty(rawVal))
-                                writer.Write(DBNull.Value);
-                            else
-                                writer.Write(rawVal, NpgsqlTypes.NpgsqlDbType.Text);
+                            string txt = rawVal?.ToString();
+                            if (string.IsNullOrEmpty(txt)) writer.Write(DBNull.Value);
+                            else writer.Write(txt, NpgsqlTypes.NpgsqlDbType.Text);
                         }
                     }
                     insertados++;
-                    if (insertados % 500 == 0)
+                    if (insertados % 10000 == 0)
                         progreso?.Report((int)(insertados * 100.0 / total));
                 }
                 writer.Complete();
@@ -126,10 +152,11 @@ public static class DatabaseWriter
         string tabla,
         List<DataItem> datos,
         List<(string Display, string Clave)> infoColumnas,
-        IProgress<int>? progreso = null)
+        IProgress<int>? progreso = null,
+        bool usarPrimaryKey = true)
     {
         return await Task.Run(() =>
-            EscribirEnPostgreSQL(cadenaConexion, tabla, datos, infoColumnas, progreso));
+            EscribirEnPostgreSQL(cadenaConexion, tabla, datos, infoColumnas, progreso, usarPrimaryKey));
     }
 
     /// <summary>
@@ -141,11 +168,12 @@ public static class DatabaseWriter
         NpgsqlConnection conn,
         string tabla,
         List<(string NombreDB, string Clave, string Display)> columnas,
-        bool idEsEntero)
+        bool idEsEntero,
+        bool usarPrimaryKey)
     {
         string TipoSQL(string clave, int indice)
         {
-            if (indice == 0) return (idEsEntero ? "INTEGER" : "TEXT") + " PRIMARY KEY";
+            if (indice == 0) return (idEsEntero ? "INTEGER" : "TEXT") + (usarPrimaryKey ? " PRIMARY KEY" : "");
             return clave switch
             {
                 "valor" => "DOUBLE PRECISION",
@@ -161,55 +189,6 @@ public static class DatabaseWriter
         cmd.ExecuteNonQuery();
     }
 
-    /// <summary>
-    /// Método: InsertarItemPostgreSQL
-    /// - Inicializa: NpgsqlCommand con la consulta parametrizada.
-    /// - Operación: Vincula los campos del DataItem a los parámetros @p0, @p1, etc., y ejecuta la inserción.
-    /// </summary>
-    private static void InsertarItemPostgreSQL(
-        NpgsqlConnection conn,
-        NpgsqlTransaction tx,
-        string tabla,
-        DataItem item,
-        List<(string NombreDB, string Clave, string Display)> columnas,
-        List<(string Display, string Clave)> infoColumnas,
-        bool idEsEntero)
-    {
-        var colNames = columnas.Select(c => $"\"{c.NombreDB}\"").ToList();
-        var paramNames = columnas.Select((c, i) => $"@p{i}").ToList();
-
-        string sql = $"INSERT INTO \"{tabla}\" ({string.Join(", ", colNames)}) " +
-                     $"VALUES ({string.Join(", ", paramNames)});";
-
-        using var cmd = new NpgsqlCommand(sql, conn, tx);
-
-        for (int i = 0; i < columnas.Count; i++)
-        {
-            var (_, clave, display) = columnas[i];
-            string rawVal = ObtenerValorExport(item, display, clave);
-            object dbVal;
-
-            if (i == 0)
-            {
-                if (idEsEntero)
-                    dbVal = int.TryParse(rawVal, out int idV) ? idV : DBNull.Value;
-                else
-                    dbVal = string.IsNullOrEmpty(rawVal) ? DBNull.Value : (object)rawVal;
-            }
-            else if (clave == "valor")
-            {
-                dbVal = double.TryParse(rawVal, NumberStyles.Any, CultureInfo.InvariantCulture, out double dblV) ? dblV : DBNull.Value;
-            }
-            else
-            {
-                dbVal = string.IsNullOrEmpty(rawVal) ? DBNull.Value : (object)rawVal;
-            }
-
-            cmd.Parameters.AddWithValue($"@p{i}", dbVal);
-        }
-
-        cmd.ExecuteNonQuery();
-    }
 
     // ==============================================================
     //  SECCIÓN DE MARIADB / MYSQL (OPERACIONES DE ESCRITURA)
@@ -226,7 +205,8 @@ public static class DatabaseWriter
         string tabla,
         List<DataItem> datos,
         List<(string Display, string Clave)> infoColumnas,
-        IProgress<int>? progreso = null)
+        IProgress<int>? progreso = null,
+        bool usarPrimaryKey = true)
     {
         var result = new WriteResult();
         try
@@ -235,69 +215,26 @@ public static class DatabaseWriter
             conn.Open();
 
             var columnas = BuildColumnasSanitizadas(infoColumnas);
+            var mappers = CrearMapeos(columnas, datos);
 
-            var colIdInfo = columnas.FirstOrDefault(c => c.Clave == "id");
-            bool idEsEntero = colIdInfo == default || datos.All(item =>
+            bool idEsEntero = columnas.Count > 0 && datos.All(item =>
             {
-                string rawVal = ObtenerValorExport(item, colIdInfo.Display, "id");
-                return string.IsNullOrEmpty(rawVal) || int.TryParse(rawVal, out _);
+                object val = mappers[0](item);
+                if (val is int) return true;
+                if (val == null || val == DBNull.Value || string.IsNullOrEmpty(val.ToString())) return true;
+                return int.TryParse(val.ToString(), out _);
             });
 
-            CrearTablaMariaDB(conn, tabla, columnas, idEsEntero);
+            CrearTablaMariaDB(conn, tabla, columnas, idEsEntero, usarPrimaryKey);
 
-            // 1. Construir un DataTable con el esquema de la tabla de destino
-            using var dt = new DataTable();
-            for (int i = 0; i < columnas.Count; i++)
-            {
-                var col = columnas[i];
-                Type sysType = typeof(string);
-                if (i == 0 && idEsEntero) sysType = typeof(int);
-                else if (col.Clave == "valor") sysType = typeof(double);
-                
-                var dataCol = new DataColumn(col.NombreDB, sysType) { AllowDBNull = true };
-                dt.Columns.Add(dataCol);
-            }
+            using var reader = new FastDataReader(datos, columnas, mappers, idEsEntero, progreso, usarPrimaryKey);
 
-            // 2. Poblar el DataTable
-            int total = datos.Count;
-            int insertados = 0;
-            foreach (var item in datos)
-            {
-                var row = dt.NewRow();
-                for (int i = 0; i < columnas.Count; i++)
-                {
-                    var col = columnas[i];
-                    string rawVal = ObtenerValorExport(item, col.Display, col.Clave);
-
-                    if (i == 0)
-                    {
-                        if (idEsEntero)
-                            row[i] = int.TryParse(rawVal, out int idV) ? (object)idV : DBNull.Value;
-                        else
-                            row[i] = string.IsNullOrEmpty(rawVal) ? DBNull.Value : (object)rawVal;
-                    }
-                    else if (col.Clave == "valor")
-                    {
-                        row[i] = double.TryParse(rawVal, NumberStyles.Any, CultureInfo.InvariantCulture, out double dblV) ? (object)dblV : DBNull.Value;
-                    }
-                    else
-                    {
-                        row[i] = string.IsNullOrEmpty(rawVal) ? DBNull.Value : (object)rawVal;
-                    }
-                }
-                dt.Rows.Add(row);
-                insertados++;
-                if (insertados % 500 == 0)
-                    progreso?.Report((int)(insertados * 50.0 / total)); // 50% de progreso máximo para la preparación
-            }
-
-            // 3. Ejecutar MySqlBulkCopy
             var bulkCopy = new MySqlBulkCopy(conn)
             {
                 DestinationTableName = tabla
             };
 
-            var bulkResult = bulkCopy.WriteToServer(dt);
+            var bulkResult = bulkCopy.WriteToServer(reader);
 
             progreso?.Report(100);
             result.Insertados = bulkResult.RowsInserted;
@@ -322,10 +259,11 @@ public static class DatabaseWriter
         string tabla,
         List<DataItem> datos,
         List<(string Display, string Clave)> infoColumnas,
-        IProgress<int>? progreso = null)
+        IProgress<int>? progreso = null,
+        bool usarPrimaryKey = true)
     {
         return await Task.Run(() =>
-            EscribirEnMariaDB(cadenaConexion, tabla, datos, infoColumnas, progreso));
+            EscribirEnMariaDB(cadenaConexion, tabla, datos, infoColumnas, progreso, usarPrimaryKey));
     }
 
     /// <summary>
@@ -337,11 +275,12 @@ public static class DatabaseWriter
         MySqlConnection conn,
         string tabla,
         List<(string NombreDB, string Clave, string Display)> columnas,
-        bool idEsEntero)
+        bool idEsEntero,
+        bool usarPrimaryKey)
     {
         string TipoSQL(string clave, int indice)
         {
-            if (indice == 0) return (idEsEntero ? "INT" : "VARCHAR(255)") + " PRIMARY KEY";
+            if (indice == 0) return (idEsEntero ? "INT" : "VARCHAR(255)") + (usarPrimaryKey ? " PRIMARY KEY" : "");
             return clave switch
             {
                 "valor" => "DOUBLE",
@@ -356,55 +295,6 @@ public static class DatabaseWriter
         cmd.ExecuteNonQuery();
     }
 
-    /// <summary>
-    /// Método: InsertarItemMariaDB
-    /// - Inicializa: MySqlCommand parametrizado.
-    /// - Operación: Asocia valores al comando y ejecuta la inserción de una fila en MariaDB.
-    /// </summary>
-    private static void InsertarItemMariaDB(
-        MySqlConnection conn,
-        MySqlTransaction tx,
-        string tabla,
-        DataItem item,
-        List<(string NombreDB, string Clave, string Display)> columnas,
-        List<(string Display, string Clave)> infoColumnas,
-        bool idEsEntero)
-    {
-        var colNames = columnas.Select(c => $"`{c.NombreDB}`").ToList();
-        var paramNames = columnas.Select((c, i) => $"@p{i}").ToList();
-
-        string sql = $"INSERT INTO `{tabla}` ({string.Join(", ", colNames)}) " +
-                     $"VALUES ({string.Join(", ", paramNames)});";
-
-        using var cmd = new MySqlCommand(sql, conn, tx);
-
-        for (int i = 0; i < columnas.Count; i++)
-        {
-            var (_, clave, display) = columnas[i];
-            string rawVal = ObtenerValorExport(item, display, clave);
-            object dbVal;
-
-            if (i == 0)
-            {
-                if (idEsEntero)
-                    dbVal = int.TryParse(rawVal, out int idV) ? idV : DBNull.Value;
-                else
-                    dbVal = string.IsNullOrEmpty(rawVal) ? DBNull.Value : (object)rawVal;
-            }
-            else if (clave == "valor")
-            {
-                dbVal = double.TryParse(rawVal, NumberStyles.Any, CultureInfo.InvariantCulture, out double dblV) ? dblV : DBNull.Value;
-            }
-            else
-            {
-                dbVal = string.IsNullOrEmpty(rawVal) ? DBNull.Value : (object)rawVal;
-            }
-
-            cmd.Parameters.AddWithValue($"@p{i}", dbVal);
-        }
-
-        cmd.ExecuteNonQuery();
-    }
 
     // ==============================================================
     //  SECCIÓN DE CONEXIONES Y STRINGS DE CONEXIÓN
@@ -588,32 +478,6 @@ public static class DatabaseWriter
         return resultado;
     }
 
-    /// <summary>
-    /// Método: ObtenerValorExport
-    /// - Operación: Extrae el valor de un campo desde CamposExtra (priorizado por mayúsculas/minúsculas o rol) o properties del DataItem.
-    /// </summary>
-    private static string ObtenerValorExport(DataItem item, string display, string clave)
-    {
-        if (item.CamposExtra.TryGetValue(display, out var v1) && v1 != null)
-            return v1;
-
-        if (item.CamposExtra.TryGetValue(display.ToLowerInvariant(), out var v2) && v2 != null)
-            return v2;
-
-        if (item.CamposExtra.TryGetValue(clave, out var v3) && v3 != null)
-            return v3;
-
-        return clave switch
-        {
-            "id" => item.Id.ToString(),
-            "nombre" => item.Nombre ?? "",
-            "categoria" => item.Categoria ?? "",
-            "valor" => item.Valor.ToString(CultureInfo.InvariantCulture),
-            "fecha" => item.Fecha.ToString("yyyy-MM-dd"),
-            "fuente" => item.Fuente ?? "",
-            _ => ""
-        };
-    }
 
     /// <summary>
     /// Método: SanitizarNombre
@@ -821,15 +685,192 @@ public static class DatabaseWriter
     {
         return await Task.Run(() => ActualizarCampoMariaDB(cadenaConexion, tabla, colId, idVal, colNombre, nuevoValor));
     }
-}
+    private static Func<DataItem, object>[] CrearMapeos(List<(string NombreDB, string Clave, string Display)> columnas, List<DataItem> datos)
+    {
+        var mappers = new Func<DataItem, object>[columnas.Count];
+        
+        var firstItem = datos.FirstOrDefault();
+        var realKeys = new Dictionary<int, string>();
+        if (firstItem != null)
+        {
+            for (int i = 0; i < columnas.Count; i++)
+            {
+                var (_, clave, display) = columnas[i];
+                string? matchedKey = null;
+                
+                string dispLow = display.Trim().ToLowerInvariant();
+                string claveLow = clave.Trim().ToLowerInvariant();
 
-/// <summary>
-/// Modelo de datos que encapsula el resultado de las operaciones de escritura en base de datos.
-/// </summary>
-public class WriteResult
-{
-    public bool Exito { get; set; }
-    public string Mensaje { get; set; } = "";
-    public int Insertados { get; set; }
-    public int Errores { get; set; }
+                if (firstItem.CamposExtra.ContainsKey(display)) matchedKey = display;
+                else if (firstItem.CamposExtra.ContainsKey(clave)) matchedKey = clave;
+                else
+                {
+                    foreach (var k in firstItem.CamposExtra.Keys)
+                    {
+                        string kLow = k.Trim().ToLowerInvariant();
+                        if (kLow == dispLow || kLow == claveLow)
+                        {
+                            matchedKey = k;
+                            break;
+                        }
+                    }
+                }
+                if (matchedKey != null) realKeys[i] = matchedKey;
+            }
+        }
+
+        for (int i = 0; i < columnas.Count; i++)
+        {
+            var (_, clave, _) = columnas[i];
+            bool hasRealKey = realKeys.TryGetValue(i, out string? exactKey);
+
+            mappers[i] = item =>
+            {
+                if (hasRealKey && exactKey != null && item.CamposExtra.TryGetValue(exactKey, out var v) && v != null) 
+                    return v;
+
+                return clave switch
+                {
+                    "id" => item.Id,
+                    "nombre" => item.Nombre ?? "",
+                    "categoria" => item.Categoria ?? "",
+                    "valor" => item.Valor,
+                    "fecha" => item.Fecha.ToString("yyyy-MM-dd"),
+                    "latitude" => (object?)item.Latitude ?? DBNull.Value,
+                    "longitude" => (object?)item.Longitude ?? DBNull.Value,
+                    "fuente" => item.Fuente ?? "",
+                    _ => DBNull.Value
+                };
+            };
+        }
+        return mappers;
+    }
+
+    private class FastDataReader : IDataReader
+    {
+        private readonly List<DataItem> _datos;
+        private readonly List<(string NombreDB, string Clave, string Display)> _columnas;
+        private readonly Func<DataItem, object>[] _mappers;
+        private readonly bool _idEsEntero;
+        private readonly IProgress<int>? _progreso;
+        private readonly bool _usarPrimaryKey;
+        
+        private int _currentIndex = -1;
+        private int _nextId = 1;
+        private HashSet<int> _seenIdsInt = new HashSet<int>();
+        private HashSet<string> _seenIdsText = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        private Dictionary<string, int> _textSuffixTracker = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+
+        public FastDataReader(List<DataItem> datos, List<(string, string, string)> columnas, Func<DataItem, object>[] mappers, bool idEsEntero, IProgress<int>? progreso, bool usarPrimaryKey)
+        {
+            _datos = datos;
+            _columnas = columnas;
+            _mappers = mappers;
+            _idEsEntero = idEsEntero;
+            _progreso = progreso;
+            _usarPrimaryKey = usarPrimaryKey;
+        }
+
+        public bool Read()
+        {
+            _currentIndex++;
+            if (_currentIndex % 10000 == 0 && _currentIndex > 0)
+                _progreso?.Report((int)(_currentIndex * 100.0 / _datos.Count));
+            return _currentIndex < _datos.Count;
+        }
+
+        public object GetValue(int i)
+        {
+            var rawVal = _mappers[i](_datos[_currentIndex]);
+            
+            if (i == 0)
+            {
+                if (_idEsEntero)
+                {
+                    int idV;
+                    if (rawVal is int iVal) idV = iVal;
+                    else if (rawVal != null && rawVal != DBNull.Value && int.TryParse(rawVal.ToString(), out int pId)) idV = pId;
+                    else idV = _nextId++;
+                    
+                    if (_usarPrimaryKey)
+                    {
+                        if (!_seenIdsInt.Add(idV))
+                        {
+                            idV = _nextId;
+                            while (!_seenIdsInt.Add(idV)) idV++;
+                            _nextId = idV + 1;
+                        }
+                    }
+                    return idV;
+                }
+                else
+                {
+                    string? strId = rawVal?.ToString();
+                    if (string.IsNullOrWhiteSpace(strId)) strId = Guid.NewGuid().ToString();
+                    else if (_usarPrimaryKey)
+                    {
+                        string orig = strId;
+                        if (!_seenIdsText.Add(strId))
+                        {
+                            if (!_textSuffixTracker.TryGetValue(orig, out int suffix)) suffix = 1;
+                            while (!_seenIdsText.Add(strId)) strId = $"{orig}_{suffix++}";
+                            _textSuffixTracker[orig] = suffix;
+                        }
+                    }
+                    return strId;
+                }
+            }
+            else if (_columnas[i].Clave == "valor")
+            {
+                if (rawVal is double dblV) return dblV;
+                if (rawVal != null && rawVal != DBNull.Value && double.TryParse(rawVal.ToString(), NumberStyles.Any, CultureInfo.InvariantCulture, out double parsedVal))
+                    return parsedVal;
+                return DBNull.Value;
+            }
+            else
+            {
+                if (rawVal == null || (rawVal is string s && string.IsNullOrEmpty(s))) return DBNull.Value;
+                return rawVal.ToString() ?? (object)DBNull.Value;
+            }
+        }
+
+        public int FieldCount => _columnas.Count;
+        public bool IsDBNull(int i) => GetValue(i) == DBNull.Value;
+        public int GetValues(object[] values)
+        {
+            int count = Math.Min(values.Length, FieldCount);
+            for (int i = 0; i < count; i++) values[i] = GetValue(i);
+            return count;
+        }
+        
+        public object this[int i] => GetValue(i);
+        public object this[string name] => throw new NotImplementedException();
+        public void Close() {}
+        public void Dispose() {}
+        public DataTable GetSchemaTable() => throw new NotImplementedException();
+        public bool NextResult() => false;
+        public int Depth => 0;
+        public bool IsClosed => false;
+        public int RecordsAffected => -1;
+
+        public bool GetBoolean(int i) => Convert.ToBoolean(GetValue(i));
+        public byte GetByte(int i) => Convert.ToByte(GetValue(i));
+        public long GetBytes(int i, long fieldOffset, byte[] buffer, int bufferoffset, int length) => throw new NotImplementedException();
+        public char GetChar(int i) => Convert.ToChar(GetValue(i));
+        public long GetChars(int i, long fieldoffset, char[] buffer, int bufferoffset, int length) => throw new NotImplementedException();
+        public IDataReader GetData(int i) => throw new NotImplementedException();
+        public string GetDataTypeName(int i) => throw new NotImplementedException();
+        public DateTime GetDateTime(int i) => Convert.ToDateTime(GetValue(i));
+        public decimal GetDecimal(int i) => Convert.ToDecimal(GetValue(i));
+        public double GetDouble(int i) => Convert.ToDouble(GetValue(i));
+        public Type GetFieldType(int i) => typeof(object);
+        public float GetFloat(int i) => Convert.ToSingle(GetValue(i));
+        public Guid GetGuid(int i) => (Guid)GetValue(i);
+        public short GetInt16(int i) => Convert.ToInt16(GetValue(i));
+        public int GetInt32(int i) => Convert.ToInt32(GetValue(i));
+        public long GetInt64(int i) => Convert.ToInt64(GetValue(i));
+        public string GetName(int i) => throw new NotImplementedException();
+        public int GetOrdinal(string name) => throw new NotImplementedException();
+        public string GetString(int i) => Convert.ToString(GetValue(i)) ?? "";
+    }
 }

@@ -69,4 +69,27 @@ public class DataItem
     /// Realiza y devuelve una copia superficial (shallow copy) del objeto DataItem actual.
     /// </summary>
     public DataItem Clonar() => (DataItem)MemberwiseClone();
+
+    /// <summary>
+    /// Normaliza una cadena de caracteres quitando acentos y diacríticos, convirtiendo a minúsculas,
+    /// y dejando únicamente caracteres alfanuméricos. Útil para comparar nombres de columnas
+    /// de manera genérica sin importar espacios, guiones bajos o acentos.
+    /// </summary>
+    public static string NormalizarParaComparar(string s)
+    {
+        if (string.IsNullOrEmpty(s)) return string.Empty;
+        var fd = s.Normalize(System.Text.NormalizationForm.FormD);
+        var sb = new System.Text.StringBuilder(fd.Length);
+        foreach (char c in fd)
+        {
+            if (System.Globalization.CharUnicodeInfo.GetUnicodeCategory(c)
+                != System.Globalization.UnicodeCategory.NonSpacingMark)
+            {
+                if (char.IsLetterOrDigit(c))
+                    sb.Append(char.ToLowerInvariant(c));
+            }
+        }
+        return sb.ToString();
+    }
 }
+

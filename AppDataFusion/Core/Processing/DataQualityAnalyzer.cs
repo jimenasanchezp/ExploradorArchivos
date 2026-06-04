@@ -140,11 +140,11 @@ public static class DataQualityAnalyzer
         if (item.CamposExtra.TryGetValue(clave, out var exacto))
             return exacto ?? "";
 
-        // 2. Búsqueda case-insensitive
-        string claveLow = clave.Trim().ToLowerInvariant();
+        // 2. Búsqueda normalizada
+        string normClave = DataItem.NormalizarParaComparar(clave);
         foreach (var kv in item.CamposExtra)
         {
-            if (string.Equals(kv.Key.Trim(), claveLow, StringComparison.OrdinalIgnoreCase))
+            if (DataItem.NormalizarParaComparar(kv.Key) == normClave)
                 return kv.Value ?? "";
         }
 

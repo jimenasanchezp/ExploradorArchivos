@@ -1,6 +1,7 @@
 using System;
 using System.Drawing;
 using System.IO;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using ExploradorArchivos.AppCamara;
@@ -25,13 +26,14 @@ namespace ExploradorArchivos.AppCapturaPantalla
         private System.Diagnostics.Stopwatch?  _stopwatch;
         private string                         _rutaAviTemporal   = string.Empty;
         private string                         _rutaMp4Final      = string.Empty;
+        private CancellationTokenSource?       _ctsGrabacion      = null;
 
         // ─── Región seleccionada ─────────────────────────────────────────────────
         /// <summary>Región activa a capturar / grabar. Si es Empty se usa la pantalla completa.</summary>
         private Rectangle _regionActiva = Rectangle.Empty;
 
         // ─── Timer de captura de frames durante grabación ─────────────────────
-        private System.Windows.Forms.Timer _timerFrames = default!;
+        // Reemplazado por BucleCapturaAsync
 
         // ─── Controles UI ────────────────────────────────────────────────────────
         private Panel      _pnlTop         = default!;
@@ -249,9 +251,8 @@ namespace ExploradorArchivos.AppCapturaPantalla
         }
 
         /// <summary>
-        /// Crea los dos timers del módulo:<br/>
+        /// Crea el timer del módulo:<br/>
         /// • <b>_timerGrabacion</b> (1 000 ms): actualiza el contador MM:SS en la UI.<br/>
-        /// • <b>_timerFrames</b> (66 ms ≈ 15 fps): dispara la captura de cada frame al AviGrabador.
         /// </summary>
         private void InicializarTimers()
         {
@@ -259,11 +260,6 @@ namespace ExploradorArchivos.AppCapturaPantalla
             _timerGrabacion          = new System.Windows.Forms.Timer();
             _timerGrabacion.Interval = 1000;
             _timerGrabacion.Tick    += TimerGrabacion_Tick;
-
-            // Timer de captura de frames (~15 fps)
-            _timerFrames          = new System.Windows.Forms.Timer();
-            _timerFrames.Interval = 66; // ~15 fps
-            _timerFrames.Tick    += TimerFrames_Tick;
         }
 
         /// <summary>
@@ -520,7 +516,9 @@ namespace ExploradorArchivos.AppCapturaPantalla
                 _lblTimer.ForeColor  = Color.FromArgb(220, 50, 50);
 
                 _timerGrabacion.Start();
-                _timerFrames.Start();
+                
+                _ctsGrabacion = new CancellationTokenSource();
+                _ = BucleCapturaAsync(_ctsGrabacion.Token);
             }
             catch (Exception ex)
             {
@@ -537,7 +535,10 @@ namespace ExploradorArchivos.AppCapturaPantalla
         /// </summary>
         private async void DetenerGrabacion()
         {
-            _timerFrames.Stop();
+            _ctsGrabacion?.Cancel();
+            _ctsGrabacion?.Dispose();
+            _ctsGrabacion = null;
+            
             _timerGrabacion.Stop();
             _stopwatch?.Stop();
             _stopwatch  = null;
@@ -610,31 +611,41 @@ namespace ExploradorArchivos.AppCapturaPantalla
         }
 
         /// <summary>
-        /// Callback del timer de ~15 fps (66 ms). Captura un frame del área activa
-        /// y lo escribe en el <see cref="AviGrabador"/> dentro de un <c>Task.Run</c>
-        /// para no bloquear el hilo UI durante la operación I/O de escritura al disco.
+        /// Bucle asíncrono para la captura de frames (~15 fps). Captura un frame del área activa
+        /// y lo escribe en el <see cref="AviGrabador"/> dentro de un Task para no bloquear la UI.
         /// </summary>
-        private void TimerFrames_Tick(object? sender, EventArgs e)
+        private async Task BucleCapturaAsync(CancellationToken token)
         {
-            if (!_grabando || _grabador == null) return;
-
-            // Capturar y escribir frame en hilo de fondo para no bloquear la UI
-            var grabadorLocal = _grabador;
-            var regionLocal   = _regionActiva.IsEmpty
+            var regionLocal = _regionActiva.IsEmpty
                 ? (Screen.PrimaryScreen?.Bounds ?? new Rectangle(0, 0, 1920, 1080))
                 : _regionActiva;
-            var elapsedLocal = _stopwatch?.Elapsed ?? TimeSpan.Zero;
 
-            _ = Task.Run(() =>
+            await Task.Run(async () =>
             {
-                try
+                while (!token.IsCancellationRequested && _grabador != null)
                 {
-                    if (grabadorLocal == null) return;
-                    using Bitmap frame = ScreenCaptureService.CapturarFrame(regionLocal);
-                    ScreenCaptureService.EscribirFrame(grabadorLocal, frame, elapsedLocal);
+                    var swFrame = System.Diagnostics.Stopwatch.StartNew();
+                    try
+                    {
+                        var elapsedLocal = _stopwatch?.Elapsed ?? TimeSpan.Zero;
+                        using Bitmap frame = ScreenCaptureService.CapturarFrame(regionLocal);
+                        ScreenCaptureService.EscribirFrame(_grabador, frame, elapsedLocal);
+                    }
+                    catch { /* ignorar frames perdidos */ }
+
+                    swFrame.Stop();
+                    int msRestantes = 66 - (int)swFrame.ElapsedMilliseconds;
+                    
+                    if (msRestantes > 0)
+                    {
+                        try
+                        {
+                            await Task.Delay(msRestantes, token);
+                        }
+                        catch (TaskCanceledException) { break; }
+                    }
                 }
-                catch { /* ignorar frames perdidos */ }
-            });
+            }, token);
         }
 
         #endregion
@@ -649,15 +660,15 @@ namespace ExploradorArchivos.AppCapturaPantalla
         {
             if (_grabando)
             {
-                _timerFrames.Stop();
+                _ctsGrabacion?.Cancel();
                 _timerGrabacion.Stop();
                 _grabando = false;
                 LimpiarGrabador();
                 try { if (File.Exists(_rutaAviTemporal)) File.Delete(_rutaAviTemporal); } catch { }
             }
 
+            _ctsGrabacion?.Dispose();
             _timerGrabacion.Dispose();
-            _timerFrames.Dispose();
             _picPreview.Image?.Dispose();
             base.OnFormClosing(e);
         }

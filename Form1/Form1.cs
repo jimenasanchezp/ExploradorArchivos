@@ -1053,7 +1053,7 @@ public partial class Form1 : Form
     /// </summary>
     private void BtnCapturaPantalla_Click(object? sender, EventArgs e)
     {
-        using var form = new AppCapturaPantallaForm();
-        form.ShowDialog(this);
+        var form = new AppCapturaPantallaForm();
+        form.Show();
     }
 }
