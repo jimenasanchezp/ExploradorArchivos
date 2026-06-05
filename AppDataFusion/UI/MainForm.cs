@@ -1254,32 +1254,10 @@ public partial class MainForm : Form
         lblProcInfo.Text = dupes.Count == 0
             ? "No se encontraron duplicados."
             : $"{dupes.Count} duplicados encontrados.";
-        if (dupes.Count > 0) btnEliminarDuplicados.Enabled = true;
         ActualizarEstadoBarra($"Duplicados: {dupes.Count}");
     }
 
-    /// <summary>
-    /// Confirma y ejecuta la eliminación de los duplicados detectados del conjunto global de datos.
-    /// </summary>
-    private async void BtnEliminarDuplicados_Click(object? sender, EventArgs e)
-    {
-        if (MessageBox.Show("¿Eliminar duplicados? Esta acción no se puede deshacer.",
-            "Confirmar eliminación", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes) return;
-        int antes = _datos.Count;
-        var limpia = await Task.Run(() => DataProcessor.EliminarDuplicados(_datos));
-        _datos.Clear(); _datos.AddRange(limpia);
-        
-        foreach (var item in _datos)
-        {
-            if (!string.IsNullOrEmpty(item.Fuente))
-                _fuentesModificadas.Add(item.Fuente);
-        }
-        btnHdrGuardar.Enabled = true;
 
-        await ActualizarTodoAsync();
-        lblProcInfo.Text = $"Eliminados {antes - _datos.Count}. Quedan {_datos.Count}.";
-        btnEliminarDuplicados.Enabled = false;
-    }
 
     /// <summary>
     /// Normaliza una cadena de texto (remueve tildes, diacríticos y convierte a minúsculas)
@@ -1988,7 +1966,6 @@ public partial class MainForm : Form
         cmbMetricaGrafica?.Items.Clear();
         txtLinqFiltro.Text = "";
         lblProcInfo.Text = "Selecciona una operaciÃ³n.";
-        btnEliminarDuplicados.Enabled = false;
         chartMain.Limpiar();
         lblContadorTodos.Text = "0 registros";
 

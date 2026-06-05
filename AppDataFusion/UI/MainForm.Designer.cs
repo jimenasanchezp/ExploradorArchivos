@@ -88,7 +88,7 @@ partial class MainForm
 
     // ── Tab 5 ──────────────────────────────────────────────────────────
     private Panel pnlProcHeader;
-    private Button btnDetectarDuplicados, btnEliminarDuplicados;
+    private Button btnDetectarDuplicados;
     private Label lblProcInfo;
     private ComboBox cmbLinqCampo;
     private TextBox txtLinqFiltro;
@@ -836,9 +836,7 @@ partial class MainForm
         };
         btnDetectarDuplicados = FButton("Detectar duplicados", new Point(16, 12), 168,
             clrRose, Color.White, BtnDetectarDuplicados_Click!);
-        btnEliminarDuplicados = FButton("Eliminar duplicados", new Point(194, 12), 168,
-            clrSurface, clrTextDim, BtnEliminarDuplicados_Click!);
-        btnEliminarDuplicados.Enabled = false;
+
 
         lblProcInfo = new Label
         {
@@ -851,7 +849,7 @@ partial class MainForm
             BackColor = Color.Transparent
         };
         rowDupes.Controls.AddRange(new Control[]
-            { btnDetectarDuplicados, btnEliminarDuplicados, lblProcInfo });
+            { btnDetectarDuplicados, lblProcInfo });
 
         var rowSep = new Panel { Location = new Point(0, 52), Size = new Size(4000, 1), BackColor = clrBorder };
 

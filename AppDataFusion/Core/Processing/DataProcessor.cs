@@ -161,29 +161,6 @@ public static class DataProcessor
         return duplicados;
     }
 
-    /// <summary>
-    /// Método: EliminarDuplicados
-    /// - Inicializa: Dictionary (vistos) de firmas procesadas.
-    /// - Operación: Elimina registros duplicados dejando únicamente el primero.
-    /// </summary>
-    public static List<DataItem> EliminarDuplicados(List<DataItem> datos)
-    {
-        var limpia = new List<DataItem>();
-        var vistos = new Dictionary<string, bool>();
-
-        for (int i = 0; i < datos.Count; i++)
-        {
-            string clave = $"{datos[i].Id}|{datos[i].Nombre.ToLower()}|{datos[i].Categoria.ToLower()}";
-            
-            if (!vistos.ContainsKey(clave))
-            {
-                vistos[clave] = true;
-                limpia.Add(datos[i]);
-            }
-        }
-        return limpia;
-    }
-
     // ==============================================================
     //  SECCIÓN: CONSULTAS AVANZADAS CON LINQ
     // ==============================================================
