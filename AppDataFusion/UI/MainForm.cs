@@ -117,18 +117,37 @@ public partial class MainForm : Form
                 return;
             }
             
-            ActualizarEstadoBarra("Llamando a la API de Geocoding...");
-            await GeocodingService.IdentificarCoordenadasAsync(_datos);
-            
-            foreach (var item in _datos)
+            btnSbApi.Enabled = false;
+            try
             {
-                if (!string.IsNullOrEmpty(item.Fuente))
-                    _fuentesModificadas.Add(item.Fuente);
-            }
-            btnHdrGuardar.Enabled = true;
+                ActualizarEstadoBarra("Llamando a la API de Geocoding...");
+                var result = await GeocodingService.IdentificarCoordenadasAsync(_datos, msg => ActualizarEstadoBarra(msg));
+                
+                foreach (var item in _datos)
+                {
+                    if (!string.IsNullOrEmpty(item.Fuente))
+                        _fuentesModificadas.Add(item.Fuente);
+                }
+                btnHdrGuardar.Enabled = true;
 
-            await ActualizarTodoAsync();
-            ActualizarEstadoBarra("GeocodificaciÃ³n completada.");
+                await ActualizarTodoAsync();
+                
+                // Si el mensaje contiene indicativos de error o bloqueo de la API
+                bool isError = result.Message.Contains("bloqueado") || result.Message.Contains("limitado") || result.Message.Contains("Error");
+                ActualizarEstadoBarra(isError ? "⚠ " + result.Message : "✓ " + result.Message);
+                
+                MessageBox.Show(result.Message, "API Geocoding", MessageBoxButtons.OK, 
+                    isError ? MessageBoxIcon.Warning : MessageBoxIcon.Information);
+            }
+            catch (Exception ex)
+            {
+                ActualizarEstadoBarra("❌ Error: " + ex.Message);
+                MessageBox.Show($"Ocurrió un error al procesar la geocodificación:\n{ex.Message}", "Error de Geocodificación", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+            finally
+            {
+                btnSbApi.Enabled = true;
+            }
         };
     }
 

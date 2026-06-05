@@ -37,60 +37,92 @@ public static class GeocodingService
     /// Intenta resolver y asignar las coordenadas para una lista de <c>DataItem</c>,
     /// priorizando campos que contengan palabras clave como "ciudad" o "location".
     /// </summary>
-    public static async Task IdentificarCoordenadasAsync(IEnumerable<DataItem> items)
+    public static async Task<(int Processed, int Geocoded, string Message)> IdentificarCoordenadasAsync(
+        IEnumerable<DataItem> items, 
+        Action<string>? progressCallback = null)
     {
-        // Contador de peticiones realizadas en el lote actual
-        int count = 0;
-        
-        // Recorrer los elementos recibidos
+        int queryCount = 0;
+        int geocodedCount = 0;
+
+        // Primero seleccionamos los elementos que realmente necesitan procesamiento
+        var itemsToProcess = new List<(DataItem Item, string Target)>();
         foreach (var item in items)
         {
-            // Omitir si el registro ya contiene información de latitud o longitud asignada
             if ((item.Latitude != 0 && item.Latitude != null) || (item.Longitude != 0 && item.Longitude != null)) continue;
-            // Detener el proceso si alcanzamos el límite de consultas permitidas por lote
-            if (count >= MAX_GEOCODE_PER_BATCH) break;
 
             // Buscar en CamposExtra el primer valor que parezca una ciudad utilizando operadores de LINQ
             string? target = item.CamposExtra
-                .Where(kv => _cityKeywords.Any(k => kv.Key.ToLowerInvariant().Contains(k))) // Filtrar por claves con coincidencia de palabra clave
-                .Select(kv => kv.Value) // Seleccionar los valores asociados
-                .FirstOrDefault(val => !string.IsNullOrEmpty(val) && val.Length >= 3); // Obtener la primera cadena válida con longitud mínima de 3
+                .Where(kv => _cityKeywords.Any(k => kv.Key.ToLowerInvariant().Contains(k)))
+                .Select(kv => kv.Value)
+                .FirstOrDefault(val => !string.IsNullOrEmpty(val) && val.Length >= 3);
 
-            // Si no se encuentra un valor específico en CamposExtra, tomar el nombre o la categoría como fallback
             if (string.IsNullOrEmpty(target)) target = item.Nombre ?? item.Categoria;
-            // Validar que el término de búsqueda resultante sea útil (mínimo 3 caracteres)
             if (string.IsNullOrEmpty(target) || target.Length < 3) continue;
+
+            itemsToProcess.Add((item, target));
+        }
+
+        if (itemsToProcess.Count == 0)
+        {
+            return (0, 0, "No hay nuevos registros válidos que requieran geocodificación.");
+        }
+
+        progressCallback?.Invoke($"Iniciando geocodificación (lote máx. {MAX_GEOCODE_PER_BATCH} consultas)...");
+
+        foreach (var (item, target) in itemsToProcess)
+        {
+            if (queryCount >= MAX_GEOCODE_PER_BATCH) break;
 
             // Verificar si el término de búsqueda ya se encuentra registrado en nuestra caché local
             if (_cache.TryGetValue(target, out var cached))
             {
-                // Si la caché tiene datos de coordenadas válidos, asignarlos directamente al elemento
                 if (cached.HasValue) 
                 { 
                     item.Latitude = cached.Value.Lat; 
                     item.Longitude = cached.Value.Lon; 
+                    geocodedCount++;
                 }
-                // Continuar con el siguiente registro
                 continue;
             }
 
-            // Realizar la consulta física de geolocalización a la API remota
-            var coords = await FetchCoordsAsync(target);
-            // Almacenar el resultado (coordenadas o nulo) en la caché
-            _cache[target] = coords;
+            progressCallback?.Invoke($"Consultando coordenadas para '{target}' ({queryCount + 1}/{MAX_GEOCODE_PER_BATCH})...");
 
-            // Si se resolvieron coordenadas de forma exitosa
-            if (coords != null)
+            try
             {
-                // Asignar latitud y longitud encontradas
-                item.Latitude = coords.Value.Lat;
-                item.Longitude = coords.Value.Lon;
-                // Incrementar contador de llamadas exitosas en el lote
-                count++;
+                // Realizar la consulta física de geolocalización a la API remota
+                var coords = await FetchCoordsAsync(target);
+                
+                // Almacenar el resultado (coordenadas o nulo) en la caché
+                _cache[target] = coords;
+                
+                // Incrementar contador de llamadas en el lote por cada petición física de red realizada
+                queryCount++;
+
+                if (coords != null)
+                {
+                    // Asignar latitud y longitud encontradas
+                    item.Latitude = coords.Value.Lat;
+                    item.Longitude = coords.Value.Lon;
+                    geocodedCount++;
+                }
+
                 // Aplicar retardo de 1 segundo para respetar estrictamente las directivas de Nominatim (1 req/sec)
+                // Se hace por cada consulta de red para evitar ser penalizado/bloqueado.
                 await Task.Delay(1000);
             }
+            catch (GeocodingBlockedException ex)
+            {
+                progressCallback?.Invoke($"Límite excedido o bloqueo: {ex.Message}");
+                return (queryCount, geocodedCount, $"La API de Nominatim ha bloqueado o limitado temporalmente las peticiones (HTTP 429/403). Se abortó el lote actual.");
+            }
+            catch (Exception ex)
+            {
+                progressCallback?.Invoke($"Error al consultar '{target}': {ex.Message}");
+                return (queryCount, geocodedCount, $"Error inesperado al geocodificar '{target}': {ex.Message}. Se detuvo el lote.");
+            }
         }
+
+        return (queryCount, geocodedCount, $"Lote de geocodificación finalizado. Se realizaron {queryCount} consultas de red, obteniendo {geocodedCount} coordenadas exitosas.");
     }
 
     /// <summary>
@@ -105,10 +137,25 @@ public static class GeocodingService
         {
             // Construir URL de consulta escapando el texto de forma segura y limitando a 1 resultado en formato JSON
             string url = $"https://nominatim.openstreetmap.org/search?q={Uri.EscapeDataString(input)}&format=json&limit=1";
-            // Ejecutar la petición HTTP de forma asíncrona
-            var response = await _httpClient.GetStringAsync(url);
+            
+            // Usar GetAsync para poder verificar los códigos de respuesta del servidor (especialmente 429/403)
+            using var response = await _httpClient.GetAsync(url);
+            
+            if (response.StatusCode == System.Net.HttpStatusCode.TooManyRequests || 
+                response.StatusCode == System.Net.HttpStatusCode.Forbidden)
+            {
+                throw new GeocodingBlockedException("La API de Nominatim ha bloqueado las peticiones temporalmente (HTTP 429/403).");
+            }
+            
+            if (!response.IsSuccessStatusCode)
+            {
+                return null;
+            }
+
+            var responseBody = await response.Content.ReadAsStringAsync();
+            
             // Parsear la respuesta en un árbol JSON estructurado
-            var json = JsonDocument.Parse(response);
+            var json = JsonDocument.Parse(responseBody);
             // Obtener el nodo raíz del JSON
             var root = json.RootElement;
 
@@ -126,12 +173,24 @@ public static class GeocodingService
                 }
             }
         }
+        catch (GeocodingBlockedException)
+        {
+            throw; // Propagar para que el llamador aborte el bucle
+        }
         catch 
         { 
-            // Absorber cualquier excepción de red o parseo y retornar nulo
+            // Absorber cualquier otra excepción de red o parseo y retornar nulo
         }
 
         // Retornar nulo si no se encontraron coordenadas válidas
         return null;
     }
+}
+
+/// <summary>
+/// Excepción personalizada para representar bloqueos o límites de velocidad (403/429) por parte de Nominatim.
+/// </summary>
+public class GeocodingBlockedException : Exception
+{
+    public GeocodingBlockedException(string message) : base(message) { }
 }

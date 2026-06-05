@@ -31,7 +31,7 @@ public static class DataProcessor
     /// </summary>
     public static Dictionary<string, List<DataItem>> AgruparPorCategoria(List<DataItem> datos)
     {
-        var dict = new Dictionary<string, List<DataItem>>(StringComparer.OrdinalIgnoreCase);
+        var dict = new Dictionary<string, List<DataItem>>(StringComparer.OrdinalIgnoreCase); 
         
         foreach (var item in datos)
         {
