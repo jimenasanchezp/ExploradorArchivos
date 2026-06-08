@@ -79,7 +79,7 @@ public static class DatabaseWriter
                                 if (rawVal is int iVal) idV = iVal;
                                 else if (rawVal != null && rawVal != DBNull.Value && int.TryParse(rawVal.ToString(), out int pId)) idV = pId;
                                 else idV = nextId++;
-                                
+
                                 if (usarPrimaryKey)
                                 {
                                     if (!seenIdsInt.Add(idV))
@@ -357,7 +357,7 @@ public static class DatabaseWriter
             string connStr = BuildPostgreSqlConnectionString(host, puerto, "postgres", usuario, contrasena);
             using var conn = new NpgsqlConnection(connStr);
             conn.Open();
-            
+
             using var cmd = new NpgsqlCommand(
                 "SELECT datname FROM pg_database WHERE datistemplate = false AND datallowconn = true ORDER BY datname;", conn);
             using var r = cmd.ExecuteReader();
@@ -384,7 +384,7 @@ public static class DatabaseWriter
             string connStr = BuildMariaDbConnectionString(host, puerto, "", usuario, contrasena);
             using var conn = new MySqlConnection(connStr);
             conn.Open();
-            
+
             using var cmd = new MySqlCommand("SHOW DATABASES;", conn);
             using var r = cmd.ExecuteReader();
             while (r.Read()) dbs.Add(r.GetString(0));
@@ -409,7 +409,7 @@ public static class DatabaseWriter
         {
             using var conn = new NpgsqlConnection(cadenaConexion);
             conn.Open();
-            
+
             using var cmd = new NpgsqlCommand(
                 "SELECT table_name FROM information_schema.tables " +
                 "WHERE table_schema = 'public' AND table_type = 'BASE TABLE' " +
@@ -436,7 +436,7 @@ public static class DatabaseWriter
         {
             using var conn = new MySqlConnection(cadenaConexion);
             conn.Open();
-            
+
             using var cmd = new MySqlCommand(
                 "SELECT table_name FROM information_schema.tables " +
                 "WHERE table_schema = DATABASE() AND table_type = 'BASE TABLE' " +
@@ -470,7 +470,7 @@ public static class DatabaseWriter
         {
             string nombreDB = SanitizarNombre(display);
             if (string.IsNullOrEmpty(nombreDB)) continue;
-            
+
             if (!yaAgregados.Add(nombreDB)) continue;
             resultado.Add((nombreDB, clave, display));
         }
@@ -572,7 +572,7 @@ public static class DatabaseWriter
             using var cmd = new NpgsqlCommand(sql, conn);
             cmd.Parameters.AddWithValue("@val", dbValue ?? DBNull.Value);
             cmd.Parameters.AddWithValue("@id", finalIdVal);
-            
+
             int rows = cmd.ExecuteNonQuery();
             if (rows == 0)
             {
@@ -633,14 +633,14 @@ public static class DatabaseWriter
     {
         try
         {
-            using var conn = new MySqlConnection(cadenaConexion);
+            using var conn = new MySqlConnection(cadenaConexion); // conexion a MariaDB
             conn.Open();
-            
-            string sql = $"UPDATE `{tabla}` SET `{colNombre}` = @val WHERE `{colId}` = @id;";
+
+            string sql = $"UPDATE `{tabla}` SET `{colNombre}` = @val WHERE `{colId}` = @id;"; // query sql
             using var cmd = new MySqlCommand(sql, conn);
-            cmd.Parameters.AddWithValue("@val", nuevoValor ?? DBNull.Value);
-            cmd.Parameters.AddWithValue("@id", idVal);
-            int rows = cmd.ExecuteNonQuery();
+            cmd.Parameters.AddWithValue("@val", nuevoValor ?? DBNull.Value); // parametro de valor
+            cmd.Parameters.AddWithValue("@id", idVal); // parametro de identificador
+            int rows = cmd.ExecuteNonQuery(); // ejecuta la query
             if (rows == 0)
             {
                 return (false, "No se encontró ningún registro en la base de datos con ese identificador.");
@@ -685,19 +685,19 @@ public static class DatabaseWriter
     {
         return await Task.Run(() => ActualizarCampoMariaDB(cadenaConexion, tabla, colId, idVal, colNombre, nuevoValor));
     }
-    private static Func<DataItem, object>[] CrearMapeos(List<(string NombreDB, string Clave, string Display)> columnas, List<DataItem> datos)
+    private static Func<DataItem, object>[] CrearMapeos(List<(string NombreDB, string Clave, string Display)> columnas, List<DataItem> datos) // metodo creador de mapeos
     {
-        var mappers = new Func<DataItem, object>[columnas.Count];
-        
-        var firstItem = datos.FirstOrDefault();
-        var realKeys = new Dictionary<int, string>();
-        if (firstItem != null)
+        var mappers = new Func<DataItem, object>[columnas.Count]; // array de mapeos
+
+        var firstItem = datos.FirstOrDefault(); // primer item de la lista
+        var realKeys = new Dictionary<int, string>(); // diccionario de claves reales
+        if (firstItem != null) // si el primer item no es null
         {
             for (int i = 0; i < columnas.Count; i++)
             {
                 var (_, clave, display) = columnas[i];
                 string? matchedKey = null;
-                
+
                 string dispLow = display.Trim().ToLowerInvariant();
                 string claveLow = clave.Trim().ToLowerInvariant();
 
@@ -705,7 +705,7 @@ public static class DatabaseWriter
                 else if (firstItem.CamposExtra.ContainsKey(clave)) matchedKey = clave;
                 else
                 {
-                    foreach (var k in firstItem.CamposExtra.Keys)
+                    foreach (var k in firstItem.CamposExtra.Keys) // para cada key en el primer item
                     {
                         string kLow = k.Trim().ToLowerInvariant();
                         if (kLow == dispLow || kLow == claveLow)
@@ -719,14 +719,14 @@ public static class DatabaseWriter
             }
         }
 
-        for (int i = 0; i < columnas.Count; i++)
+        for (int i = 0; i < columnas.Count; i++) // para cada columna
         {
             var (_, clave, _) = columnas[i];
             bool hasRealKey = realKeys.TryGetValue(i, out string? exactKey);
 
             mappers[i] = item =>
             {
-                if (hasRealKey && exactKey != null && item.CamposExtra.TryGetValue(exactKey, out var v) && v != null) 
+                if (hasRealKey && exactKey != null && item.CamposExtra.TryGetValue(exactKey, out var v) && v != null)
                     return v;
 
                 return clave switch
@@ -746,21 +746,50 @@ public static class DatabaseWriter
         return mappers;
     }
 
+    /// <summary>
+    /// Clase lectora personalizada que implementa <see cref="IDataReader"/>.
+    /// Permite el streaming de datos directamente desde una lista en memoria sin
+    /// necesidad de instanciar un objeto pesado como <see cref="DataTable"/>,
+    /// optimizando significativamente el consumo de memoria RAM en procesos Bulk Copy.
+    /// </summary>
     private class FastDataReader : IDataReader
     {
+        // Lista original de datos en memoria
         private readonly List<DataItem> _datos;
+
+        // Estructura de las columnas sanitizadas para la base de datos
         private readonly List<(string NombreDB, string Clave, string Display)> _columnas;
+
+        // Mapeadores rápidos pre-generados para acceder eficientemente a las propiedades de DataItem
         private readonly Func<DataItem, object>[] _mappers;
+
+        // Indica si el identificador (ID) de la clave primaria debe tratarse como un valor entero
         private readonly bool _idEsEntero;
+
+        // Callback opcional para reportar el progreso de la lectura de los datos
         private readonly IProgress<int>? _progreso;
+
+        // Indica si se debe validar la unicidad y auto-incremento de la clave primaria
         private readonly bool _usarPrimaryKey;
-        
+
+        // Puntero o índice del registro actual en la iteración (-1 al inicio)
         private int _currentIndex = -1;
+
+        // Siguiente ID entero disponible para casos de colisión o IDs nulos
         private int _nextId = 1;
+
+        // Conjunto para control rápido de duplicidad de IDs enteros
         private HashSet<int> _seenIdsInt = new HashSet<int>();
+
+        // Conjunto para control rápido de duplicidad de IDs de texto (case insensitive)
         private HashSet<string> _seenIdsText = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        // Rastreador de sufijos secuenciales para IDs de texto duplicados (ej. item, item_1, item_2)
         private Dictionary<string, int> _textSuffixTracker = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
 
+        /// <summary>
+        /// Inicializa una nueva instancia de la clase <see cref="FastDataReader"/>.
+        /// </summary>
         public FastDataReader(List<DataItem> datos, List<(string, string, string)> columnas, Func<DataItem, object>[] mappers, bool idEsEntero, IProgress<int>? progreso, bool usarPrimaryKey)
         {
             _datos = datos;
@@ -771,27 +800,42 @@ public static class DatabaseWriter
             _usarPrimaryKey = usarPrimaryKey;
         }
 
+        /// <summary>
+        /// Avanza el cursor al siguiente registro de la lista de datos.
+        /// </summary>
+        /// <returns>True si hay más registros por leer; de lo contrario, False.</returns>
         public bool Read()
         {
             _currentIndex++;
+            // Reporta progreso cada 10,000 registros para evitar sobrecargar la UI
             if (_currentIndex % 10000 == 0 && _currentIndex > 0)
                 _progreso?.Report((int)(_currentIndex * 100.0 / _datos.Count));
             return _currentIndex < _datos.Count;
         }
 
+        /// <summary>
+        /// Obtiene el valor formateado y sanitizado de la columna indicada para la fila actual.
+        /// Controla duplicidad de claves primarias y parsea los tipos de datos sobre la marcha.
+        /// </summary>
+        /// <param name="i">Índice de la columna (0-indexed).</param>
+        /// <returns>El valor procesado de la celda.</returns>
         public object GetValue(int i)
         {
+            // Extrae el valor bruto usando el mapeador correspondiente a la columna
             var rawVal = _mappers[i](_datos[_currentIndex]);
-            
+
+            // Tratamiento especial para la columna del identificador único (ID) - Columna 0
             if (i == 0)
             {
                 if (_idEsEntero)
                 {
                     int idV;
+                    // Intenta extraer el ID entero o parsear el valor bruto
                     if (rawVal is int iVal) idV = iVal;
                     else if (rawVal != null && rawVal != DBNull.Value && int.TryParse(rawVal.ToString(), out int pId)) idV = pId;
-                    else idV = _nextId++;
-                    
+                    else idV = _nextId++; // Si es nulo o inválido, asigna el siguiente secuencial
+
+                    // Controla duplicados de clave primaria entera si la configuración lo requiere
                     if (_usarPrimaryKey)
                     {
                         if (!_seenIdsInt.Add(idV))
@@ -805,11 +849,13 @@ public static class DatabaseWriter
                 }
                 else
                 {
+                    // Tratamiento de clave primaria de tipo texto (UUID o nombres)
                     string? strId = rawVal?.ToString();
                     if (string.IsNullOrWhiteSpace(strId)) strId = Guid.NewGuid().ToString();
                     else if (_usarPrimaryKey)
                     {
                         string orig = strId;
+                        // Si ya existe el ID de texto, añade un sufijo numérico para evitar colisiones
                         if (!_seenIdsText.Add(strId))
                         {
                             if (!_textSuffixTracker.TryGetValue(orig, out int suffix)) suffix = 1;
@@ -820,6 +866,7 @@ public static class DatabaseWriter
                     return strId;
                 }
             }
+            // Tratamiento especial para la columna 'valor' (tipo numérico de coma flotante)
             else if (_columnas[i].Clave == "valor")
             {
                 if (rawVal is double dblV) return dblV;
@@ -827,6 +874,7 @@ public static class DatabaseWriter
                     return parsedVal;
                 return DBNull.Value;
             }
+            // Columnas genéricas (texto o nulos)
             else
             {
                 if (rawVal == null || (rawVal is string s && string.IsNullOrEmpty(s))) return DBNull.Value;
@@ -834,25 +882,31 @@ public static class DatabaseWriter
             }
         }
 
+        // Propiedades e implementaciones adicionales de la interfaz IDataReader
         public int FieldCount => _columnas.Count;
         public bool IsDBNull(int i) => GetValue(i) == DBNull.Value;
+
+        /// <summary>
+        /// Rellena un array con los valores de las columnas del registro actual.
+        /// </summary>
         public int GetValues(object[] values)
         {
             int count = Math.Min(values.Length, FieldCount);
             for (int i = 0; i < count; i++) values[i] = GetValue(i);
             return count;
         }
-        
+
         public object this[int i] => GetValue(i);
         public object this[string name] => throw new NotImplementedException();
-        public void Close() {}
-        public void Dispose() {}
+        public void Close() { }
+        public void Dispose() { }
         public DataTable GetSchemaTable() => throw new NotImplementedException();
         public bool NextResult() => false;
         public int Depth => 0;
         public bool IsClosed => false;
         public int RecordsAffected => -1;
 
+        // Métodos de conversión obligatorios por interfaz (no utilizados directamente en el BulkCopy)
         public bool GetBoolean(int i) => Convert.ToBoolean(GetValue(i));
         public byte GetByte(int i) => Convert.ToByte(GetValue(i));
         public long GetBytes(int i, long fieldOffset, byte[] buffer, int bufferoffset, int length) => throw new NotImplementedException();
