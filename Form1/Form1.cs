@@ -368,7 +368,7 @@ public partial class Form1 : Form
             // Deshabilitar la interfaz mientras carga para evitar clicks múltiples
             this.Enabled = false;
             
-            await Task.Run(() => ExploradorArchivos.Services.FileConverterService.Convertir(ruta, formatoDestino));
+            await FileConverterService.ConvertirAsync(ruta, formatoDestino);
             
             MessageBox.Show($"Archivo exportado a {formatoDestino} exitosamente.", "Exportación Completada", MessageBoxButtons.OK, MessageBoxIcon.Information);
             CargarDirectorio(_rutaActual, false);

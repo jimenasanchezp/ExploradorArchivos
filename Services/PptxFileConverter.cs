@@ -1,4 +1,5 @@
 using System;
+using System.Threading.Tasks;
 using DocumentFormat.OpenXml;
 using DocumentFormat.OpenXml.Packaging;
 using DocumentFormat.OpenXml.Presentation;
@@ -8,10 +9,15 @@ namespace ExploradorArchivos.Services
 {
     /// <summary>
     /// Estrategia de conversión que genera una presentación de PowerPoint (.pptx).
+    /// OpenXml SDK no tiene API async nativa, por lo que el trabajo de CPU se encapsula
+    /// en <c>Task.Run</c> para liberar el hilo de la UI durante la conversión.
     /// </summary>
     public class PptxFileConverter : IFileConverter
     {
-        public void Convertir(string rutaOrigen, string rutaDestino, bool esImagen)
+        public Task ConvertirAsync(string rutaOrigen, string rutaDestino, bool esImagen)
+            => Task.Run(() => ConvertirInterno(rutaOrigen, rutaDestino, esImagen));
+
+        private static void ConvertirInterno(string rutaOrigen, string rutaDestino, bool esImagen)
         {
             using (PresentationDocument presentacionPowerPoint = PresentationDocument.Create(rutaDestino, PresentationDocumentType.Presentation))
             {

@@ -204,13 +204,14 @@ internal sealed class AviGrabador : IDisposable
         Bitmap bmp24 = new Bitmap(_width, _height, PixelFormat.Format24bppRgb);
         using (Graphics g = Graphics.FromImage(bmp24))
         {
-            // Para corregir la orientación y los colores que requiere el formato DIB/AVI crudo
-            // aplicamos RotateNoneFlipY (voltear verticalmente) ya que el formato de video 
-            // no comprimido lee la memoria de abajo hacia arriba.
-            fuente.RotateFlip(RotateFlipType.RotateNoneFlipY);
-            
             g.DrawImage(fuente, 0, 0, _width, _height);
         }
+
+        // Aplicar el FlipY sobre la copia temporal (bmp24), NO sobre el frame original.
+        // El formato DIB/AVI crudo almacena las filas de abajo hacia arriba, por eso
+        // necesitamos voltear verticalmente antes de pasarlo a la API nativa.
+        // Si se aplicara sobre `fuente`, el PictureBox también mostraría la imagen volteada.
+        bmp24.RotateFlip(RotateFlipType.RotateNoneFlipY);
 
         // Bloquear bits en memoria para transferir a la API de Windows
         BitmapData bmpData = bmp24.LockBits(

@@ -1,15 +1,21 @@
 using System;
 using System.IO;
+using System.Threading.Tasks;
 using ClosedXML.Excel;
 
 namespace ExploradorArchivos.Services
 {
     /// <summary>
     /// Estrategia de conversión que genera un libro de cálculo de Microsoft Excel (.xlsx).
+    /// ClosedXML no tiene API async nativa, por lo que el trabajo de CPU se encapsula
+    /// en <c>Task.Run</c> para liberar el hilo de la UI durante la conversión.
     /// </summary>
     public class XlsxFileConverter : IFileConverter
     {
-        public void Convertir(string rutaOrigen, string rutaDestino, bool esImagen)
+        public Task ConvertirAsync(string rutaOrigen, string rutaDestino, bool esImagen)
+            => Task.Run(() => ConvertirInterno(rutaOrigen, rutaDestino, esImagen));
+
+        private static void ConvertirInterno(string rutaOrigen, string rutaDestino, bool esImagen)
         {
             using (XLWorkbook libroExcel = new XLWorkbook())
             {

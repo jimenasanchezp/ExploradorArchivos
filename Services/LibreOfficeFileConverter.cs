@@ -2,11 +2,15 @@ using System;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace ExploradorArchivos.Services
 {
     /// <summary>
     /// Estrategia de conversión de alta fidelidad que utiliza LibreOffice Headless en segundo plano.
+    /// Este es el único convertidor verdaderamente asíncrono a nivel de I/O, ya que espera la
+    /// finalización del proceso externo con <c>WaitForExitAsync</c> sin bloquear ningún hilo.
     /// </summary>
     public class LibreOfficeFileConverter : IFileConverter
     {
@@ -17,7 +21,7 @@ namespace ExploradorArchivos.Services
             _rutaSOffice = rutaSOffice;
         }
 
-        public void Convertir(string rutaOrigen, string rutaDestino, bool esImagen)
+        public async Task ConvertirAsync(string rutaOrigen, string rutaDestino, bool esImagen)
         {
             string directorioDestino = Path.GetDirectoryName(rutaDestino)!;
             string formatoDestino = Path.GetExtension(rutaDestino);
@@ -50,8 +54,14 @@ namespace ExploradorArchivos.Services
                 using var proceso = Process.Start(psi)
                     ?? throw new InvalidOperationException("No se pudo iniciar el proceso de LibreOffice.");
 
-                bool termino = proceso.WaitForExit(180_000);
-                if (!termino)
+                // Espera verdaderamente asíncrona: no bloquea ningún hilo del ThreadPool.
+                // Se cancela automáticamente si LibreOffice tarda más de 3 minutos.
+                using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(3));
+                try
+                {
+                    await proceso.WaitForExitAsync(cts.Token);
+                }
+                catch (OperationCanceledException)
                 {
                     proceso.Kill();
                     throw new TimeoutException("LibreOffice tardó demasiado en convertir el archivo.");
@@ -59,7 +69,7 @@ namespace ExploradorArchivos.Services
 
                 if (proceso.ExitCode != 0)
                 {
-                    string stderr = proceso.StandardError.ReadToEnd();
+                    string stderr = await proceso.StandardError.ReadToEndAsync();
                     throw new InvalidOperationException($"LibreOffice falló (código {proceso.ExitCode}): {stderr}");
                 }
 

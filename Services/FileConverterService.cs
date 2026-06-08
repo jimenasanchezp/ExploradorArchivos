@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using Xceed.Document.NET;
 using Xceed.Words.NET;
 using ClosedXML.Excel;
@@ -18,9 +19,10 @@ namespace ExploradorArchivos.Services;
 public static class FileConverterService
 {
     /// <summary>
-    /// Convierte un archivo de origen físico a un formato de destino especificado utilizando la estrategia adecuada.
+    /// Convierte de forma asíncrona un archivo de origen físico a un formato de destino especificado
+    /// utilizando la estrategia adecuada. El trabajo de conversión se ejecuta fuera del hilo de la UI.
     /// </summary>
-    public static void Convertir(string rutaOrigen, string formatoDestino)
+    public static async Task ConvertirAsync(string rutaOrigen, string formatoDestino)
     {
         string directorioDestino = Path.GetDirectoryName(rutaOrigen)!;
         string nombreSinExtension = Path.GetFileNameWithoutExtension(rutaOrigen);
@@ -41,8 +43,9 @@ public static class FileConverterService
                                extensionOrigen == ".bmp";
 
         IFileConverter conversor = FileConverterFactory.GetConverter(rutaOrigen, formatoDestino, esArchivoImagen);
-        conversor.Convertir(rutaOrigen, rutaArchivoDestino, esArchivoImagen);
+        await conversor.ConvertirAsync(rutaOrigen, rutaArchivoDestino, esArchivoImagen);
     }
+
 
     /// <summary>
     /// Elimina caracteres de control que son inválidos en XML (0x00–0x08, 0x0B, 0x0C, 0x0E–0x1F).

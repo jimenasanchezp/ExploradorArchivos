@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Threading.Tasks;
 using PdfVisual = PdfSharpCore.Pdf;
 using PdfSharpCore.Pdf;
 using PdfSharpCore.Drawing;
@@ -10,10 +11,15 @@ namespace ExploradorArchivos.Services
 {
     /// <summary>
     /// Estrategia de conversión que genera un documento de formato portátil (.pdf).
+    /// PdfSharpCore no tiene API async nativa, por lo que el trabajo de CPU se encapsula
+    /// en <c>Task.Run</c> para liberar el hilo de la UI durante la conversión.
     /// </summary>
     public class PdfFileConverter : IFileConverter
     {
-        public void Convertir(string rutaOrigen, string rutaDestino, bool esImagen)
+        public Task ConvertirAsync(string rutaOrigen, string rutaDestino, bool esImagen)
+            => Task.Run(() => ConvertirInterno(rutaOrigen, rutaDestino, esImagen));
+
+        private static void ConvertirInterno(string rutaOrigen, string rutaDestino, bool esImagen)
         {
             if (GlobalFontSettings.FontResolver == null)
                 GlobalFontSettings.FontResolver = new PdfSharpCore.Utils.FontResolver();

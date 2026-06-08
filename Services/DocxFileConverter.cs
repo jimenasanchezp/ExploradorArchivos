@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Threading.Tasks;
 using Xceed.Document.NET;
 using Xceed.Words.NET;
 
@@ -7,10 +8,15 @@ namespace ExploradorArchivos.Services
 {
     /// <summary>
     /// Estrategia de conversión que genera un documento de Microsoft Word (.docx).
+    /// Xceed no tiene API async nativa, por lo que el trabajo de CPU se encapsula
+    /// en <c>Task.Run</c> para liberar el hilo de la UI durante la conversión.
     /// </summary>
     public class DocxFileConverter : IFileConverter
     {
-        public void Convertir(string rutaOrigen, string rutaDestino, bool esImagen)
+        public Task ConvertirAsync(string rutaOrigen, string rutaDestino, bool esImagen)
+            => Task.Run(() => ConvertirInterno(rutaOrigen, rutaDestino, esImagen));
+
+        private static void ConvertirInterno(string rutaOrigen, string rutaDestino, bool esImagen)
         {
             using (DocX documentoWord = DocX.Create(rutaDestino))
             {

@@ -1,3 +1,5 @@
+using System.Threading.Tasks;
+
 namespace ExploradorArchivos.Services
 {
     /// <summary>
@@ -6,11 +8,11 @@ namespace ExploradorArchivos.Services
     public interface IFileConverter
     {
         /// <summary>
-        /// Convierte un archivo de origen físico a un formato de destino específico.
+        /// Convierte de forma asíncrona un archivo de origen físico a un formato de destino específico.
         /// </summary>
         /// <param name="rutaOrigen">Ruta absoluta del archivo de entrada.</param>
         /// <param name="rutaDestino">Ruta absoluta del archivo de salida.</param>
         /// <param name="esImagen">Especifica si el archivo de entrada original es una imagen.</param>
-        void Convertir(string rutaOrigen, string rutaDestino, bool esImagen);
+        Task ConvertirAsync(string rutaOrigen, string rutaDestino, bool esImagen);
     }
 }
