@@ -1,24 +1,34 @@
+<div align="center">
+
 # 📁 Explorador de Archivos — Suite de Productividad Multimedia
+
+[![.NET 8.0](https://img.shields.io/badge/.NET-8.0-FF80BF?style=for-the-badge&logo=dotnet&logoColor=white)](https://dotnet.microsoft.com/download/dotnet/8.0)
+[![C# 12](https://img.shields.io/badge/C%23-12-FFD1EA?style=for-the-badge&logo=c-sharp&logoColor=8B5E75)](https://learn.microsoft.com/en-us/dotnet/csharp/)
+[![Windows Forms](https://img.shields.io/badge/Windows-Forms-FF80BF?style=for-the-badge&logo=windows&logoColor=white)](https://learn.microsoft.com/en-us/dotnet/desktop/winforms/)
+[![GDI+](https://img.shields.io/badge/Graphics-GDI%2B-FFBDE3?style=for-the-badge)](https://learn.microsoft.com/en-us/dotnet/desktop/winforms/advanced/about-gdi-managed-code)
+[![Theme: Classic Pink](https://img.shields.io/badge/Theme-Classic_Pink_/_Soft_Pastel-FFE4F2?style=for-the-badge)](UI/ThemeRenderer.cs)
 
 > **Explorador de archivos para Windows** construido desde cero con **.NET 8 y Windows Forms**.
 > No es solo un navegador de carpetas: integra edición de fotos, reproducción de música y video,
-> grabación de audio, captura y grabación de pantalla, ciencia de datos y conectividad a bases de datos — todo en una sola aplicación nativa.
+> grabación de audio, captura y grabación de pantalla, ciencia de datos y conectividad a bases de datos — todo bajo el diseño y estética **Total Pink Classic / Soft Pastel**.
+
+</div>
 
 ---
 
 ## 📋 Tabla de contenidos
 
-- [Vista general](#-vista-general)
-- [Requisitos previos](#-requisitos-previos)
-- [Instalación y ejecución](#-instalación-y-ejecución)
-- [Arquitectura del proyecto](#-arquitectura-del-proyecto)
-- [Lógica de Navegación y Persistencia](#-lógica-de-navegación-y-persistencia)
-- [Módulos del sistema](#-módulos-del-sistema)
-- [Motor Universal de Conversión y Exportación](#-motor-universal-de-conversión-y-exportación)
-- [Envío de Correos y Cliente SMTP](#-envío-de-correos-y-cliente-smtp)
-- [Dependencias](#-dependencias)
-- [Atajos de teclado](#-atajos-de-teclado)
-- [Autoras](#-autoras)
+- [🔭 Vista general](#-vista-general)
+- [✅ Requisitos previos](#-requisitos-previos)
+- [🚀 Instalación y ejecución](#-instalación-y-ejecución)
+- [🏛️ Arquitectura del proyecto](#-arquitectura-del-proyecto)
+- [🧭 Lógica de Navegación y Persistencia](#-lógica-de-navegación-y-persistencia)
+- [🧩 Módulos del sistema](#-módulos-del-sistema)
+- [🔄 Motor Universal de Conversión y Exportación](#-motor-universal-de-conversión-y-exportación)
+- [✉️ Envío de Correos y Cliente SMTP](#-envío-de-correos-y-cliente-smtp)
+- [📦 Dependencias](#-dependencias)
+- [⌨️ Atajos de teclado](#-atajos-de-teclado)
+- [👤 Autoras](#-autoras)
 
 ---
 
@@ -27,15 +37,15 @@
 El proyecto nació como un explorador de archivos tradicional y evolucionó hasta convertirse en una **suite de productividad multimedia y científica**. Cada tipo de archivo se abre en un módulo especializado construido a medida:
 
 | Tipo de archivo / Origen | Módulo que lo maneja | Qué puedes hacer |
-|---|---|---|
-| `.jpg`, `.png`, `.bmp` | **AppFoto** | Filtros (BN, Sepia, Soft), ajuste de brillo/contraste/saturación, dibujo libre, recorte, lectura y escritura de coordenadas GPS (EXIF), visualización en mapa interactivo. |
-| `.mp3`, `.wav` | **Mp3** | Reproducción con cola de reproducción, modo aleatorio (shuffle) con restauración al orden original, carátulas ID3, letras online, barra de progreso personalizada, **edición y persistencia de metadatos (título, artista y foto de portada)**. |
-| `.mp4`, `.avi`, `.mkv` | **AppVideo** | Reproducción con LibVLC, extracción de audio a MP3, silenciado de video, extracción de fotogramas, recorte de video no bloqueante en barra de reproducción. |
-| `.csv`, `.json`, `.xml`, `.txt` | **AppDataFusion** | Lectura inteligente sin esquema fijo, grilla virtualizada de alto rendimiento, ordenamiento (QuickSort), filtrado avanzado (búsqueda exacta con `""` y geolocalización), exportación y migración masiva Bulk a PostgreSQL y MariaDB. |
-| Cámara web | **AppCamara** | Captura de video en vivo desde la webcam usando P/Invoke nativo a `avicap32.dll`. |
-| Micrófono | **AppGrabadora** | Grabación de audio WAV desde el micrófono del sistema usando NAudio. |
-| Pantalla / Escritorio | **AppCapturaPantalla** | Captura de pantalla completa o por región en PNG, y grabación de pantalla completa o por región en MP4 (con AVI temporal como fallback) mediante timers y FFmpeg. |
-| Cualquier otro | **UI/FileViewerForm** o **QuickLookForm** | Visor de texto con edición, visor de imágenes, vista previa rápida (QuickLook con controles semáforo, arrastre de ventana y soporte para múltiples extensiones). |
+|:---|:---|:---|
+| 🖼️ `.jpg`, `.png`, `.bmp` | **AppFoto** | Filtros (BN, Sepia, Soft), ajuste de brillo/contraste/saturación, dibujo libre, recorte, lectura y escritura de coordenadas GPS (EXIF), visualización en mapa interactivo. |
+| 🎵 `.mp3`, `.wav` | **Mp3** | Reproducción con cola de reproducción, modo aleatorio (shuffle) con restauración al orden original, carátulas ID3, letras online, barra de progreso personalizada, **edición y persistencia de metadatos (título, artista y foto de portada)**. |
+| 🎬 `.mp4`, `.avi`, `.mkv` | **AppVideo** | Reproducción con LibVLC, extracción de audio a MP3, silenciado de video, extracción de fotogramas, recorte de video no bloqueante en barra de reproducción. |
+| 📊 `.csv`, `.json`, `.xml`, `.txt` | **AppDataFusion** | Lectura inteligente sin esquema fijo, grilla virtualizada de alto rendimiento, ordenamiento (QuickSort), filtrado avanzado (búsqueda exacta con `""` y geolocalización), exportación y migración masiva Bulk a PostgreSQL y MariaDB. |
+| 📷 Cámara web | **AppCamara** | Captura de video en vivo desde la webcam usando P/Invoke nativo a `avicap32.dll`. |
+| 🎙️ Micrófono | **AppGrabadora** | Grabación de audio WAV desde el micrófono del sistema usando NAudio. |
+| 📺 Pantalla / Escritorio | **AppCapturaPantalla** | Captura de pantalla completa o por región en PNG, y grabación de pantalla completa o por región en MP4 (con AVI temporal como fallback) mediante timers y FFmpeg. |
+| 📄 Cualquier otro | **UI/FileViewerForm** o **QuickLookForm** | Visor de texto con edición, visor de imágenes, vista previa rápida (QuickLook con controles semáforo, arrastre de ventana y soporte para múltiples extensiones). |
 
 ---
 
@@ -306,8 +316,7 @@ Las dependencias NuGet se gestionan automáticamente al ejecutar `dotnet restore
 ## 👤 Autoras
 
 Desarrollado con 💜 en C# y .NET 8 por:
-- **Jimena Sanchez**
-- **Carolina Sustaita**
+- **Jimena Monzerrat Sanchez Palos**
+- **Carolina Sustaita de Luna**
 
 *Desarrollo y programación asistidos por **Antigravity**, un agente de IA para codificación avanzada desarrollado por el equipo de Google DeepMind.*
-
