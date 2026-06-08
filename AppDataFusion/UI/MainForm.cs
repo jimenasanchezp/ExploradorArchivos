@@ -117,18 +117,37 @@ public partial class MainForm : Form
                 return;
             }
             
-            ActualizarEstadoBarra("Llamando a la API de Geocoding...");
-            await GeocodingService.IdentificarCoordenadasAsync(_datos);
-            
-            foreach (var item in _datos)
+            btnSbApi.Enabled = false;
+            try
             {
-                if (!string.IsNullOrEmpty(item.Fuente))
-                    _fuentesModificadas.Add(item.Fuente);
-            }
-            btnHdrGuardar.Enabled = true;
+                ActualizarEstadoBarra("Llamando a la API de Geocoding...");
+                var result = await GeocodingService.IdentificarCoordenadasAsync(_datos, msg => ActualizarEstadoBarra(msg));
+                
+                foreach (var item in _datos)
+                {
+                    if (!string.IsNullOrEmpty(item.Fuente))
+                        _fuentesModificadas.Add(item.Fuente);
+                }
+                btnHdrGuardar.Enabled = true;
 
-            await ActualizarTodoAsync();
-            ActualizarEstadoBarra("GeocodificaciÃ³n completada.");
+                await ActualizarTodoAsync();
+                
+                // Si el mensaje contiene indicativos de error o bloqueo de la API
+                bool isError = result.Message.Contains("bloqueado") || result.Message.Contains("limitado") || result.Message.Contains("Error");
+                ActualizarEstadoBarra(isError ? "⚠ " + result.Message : "✓ " + result.Message);
+                
+                MessageBox.Show(result.Message, "API Geocoding", MessageBoxButtons.OK, 
+                    isError ? MessageBoxIcon.Warning : MessageBoxIcon.Information);
+            }
+            catch (Exception ex)
+            {
+                ActualizarEstadoBarra("❌ Error: " + ex.Message);
+                MessageBox.Show($"Ocurrió un error al procesar la geocodificación:\n{ex.Message}", "Error de Geocodificación", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+            finally
+            {
+                btnSbApi.Enabled = true;
+            }
         };
     }
 
@@ -1254,32 +1273,10 @@ public partial class MainForm : Form
         lblProcInfo.Text = dupes.Count == 0
             ? "No se encontraron duplicados."
             : $"{dupes.Count} duplicados encontrados.";
-        if (dupes.Count > 0) btnEliminarDuplicados.Enabled = true;
         ActualizarEstadoBarra($"Duplicados: {dupes.Count}");
     }
 
-    /// <summary>
-    /// Confirma y ejecuta la eliminación de los duplicados detectados del conjunto global de datos.
-    /// </summary>
-    private async void BtnEliminarDuplicados_Click(object? sender, EventArgs e)
-    {
-        if (MessageBox.Show("¿Eliminar duplicados? Esta acción no se puede deshacer.",
-            "Confirmar eliminación", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes) return;
-        int antes = _datos.Count;
-        var limpia = await Task.Run(() => DataProcessor.EliminarDuplicados(_datos));
-        _datos.Clear(); _datos.AddRange(limpia);
-        
-        foreach (var item in _datos)
-        {
-            if (!string.IsNullOrEmpty(item.Fuente))
-                _fuentesModificadas.Add(item.Fuente);
-        }
-        btnHdrGuardar.Enabled = true;
 
-        await ActualizarTodoAsync();
-        lblProcInfo.Text = $"Eliminados {antes - _datos.Count}. Quedan {_datos.Count}.";
-        btnEliminarDuplicados.Enabled = false;
-    }
 
     /// <summary>
     /// Normaliza una cadena de texto (remueve tildes, diacríticos y convierte a minúsculas)
@@ -1988,7 +1985,6 @@ public partial class MainForm : Form
         cmbMetricaGrafica?.Items.Clear();
         txtLinqFiltro.Text = "";
         lblProcInfo.Text = "Selecciona una operaciÃ³n.";
-        btnEliminarDuplicados.Enabled = false;
         chartMain.Limpiar();
         lblContadorTodos.Text = "0 registros";
 

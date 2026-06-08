@@ -31,7 +31,7 @@ public static class DataProcessor
     /// </summary>
     public static Dictionary<string, List<DataItem>> AgruparPorCategoria(List<DataItem> datos)
     {
-        var dict = new Dictionary<string, List<DataItem>>(StringComparer.OrdinalIgnoreCase);
+        var dict = new Dictionary<string, List<DataItem>>(StringComparer.OrdinalIgnoreCase); 
         
         foreach (var item in datos)
         {
@@ -159,29 +159,6 @@ public static class DataProcessor
                 vistos[clave] = true;
         }
         return duplicados;
-    }
-
-    /// <summary>
-    /// Método: EliminarDuplicados
-    /// - Inicializa: Dictionary (vistos) de firmas procesadas.
-    /// - Operación: Elimina registros duplicados dejando únicamente el primero.
-    /// </summary>
-    public static List<DataItem> EliminarDuplicados(List<DataItem> datos)
-    {
-        var limpia = new List<DataItem>();
-        var vistos = new Dictionary<string, bool>();
-
-        for (int i = 0; i < datos.Count; i++)
-        {
-            string clave = $"{datos[i].Id}|{datos[i].Nombre.ToLower()}|{datos[i].Categoria.ToLower()}";
-            
-            if (!vistos.ContainsKey(clave))
-            {
-                vistos[clave] = true;
-                limpia.Add(datos[i]);
-            }
-        }
-        return limpia;
     }
 
     // ==============================================================

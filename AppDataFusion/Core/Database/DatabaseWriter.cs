@@ -1,5 +1,5 @@
-using Npgsql;
-using MySqlConnector;
+using Npgsql;  // Biblioteca oficial para conectarse y ejecutar comandos en PostgreSQL desde .NET.
+using MySqlConnector; // Biblioteca de terceros para conectarse y ejecutar comandos en MariaDB/MySQL desde .NET, compatible con MySql.Data pero con mejor rendimiento.
 using ExploradorArchivos.AppDataFusion.Models;
 using System.Globalization;
 using System.Linq;
